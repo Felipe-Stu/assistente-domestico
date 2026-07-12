@@ -1,0 +1,6 @@
+google-generativeai>=0.8.0
+python-dotenv>=1.0.1
+SpeechRecognition>=3.10.0
+# PyAudio é necessário para capturar áudio do microfone.
+# No Windows, pode ser necessário instalar via pip ou binário compilado.
+PyAudio>=0.2.14

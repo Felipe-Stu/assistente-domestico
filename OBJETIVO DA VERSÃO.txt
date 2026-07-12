@@ -1,0 +1,33 @@
+Visão para a V2: - FINALIZADO
+1. Permitir adicionar 2 ou mais mercados para no mesmo áudio; - OK
+2. Aumentar o tempo de áudio para o máximo indicado (2 minutos); - OK
+3. Adicionar um bip suave quando o áudio estiver disponível, assim quando o tempo estiver acabando (110 segundos) e quando acabar; - OK
+4. Assistente de gerenciamente de compras/consumo com voz.
+
+Seguindo a linha de auxiliar de mercado, vamos criar um assistente que gerencie toda essa parte de mercado. Ele saberá com que frequência eu compro certos produtos como: carne, arroz, manteiga, óleo, leite. De início irei informar para o sistema manualmente qual o tempo médio que eu compro tais produtos, mas conforme eu for fazendo compra o sistema irá identificar eu comprei um produto antes do prazo que informei e alterará a média de tempo.
+
+Ex.: Informo que compro 1 litro de leite a cada 5 dias, mas informei que fiz a compra de leite hoje, depois daqui 2 dias, depois daqui mais 2 dias, depois daqui 4 dias, depois daqui 3 dias, depois daqui 5 dias. O sistema entenderá que estou comprando não apenas em 5 dias, mas em outra frequência, e mudará a média de tempo para comprar aquele produto.
+O sistema deverá levar em consideração e compreender que quando eu comprar uma maior quantidade, exemplo, 4 litros de leite, 8 litros de leite, é normal que eu demore mais para fazer uma nova compra, pois não foi apenas um litro.
+
+Com esses dados o sistema deverá ter uma ideia de quando está faltando ou está perto de acabar algum produto em casa para que possa depois gerar uma lista de compra quando for solicitado. Então eu poderei pedir para que faça uma lista de compras para os próximos 7 dias, e o sistema fará uma análise dos itens que possuo, da MÉDIA DE TEMPO DE CONSUMO, quanto tempo essa compra irá me manter (7 dias) e entender que, a próxima compra talvez seja só daqui 7 dias, então se tem um produto que eu costumo comprar que irá acabar nos próximos 7 dias, ele deverá ser incluído na lista.
+
+Outro ponto: Quando estiver chegando perto da data final (quando eu estiver sem o produto) o sistema avisará com antecedência.
+
+O assistente deverá zerar o estoque quando o usuário informar algo como "acabou o leite".
+
+
+
+Patch V2 - Na fila
+V2.1: Patch de correção de requisição ao Gemini (tráfego congestionado)
+
+1. Corrigir o erro: lash:generateContent "HTTP/1.1 503 Service Unavailable"
+2026-07-12 14:01:36,185 - ERROR - Falha na orquestração principal do MVP: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+
+Quando esse erro acontecer, o assistente deverá realizar duas ações:
+a. Salvar o texto transcrito para reenviar a requisição ao Gemini;
+b. Já iniciar um timer de 5 segundos (me indique se altero esse tmepo de requisição para mais ou menos) para enviar novamente a requisição ao Gemini com esse texto que foi salvo;
+c. Depois de feitos os itens a e b, informar brevemente por áudio e texto que deu erro e está sendo feita nova requisição. "Tráfego congestionado. Fazendo nova requisição".
+
+Então a ideia é que quando esse erro acontecer o sistema não irá simplesmente travar, mas sim buscar a mensagem enviada anteriormente, fazer nova requisição e informar o usuário.
+
+

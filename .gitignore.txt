@@ -1,0 +1,13 @@
+# Banco de dados local (SQLite)
+coredatabaseassistente_casa.db
+
+# Arquivos de ambiente e chaves privadas
+.env
+.env
+
+# Arquivos temporários do Python
+__pycache__
+.pyc
+.pytest_cache
+.venv
+venv
