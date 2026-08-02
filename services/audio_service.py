@@ -1,0 +1,170 @@
+import logging
+import time
+import winsound
+import math
+import struct
+from core.config import RECORD_SECONDS
+from services.logger_service import logger as custom_logger
+
+# Logger do console (terminal)
+logging_logger = logging.getLogger(__name__)
+
+NOME_ASSISTENTE = "audio_service"
+
+class AudioService:
+    def __init__(self):
+        custom_logger.log_assistente(NOME_ASSISTENTE, "Inicialização do serviço de áudio.")
+
+    def emitir_bip_inicial(self):
+        try:
+            winsound.Beep(800, 300)
+        except Exception as e:
+            logging_logger.debug(f"Erro ao emitir bip: {e}")
+
+    def emitir_bip_aviso_10s(self):
+        try:
+            winsound.Beep(600, 150)
+            time.sleep(0.05)
+            winsound.Beep(600, 150)
+        except Exception as e:
+            logging_logger.debug(f"Erro ao emitir bip: {e}")
+
+    def emitir_bip_final(self) -> None:
+        try:
+            winsound.Beep(440, 600)
+        except Exception as e:
+            logging_logger.debug(f"Erro ao emitir bip: {e}")
+
+    def capturar_audio_e_transcrever(self, tempo_limite: int = 120, ativar_trava_inicial: bool = True) -> str:
+        """
+        Captura o áudio do microfone gerenciando o tempo máximo global e pausas de inatividade.
+        - tempo_limite: 120 segundos por padrão.
+        - ativar_trava_inicial: Se True, cancela caso o usuário não fale nada em 15s.
+        """
+        msg_inicio = "Preparando para escutar o comando de voz..."
+        logging_logger.info(msg_inicio)
+        custom_logger.log_assistente(NOME_ASSISTENTE, msg_inicio)
+        
+        try:
+            import speech_recognition as sr
+            
+            recognizer = sr.Recognizer()
+            recognizer.dynamic_energy_threshold = True
+            recognizer.dynamic_energy_adjustment_damping = 0.15
+            recognizer.dynamic_energy_ratio = 1.5
+            
+            microphone = sr.Microphone()
+            with microphone as source:
+                msg_ruido = "Calibrando ruído de fundo... (Aguarde 2 segundos)"
+                logging_logger.info(msg_ruido)
+                custom_logger.log_assistente(NOME_ASSISTENTE, msg_ruido)
+                recognizer.adjust_for_ambient_noise(source, duration=2)
+                
+                msg_pronto = "Microfone ligado! Diga seu comando..."
+                logging_logger.info(msg_pronto)
+                custom_logger.log_assistente(NOME_ASSISTENTE, msg_pronto)
+                self.emitir_bip_inicial()
+                
+                frames_audio = []
+                aviso_10s_feito = False
+                inicio_silencio = None
+                usuario_comecou_a_falar = False
+                
+                # Definindo uma margem segura baseada no ruído real calibrado
+                limiar_energia = recognizer.energy_threshold * 1.3
+                
+                audio_stream = microphone.stream
+                inicio_gravacao = time.time()
+                
+                while True:
+                    tempo_decorrido = time.time() - inicio_gravacao
+                    
+                    try:
+                        buffer_chunk = audio_stream.read(microphone.CHUNK)
+                        if buffer_chunk:
+                            frames_audio.append(buffer_chunk)
+                            
+                            # Cálculo preciso de volume (RMS) para evitar que estática impeça o corte
+                            count = len(buffer_chunk) / 2
+                            format_string = f"<{int(count)}h"
+                            shorts = struct.unpack(format_string, buffer_chunk)
+                            
+                            soma_quadrados = sum(sample ** 2 for sample in shorts)
+                            volume_atual = math.sqrt(soma_quadrados / count) if count > 0 else 0
+                            
+                            if volume_atual > limiar_energia:
+                                if not usuario_comecou_a_falar:
+                                    msg_fala = "🎙️ Fala detectada! Iniciando monitoramento de pausas."
+                                    logging_logger.info(msg_fala)
+                                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_fala)
+                                    usuario_comecou_a_falar = True
+                                inicio_silencio = None  
+                            else:
+                                if usuario_comecou_a_falar:
+                                    if inicio_silencio is None:
+                                        inicio_silencio = time.time()
+                                    
+                                    segundos_em_silencio = time.time() - inicio_silencio
+                                    
+                                    # Corte cirúrgico após 5 segundos cravados de silêncio real
+                                    if segundos_em_silencio >= 5.0:
+                                        msg_corte = "🤫 5 segundos de inatividade detectados após a fala. Encerrando por conclusão."
+                                        logging_logger.info(msg_corte)
+                                        custom_logger.log_assistente(NOME_ASSISTENTE, msg_corte)
+                                        break
+                    except IOError:
+                        pass
+
+                    # Trava de segurança inicial se você esquecer o microfone aberto
+                    if ativar_trava_inicial and not usuario_comecou_a_falar and tempo_decorrido >= 15.0:
+                        msg_trava = "🛑 Nenhum comando foi dito nos primeiros 15 segundos. Cancelando."
+                        logging_logger.info(msg_trava)
+                        custom_logger.log_assistente(NOME_ASSISTENTE, msg_trava)
+                        break
+
+                    # Alerta sonoro de fim de tempo próximo aos 2 minutos
+                    if tempo_decorrido >= (tempo_limite - 10) and not aviso_10s_feito:
+                        msg_alerta = "⏳ Faltam 10 segundos para encerrar o tempo limite global de 2 minutos!"
+                        logging_logger.info(msg_alerta)
+                        custom_logger.log_assistente(NOME_ASSISTENTE, msg_alerta)
+                        self.emitir_bip_aviso_10s()
+                        aviso_10s_feito = True
+
+                    # Limite de segurança global
+                    if tempo_decorrido >= tempo_limite:
+                        msg_limite = f"⏱️ Tempo limite global de {tempo_limite} segundos atingido. Encerrando."
+                        logging_logger.info(msg_limite)
+                        custom_logger.log_assistente(NOME_ASSISTENTE, msg_limite)
+                        break
+                
+                self.emitir_bip_final()
+                
+                audio_data_bruto = b"".join(frames_audio)
+                audio_objeto = sr.AudioData(audio_data_bruto, microphone.SAMPLE_RATE, microphone.SAMPLE_WIDTH)
+                
+                msg_proc = "Processando áudio para transcrição..."
+                logging_logger.info(msg_proc)
+                custom_logger.log_assistente(NOME_ASSISTENTE, msg_proc)
+                
+                texto_transcrito = recognizer.recognize_google(audio_objeto, language="pt-BR")
+                
+                msg_sucesso = f"Áudio transcrito com sucesso: '{texto_transcrito}'"
+                logging_logger.info("Áudio transcrito com sucesso: '%s'", texto_transcrito)
+                custom_logger.log_assistente(NOME_ASSISTENTE, msg_sucesso)
+                return texto_transcrito
+                
+        except sr.UnknownValueError:
+            msg_erro_val = "Google Speech Recognition não entendeu o áudio."
+            logging_logger.warning(msg_erro_val)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro_val)
+            return ""
+        except Exception as e:
+            msg_erro_geral = f"Falha ao acessar o microfone ou transcrever: {e}"
+            logging_logger.error("Falha ao acessar o microfone ou transcrever: %s", e)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro_geral)
+            return self._obter_comando_simulado()
+
+    def _obter_comando_simulado(self) -> str:
+        comando_simulado = "Anotar que gastei no restaurante costela de chão o valor de 150 reais em um almoço de família na categoria passeios"
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Retornando comando simulado: '{comando_simulado}'")
+        return comando_simulado

@@ -1,0 +1,83 @@
+A versão dois MAIN e PATCH estão FINALIZADAS!!!
+
+V2 finalizada, observações:
+Tenho anotado apenas um ponto melhorar, mas isso será feito em patch dentro dessa versão.
+Foi um salto tremendo da V1 para a V2!!! Animado com o desenvolvimento, me vem várias ideias de como seguir com o projeto.
+
+
+Visão para a V2:
+1. Permitir adicionar 2 ou mais mercados para no mesmo áudio;
+2. Aumentar o tempo de áudio para o máximo indicado (2 minutos);
+3. Adicionar um bip suave quando o áudio estiver disponível, assim quando o tempo estiver acabando (110 segundos) e quando acabar;
+4. Assistente de gerenciamente de compras/consumo com voz.
+
+Seguindo a linha de auxiliar de mercado, vamos criar um assistente que gerencie toda essa parte de mercado. Ele saberá com que frequência eu compro certos produtos como: carne, arroz, manteiga, óleo, leite. De início irei informar para o sistema manualmente qual o tempo médio que eu compro tais produtos, mas conforme eu for fazendo compra o sistema irá identificar eu comprei um produto antes do prazo que informei e alterará a média de tempo.
+
+Ex.: Informo que compro 1 litro de leite a cada 5 dias, mas informei que fiz a compra de leite hoje, depois daqui 2 dias, depois daqui mais 2 dias, depois daqui 4 dias, depois daqui 3 dias, depois daqui 5 dias. O sistema entenderá que estou comprando não apenas em 5 dias, mas em outra frequência, e mudará a média de tempo para comprar aquele produto.
+O sistema deverá levar em consideração e compreender que quando eu comprar uma maior quantidade, exemplo, 4 litros de leite, 8 litros de leite, é normal que eu demore mais para fazer uma nova compra, pois não foi apenas um litro.
+
+Com esses dados o sistema deverá ter uma ideia de quando está faltando ou está perto de acabar algum produto em casa para que possa depois gerar uma lista de compra quando for solicitado. Então eu poderei pedir para que faça uma lista de compras para os próximos 7 dias, e o sistema fará uma análise dos itens que possuo, da MÉDIA DE TEMPO DE CONSUMO, quanto tempo essa compra irá me manter (7 dias) e entender que, a próxima compra talvez seja só daqui 7 dias, então se tem um produto que eu costumo comprar que irá acabar nos próximos 7 dias, ele deverá ser incluído na lista.
+
+Outro ponto: Quando estiver chegando perto da data final (quando eu estiver sem o produto) o sistema avisará com antecedência.
+
+O assistente deverá zerar o estoque quando o usuário informar algo como "acabou o leite".
+
+
+
+Patch V2.1: Patch de correção de requisição ao Gemini (tráfego congestionado) dentre outros.
+
+1. Corrigir o erro: lash:generateContent "HTTP/1.1 503 Service Unavailable"
+2026-07-12 14:01:36,185 - ERROR - Falha na orquestração principal do MVP: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+
+Quando esse erro acontecer, o assistente deverá realizar duas ações:
+a. Salvar o texto transcrito para reenviar a requisição ao Gemini;
+b. Já iniciar um timer de 5 segundos (me indique se altero esse tmepo de requisição para mais ou menos) para enviar novamente a requisição ao Gemini com esse texto que foi salvo;
+c. Depois de feitos os itens a e b, informar brevemente por áudio e texto que deu erro e está sendo feita nova requisição. "Tráfego congestionado. Fazendo nova requisição".
+
+Então a ideia é que quando esse erro acontecer o sistema não irá simplesmente travar, mas sim buscar a mensagem enviada anteriormente, fazer nova requisição e informar o usuário.
+
+
+2. Entender, corrigir e refatorar os assistentes
+Atualmente estou achando muito confuso os assistentes. Penso no sistema funcionando da seguinte forma:
+> Usuário chama o sistema
+> Sistema recebe o comando do usuário, processa e entende qual é a demanda: comprou algo; pediu para anotar algo na agenda (ferramenta futura), perguntou que horas são, etc
+> Ao entender qual a demanda, seleciona um assistente específico para dar prosseguimento
+
+Então, pelo que entendo mudaríamos um pouco a forma do sistema, correto? Pois atualmente eu já inicio o sistema com a intenção de falar sobre compras, então mas a ideia é que o sistema faça muito mais que isso.
+
+
+3. Adicionar log
+Precisamos um log de tudo que está sendo feito para observarmos se o direcionamento está correto.
+
+Penso em 2 tipos de logs:
+1. Geral
+> Esse será 
+
+Imagino que o log possa ser implementado por assistente e pelo geral.
+
+EXEMPLO
+Log Geral: E:\Agente IA\assistente-domestico\Logs\main
+Arquivo .txt, um único arquivo chamado "main_log"
+Todo dia, a primeira inicialização do sistema fará a seguinte anotação no arquivo: **************************** main_01/08/2026 ****************************
+E abaixo fará a inserção de informações.
+Exemplo de log:
+[dd/mm/aaaa - hh:mm:ss] Inicialização do sistema.
+[dd/mm/aaaa - hh:mm:ss] Processamentos, etc
+[dd/mm/aaaa - hh:mm:ss] Áudio: aqui viria a transcrição do áudio que o usuário disse
+[dd/mm/aaaa - hh:mm:ss] Dados de processamento
+[dd/mm/aaaa - hh:mm:ss] LOG de qual assistente foi encaminhada a demanda
+
+
+Log do assistente:
+Log Geral: E:\Agente IA\assistente-domestico\Logs\nome_do_assistente - o nome da pasta será o assistente que foi chamado
+Arquivo .txt, um único arquivo chamado "log"
+Todo dia, a primeira inicialização desse assistente fará a seguinte anotação no arquivo: **************************** log_01/08/2026 ****************************
+E abaixo fará a inserção de informações:
+Exemplo de log:
+[dd/mm/aaaa - hh:mm:ss] Inicialização do assistente.
+[dd/mm/aaaa - hh:mm:ss] Processamentos, etc
+[dd/mm/aaaa - hh:mm:ss] Áudio recebido
+[dd/mm/aaaa - hh:mm:ss] Envio para o Gemini
+[dd/mm/aaaa - hh:mm:ss] Retorno do Gemini
+[dd/mm/aaaa - hh:mm:ss] Procedimentos feitos (salvou o que no banco de dados, por exemplo)
+[dd/mm/aaaa - hh:mm:ss] Dados de processamento
