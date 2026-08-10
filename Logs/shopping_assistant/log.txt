@@ -1,0 +1,45 @@
+
+**************************** log_09/08/2026 ****************************
+[09/08/2026 - 10:18:15] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 10:20:41] Áudio recebido: 'eu fui no mercado Moreschi e comprei filé de peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 G comprei detergente Minuano r$ 2,69 comprei chiclete Trident 3,49 comprei cebola estava por 7,49 o quilo eu comprei 484 g e também comprei alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 10:20:41] Solicitando extração de compras em JSON ao LLMProvider.
+[09/08/2026 - 10:20:50] Áudio recebido: 'eu fui no mercado Moreschi e comprei filé de peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 G comprei detergente Minuano r$ 2,69 comprei chiclete Trident 3,49 comprei cebola estava por 7,49 o quilo eu comprei 484 g e também comprei alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 10:20:50] Solicitando extração de compras em JSON ao LLMProvider.
+[09/08/2026 - 10:20:58] Áudio recebido: 'eu fui no mercado Moreschi e comprei filé de peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 G comprei detergente Minuano r$ 2,69 comprei chiclete Trident 3,49 comprei cebola estava por 7,49 o quilo eu comprei 484 g e também comprei alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 10:20:58] Solicitando extração de compras em JSON ao LLMProvider.
+[09/08/2026 - 10:28:20] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 10:37:58] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 10:39:13] Áudio recebido: 'eu fui no mercado Moreschi e eu fiz a compra do mês eu comprei filé de peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei também chiclete Trident por r$ 3,49 comprei cebola a granel também por 7,49 kg comprei 484 g e comprei também alho a granel por 27,99 kg eu comprei 106 gramas'
+[09/08/2026 - 10:39:13] Solicitando extração de compras em JSON ao LLMProvider.
+[09/08/2026 - 10:39:38] Estrutura JSON retornada pelo LLMProvider com sucesso.
+[09/08/2026 - 10:39:38] Procedimentos feitos: Compra (ID: 1) e 5 itens gravados no banco SQLite.
+[09/08/2026 - 10:39:38] Dados de processamento: 1 compras salvas com sucesso.
+[09/08/2026 - 10:57:38] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 10:59:10] Áudio recebido: 'eu fui ao supermercado Moreschi e comprei peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 Kg também comprei detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei cebola 7,49 o quilo eu comprei 484 gramas comprei também alho 7 perdão 27,99 kg eu comprei 106 gramas'
+[09/08/2026 - 10:59:18] Áudio recebido: 'eu fui ao supermercado Moreschi e comprei peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 Kg também comprei detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei cebola 7,49 o quilo eu comprei 484 gramas comprei também alho 7 perdão 27,99 kg eu comprei 106 gramas'
+[09/08/2026 - 10:59:26] Áudio recebido: 'eu fui ao supermercado Moreschi e comprei peito de frango por r$ 16,99 o quilo eu comprei 3 kg 124 Kg também comprei detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei cebola 7,49 o quilo eu comprei 484 gramas comprei também alho 7 perdão 27,99 kg eu comprei 106 gramas'
+[09/08/2026 - 11:00:04] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 15:49:09] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 15:50:53] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 16:54:24] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 16:56:02] Áudio recebido: 'eu fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola 7,49 o kg eu comprei 484 g e também alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 16:56:11] Áudio recebido: 'eu fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola 7,49 o kg eu comprei 484 g e também alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 16:56:19] Áudio recebido: 'eu fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola 7,49 o kg eu comprei 484 g e também alho 27,99 o quilo eu comprei 106 gramas'
+[09/08/2026 - 17:02:25] Inicialização do assistente de compras concluída com sucesso.
+[09/08/2026 - 17:03:59] Áudio recebido: 'fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola por r$ 7,49 o quilo comprei 484 g e também comprei alho por r$ 27,99 o quilo comprei 106 gramas'
+[09/08/2026 - 17:04:08] Áudio recebido: 'fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola por r$ 7,49 o quilo comprei 484 g e também comprei alho por r$ 27,99 o quilo comprei 106 gramas'
+[09/08/2026 - 17:04:16] Áudio recebido: 'fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola por r$ 7,49 o quilo comprei 484 g e também comprei alho por r$ 27,99 o quilo comprei 106 gramas'
+
+**************************** log_10/08/2026 ****************************
+[10/08/2026 - 15:38:07] Inicialização do assistente de compras concluída com sucesso.
+[10/08/2026 - 15:39:11] Áudio recebido: 'eu fiz a compra no Mercado Moreschi comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também'
+[10/08/2026 - 15:39:20] Áudio recebido: 'eu fiz a compra no Mercado Moreschi comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também'
+[10/08/2026 - 15:39:28] Áudio recebido: 'eu fiz a compra no Mercado Moreschi comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também'
+[10/08/2026 - 15:48:09] Inicialização do assistente de compras concluída com sucesso.
+[10/08/2026 - 15:56:17] Inicialização do assistente de compras concluída com sucesso.
+[10/08/2026 - 16:16:33] Inicialização do assistente de compras concluída com sucesso.
+[10/08/2026 - 16:18:07] Áudio recebido: 'eu fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei também chiclete Trident por r$ 3,49 comprei cebola 7,49 kg comprei 484 g e também alho comprei 106 G por r$ 27,99 o quilo'
+[10/08/2026 - 16:18:07] Solicitando extração de compras em JSON ao LLMProvider.
+[10/08/2026 - 16:18:35] Estrutura JSON retornada pelo LLMProvider com sucesso.
+[10/08/2026 - 16:18:35] Procedimentos feitos: Compra (ID: 1) e 5 itens gravados no banco SQLite.
+[10/08/2026 - 16:18:35] Dados de processamento: 1 compras salvas com sucesso.

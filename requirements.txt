@@ -4,3 +4,7 @@ SpeechRecognition>=3.10.0
 # PyAudio é necessário para capturar áudio do microfone.
 # No Windows, pode ser necessário instalar via pip ou binário compilado.
 PyAudio>=0.2.14
+# SDK oficial do Ollama para orquestração da LLM local (Gemma 4 e4b)
+ollama>=0.1.8
+# Biblioteca HTTP para comunicação com serviços e APIs
+requests>=2.31.0

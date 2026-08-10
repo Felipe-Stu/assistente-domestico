@@ -1,42 +1,55 @@
 # 03 - Arquitetura Geral
 
-Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades específicas, o fluxo principal e as relações de dependências na **Versão 2.1 (V2.1 - Patch de Correção 1)** do **Assistente Doméstico Inteligente**.
+Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência na **Versão 3 (V3)** do **Assistente Doméstico Inteligente**.
 
-> [!NOTE]
-> A arquitetura permanece equivalente à documentada na Versão 2, exceto pela introdução de um serviço transversal de logs locais (`logger_service.py`) e pela lógica de retry no orquestrador principal para lidar com indisponibilidades temporárias da API do Gemini.
+> [!IMPORTANT]
+> A V3 representa uma expansão arquitetural em relação à V2.1. Foram adicionados três novos módulos de serviço (`gemma_service.py`, `llm_provider.py`, `resilience_service.py`) e uma nova camada de abstração de LLM, alterando o fluxo de processamento de IA do sistema.
 
 ---
 
 ## 1. Organização das Pastas (Estrutura de Diretórios)
 
-A árvore física de arquivos e pastas reais da Versão 2.1 apresenta-se da seguinte forma:
-
 ```text
 assistente-domestico/
-├── assets/                    # Pasta de armazenamento temporário de arquivos de voz (temp_voice.mp3)
+├── assets/                      # Armazenamento temporário de arquivos de voz (temp_voice.mp3)
 ├── app/
-│   └── main.py                # Orquestrador do ciclo síncrono, fluxo de inicialização, compras e retry do Gemini
+│   └── main.py                  # Orquestrador principal, sessão de contexto e roteamento de fluxo
 ├── core/
 │   ├── database/
-│   │   └── assistente_casa.db # Banco de dados SQLite contendo o histórico de compras, itens e estoque
+│   │   └── assistente_casa.db   # Banco de dados SQLite (compras, itens, controle_consumo)
 │   ├── __init__.py
-│   └── config.py              # Centralização de configurações globais e leitura do .env
-├── Logs/                      # [NOVO] Pasta contendo arquivos de log gerados dinamicamente
+│   └── config.py                # Configurações globais, variáveis de ambiente e caminhos
+├── Logs/                        # Logs persistentes em disco (gerados automaticamente)
 │   ├── main/
-│   │   └── main_log.txt       # Log geral da orquestração do sistema
-│   └── [nome_do_assistente]/
-│       └── log.txt            # Log individualizado do serviço correspondente
+│   │   └── main_log.txt         # Log geral da orquestração do sistema
+│   ├── ai_service/
+│   │   └── log.txt
+│   ├── audio_service/
+│   │   └── log.txt
+│   ├── db_service/
+│   │   └── log.txt
+│   ├── inventory_assistant/
+│   │   └── log.txt
+│   ├── shopping_assistant/
+│   │   └── log.txt
+│   └── voice_service/
+│       └── log.txt
 ├── services/
 │   ├── __init__.py
-│   ├── ai_service.py          # Interface de comunicação com a API Google Gemini (compras e classificação)
-│   ├── audio_service.py       # Captação de microfone com monitoramento de RMS e bips sonoros
-│   ├── db_service.py          # Execução de comandos SQL de cabeçalho, detalhe e controle de estoque
-│   ├── inventory_assistant.py # Assistente de estoque, cálculo de autonomia preditiva e intenções
-│   ├── logger_service.py      # [NOVO] CustomLogger transversal do sistema para persistência de logs
-│   └── voice_service.py       # Geração de fala usando edge-tts e reprodução com mixer do pygame
-├── .env                       # Variáveis de ambiente locais (GEMINI_API_KEY)
-├── requirements.txt           # Declarações de dependências oficiais do projeto
-└── README.md                  # Documentação de alto nível para inicialização
+│   ├── ai_service.py            # Interface com a API Gemini (nuvem) - fallback
+│   ├── audio_service.py         # Captura de microfone com monitoramento RMS e bips
+│   ├── db_service.py            # Persistência SQLite com suporte a migrações de schema
+│   ├── gemma_service.py         # [NOVO V3] Orquestrador local via Ollama/Gemma 3 4B
+│   ├── inventory_assistant.py   # Controle preditivo de estoque com heurística + Gemma local
+│   ├── llm_provider.py          # [NOVO V3] Abstração de provedores LLM (Local/Nuvem)
+│   ├── logger_service.py        # CustomLogger transversal com logs segmentados por módulo
+│   ├── resilience_service.py    # [NOVO V3] Serviço de retry centralizado e parametrizável
+│   ├── shopping_assistant.py    # Processamento de compras via LLM local e persistência
+│   └── voice_service.py         # Síntese de voz neural (Edge TTS) e reprodução (pygame)
+├── Sobre a Versão/              # Documentação técnica da versão atual
+├── .env                         # Variáveis de ambiente (GEMINI_API_KEY)
+├── requirements.txt             # Dependências do projeto
+└── README.md                    # Documentação de alto nível
 ```
 
 ---
@@ -44,57 +57,103 @@ assistente-domestico/
 ## 2. Descrição dos Módulos e Suas Responsabilidades
 
 ### A. Orquestrador (`app/main.py`)
-*   **Responsabilidade:** Conectar e sincronizar as etapas de execução da aplicação. Na V2.1, inicializa a varredura ativa de estoque expirado, coordena a captura de voz de novas compras e o parsing de lojas. Implementa o loop resiliente para erros HTTP 503 (Serviço Indisponível) no Gemini, salvando a transcrição e fazendo novas tentativas a cada 5 segundos. Registra as transições e resultados no logger geral.
+**Responsabilidade:** Ponto de entrada do sistema. Inicializa todos os serviços e assistentes via injeção de dependências. Gerencia a `GerenciadorDeSessao` para manter o contexto e histórico da conversa. Implementa a função `processar_solicitacao` que representa o ciclo principal de execução: chama o `gemma_service.orquestrar_requisicao` via `execute_with_retry`, interpreta a decisão de dificuldade/contexto e roteia o fluxo para o assistente especializado correspondente. Define constantes `TEMPO_RETRY = 3.0` e `MAX_TENTATIVAS = 3`.
 
-### B. Serviço de Inventário (`services/inventory_assistant.py`)
-*   **Responsabilidade:** Implementar as regras de negócio de estoque doméstico. Avalia se o estoque previsto terminou comparando a data atual com o ritmo médio de consumo de cada produto. Comanda a síntese e a captação de voz para fazer perguntas interativas ao usuário e atualiza a base com base nas 4 decisões da árvore conversacional. Registra suas operações detalhadamente no seu arquivo de log específico.
+### B. Serviço de Orquestração Local (`services/gemma_service.py`) — NOVO na V3
+**Responsabilidade:** Encapsula as chamadas diretas ao modelo Gemma 4 e:4b via Ollama para orquestração de intenções. Fornece `orquestrar_requisicao()` que envia a transcrição do usuário ao Gemma e retorna um dicionário classificado com `dificuldade`, `mudanca_de_contexto`, `contexto` e `acao`. Valida o schema de saída via `_validar_schema_orquestrador()` e sanitiza o JSON via `_sanitizar_resposta_json()`. Também fornece `executar_assistente_local()` para execuções genéricas de contextos como agenda. Todas as chamadas ao Ollama utilizam `ollama.Client(timeout=120.0)`.
 
-### C. Serviço de Voz (`services/voice_service.py`)
-*   **Responsabilidade:** Realizar a síntese de voz (TTS). Transforma strings de texto fornecidas pelo assistente em arquivos físicos temporários de áudio (`assets/temp_voice.mp3`) utilizando o modelo neural `pt-BR-AntonioNeural` do Microsoft Edge, reproduzindo-os na placa de som local e excluindo o arquivo de descarte ao terminar. Escreve suas ações no logger do assistente.
+### C. Camada de Abstração LLM (`services/llm_provider.py`) — NOVO na V3
+**Responsabilidade:** Define a interface abstrata `BaseLLMProvider` com os métodos `gerar_texto()` e `gerar_json()`. Implementa:
+- `LocalLLMProvider`: Chama o Ollama local com `ollama.Client(timeout=120.0)`, usando `format="json"` para respostas estruturadas. Sanitiza e faz parse do JSON retornado.
+- `CloudLLMProvider`: Delega para `ai_service.processar_requisicao_complexa()` como fallback de nuvem.
 
-### D. Serviço de Áudio (`services/audio_service.py`)
-*   **Responsabilidade:** Controlar o canal de gravação local do microfone. Realiza calibração de barulhos, emite bips sonoros e lê o fluxo físico em chunks binários, medindo o volume RMS da sala. Decide encerrar a captura após 5 segundos contínuos de silêncio real ou abortar a chamada caso o usuário permaneça em silêncio absoluto nos primeiros 15 segundos. Registra atividades no logger de áudio.
+### D. Serviço de Resiliência (`services/resilience_service.py`) — NOVO na V3
+**Responsabilidade:** Implementa `execute_with_retry()`, uma função genérica que executa qualquer callable com retry parametrizável. Configura: número máximo de tentativas, tempo de espera entre tentativas, exceções recuperáveis, callbacks de validação de retorno e alertas de voz ao usuário em caso de reprocessamento. Lança `MaxRetriesExceededException` ao esgotar tentativas.
 
-### E. Serviço de Banco de Dados (`services/db_service.py`)
-*   **Responsabilidade:** Garantir o isolamento das chamadas SQL. Além de criar a estrutura básica relacional de compras, gerencia a tabela de `controle_consumo`, cria índices de otimização de busca rápida e expõe métodos utilitários genéricos de execução e consulta. Registra transações no logger do banco.
+### E. Assistente de Compras (`services/shopping_assistant.py`)
+**Responsabilidade:** Processa transcrições de compras de voz. Gera o prompt especializado, chama `self.llm_provider.gerar_json()` (que na V3 resolve para `LocalLLMProvider`) e percorre a lista de compras retornada. Valida e sanitiza os dados financeiros de cada item via `_validar_e_sanitizar_compra()` antes da persistência.
 
-### F. Serviço de IA (`services/ai_service.py`)
-*   **Responsabilidade:** Consumir os serviços do Gemini 2.5 Flash para processar despesas e classificar intenções. Interpreta e separa itens comprados em estabelecimentos distintos no mesmo relato de voz. Trata exceções de limites de cota (429) e indisponibilidade de serviço (503). Registra o status de envio e retorno da API no logger de IA.
+### F. Assistente de Inventário (`services/inventory_assistant.py`)
+**Responsabilidade:** Gerencia o controle preditivo de estoque. Na V3, a classificação de intenções do usuário é realizada em dois níveis: (1) `_heuristica_rapida()` via Regex (0ms) e, em caso de falha, (2) `self.llm_provider.gerar_json()` com Gemma 3 4B local. Executa varredura de itens expirados na inicialização, gerencia os 4 cenários de intenção conversacional e suporta baixa voluntária com resolução de ambiguidade.
 
-### G. Serviço de Log (`services/logger_service.py`)
-*   **Responsabilidade:** Centralizar e estruturar os registros de execução em disco. Cria de forma autônoma a estrutura de diretórios e arquivos de logs (`Logs/`), garante a inclusão de um cabeçalho diário no primeiro registro de cada dia e oferece métodos para gravação de log geral (`log_geral`) e de assistentes individuais (`log_assistente`).
+### G. Serviço de Banco de Dados (`services/db_service.py`)
+**Responsabilidade:** Persistência relacional em SQLite com controle de versão de schema via `PRAGMA user_version`. Cria e migra as tabelas `compras`, `itens_compra` e `controle_consumo`. Expõe métodos genéricos (`executar_comando`, `executar_consulta`, `executar_consulta_uma_linha`) e o método especializado `salvar_compra_da_ia()`.
+
+### H. Serviço de IA na Nuvem (`services/ai_service.py`)
+**Responsabilidade:** Interface com a API Google Gemini. Na V3, atua como fallback. Trata explicitamente erros `TokenExhaustedException` (429) e `ServiceUnavailableException` (503). O método `processar_requisicao_complexa()` destina-se ao fallback de solicitações complexas, porém contém uma dívida técnica (`self.gemini_client` não instanciado).
+
+### I. Serviço de Voz (`services/voice_service.py`)
+**Responsabilidade:** Síntese de voz neural via `edge_tts` com voz `pt-BR-AntonioNeural`, salvando temporariamente o áudio em `assets/temp_voice.mp3` e reproduzindo via `pygame.mixer`. Remove o arquivo temporário após a reprodução.
+
+### J. Serviço de Áudio (`services/audio_service.py`)
+**Responsabilidade:** Captura de microfone com calibração de ruído ambiente, monitoramento de volume RMS, bips sonoros de status e controle de tempo (limite global de 120s, corte por silêncio de 5s, cancelamento por inatividade de 15s). Transcrição via Google Speech Recognition API.
+
+### K. Serviço de Log (`services/logger_service.py`)
+**Responsabilidade:** Logger transversal com arquivos segmentados por módulo e cabeçalhos diários automáticos. Métodos: `log_geral()` (para `Logs/main/main_log.txt`) e `log_assistente(nome, mensagem)` (para `Logs/{nome}/log.txt`).
 
 ---
 
-## 3. Ciclo de Execução da Aplicação (Fluxo Principal)
+## 3. Ciclo de Execução da Aplicação (Fluxo Principal V3)
 
 ```
-[Inicialização da Aplicação]
-           │
-           ▼
-[main.py: Carrega serviços, abre banco e grava log de inicialização]
-           │
-           ▼
-[Passo 1: Varredura de Autonomia Expirada] ───────► Para cada item vencido no banco:
-           │                                        - VoiceService: Pergunta via áudio se o estoque acabou.
-           │                                        - AudioService: Ouve a resposta do usuário.
-           │                                        - Gemini: Classifica a intenção (Sim/Não) e atualiza o banco.
-           ▼
-[Passo 2: Captura de Novas Compras] ──────────────► - AudioService: Ouve o relato geral de compras do usuário.
-           │
-           ▼
-[Passo 3: Parsing da Compra com Retry 503] ◄──────► Se o Gemini retornar erro 503 (Indisponível):
-           │                                        - VoiceService: Avisa por voz sobre congestionamento de tráfego.
-           │                                        - Orquestrador: Aguarda 5 segundos e tenta novamente com o texto salvo.
-           ▼
-[Passo 4: Motor de Resíduos de Estoque] ──────────► Para cada item da nova compra:
-           │                                        - Calcula se existe resíduo estimado na base.
-           │                                        - Se houver, pergunta ao usuário se confirma a sobra de unidades.
-           │                                        - Interpreta a intenção conversacional e grava o resíduo real.
-           ▼
-[Passo 5: Persistência Relacional] ───────────────► - Salva os cabeçalhos das compras e itens na base SQLite.
-           │                                        - Associa os IDs relacionais e grava logs de finalização de fluxo.
-           ▼
+[Inicialização: main.py]
+         │
+         ▼
+[Instanciação de Serviços via Injeção de Dependências]
+ DatabaseService, AudioService, AIService, VoiceService
+ LocalLLMProvider(modelo="gemma4:e4b")
+ CloudLLMProvider(ai_service=ai_service)
+ InventoryAssistant(db, llm_provider=local_llm)
+ ShoppingAssistant(db, llm_provider=local_llm)
+         │
+         ▼
+[Passo 1: Varredura de Itens Expirados]
+ inventory_assistant.verificar_itens_expirados_inicializacao()
+   → Para cada item com autonomia esgotada:
+     → VoiceService.falar(pergunta)
+     → AudioService.capturar_audio_e_transcrever()
+     → _heuristica_rapida() → ou → LocalLLMProvider.gerar_json() [Gemma 4 Local]
+     → DatabaseService: atualiza controle_consumo
+         │
+         ▼
+[Passo 2: Captura de Nova Solicitação por Voz]
+ AudioService.capturar_audio_e_transcrever()
+         │
+         ▼
+[Passo 3: Orquestração Local com Gemma 3 4B]
+ execute_with_retry(orquestrar_requisicao, texto_transcrito)
+   → gemma_service.orquestrar_requisicao()
+     → ollama.Client(timeout=120).chat(model="gemma4:e4b", format="json")
+     → _sanitizar_resposta_json() → json.loads() → _validar_schema_orquestrador()
+   → Retorna: {dificuldade, mudanca_de_contexto, contexto, acao}
+         │
+         ├── [dificuldade="facil" + contexto="compras"]
+         │     ▼
+         │   execute_with_retry(shopping_assistant.processar_texto_compra)
+         │     → LocalLLMProvider.gerar_json() → Gemma 4 Local
+         │     → _validar_e_sanitizar_compra()
+         │     → DatabaseService.salvar_compra_da_ia()
+         │     → [Falha após 3 tentativas] → Gemini Nuvem (fallback)
+         │
+         ├── [dificuldade="facil" + outro contexto]
+         │     ▼
+         │   execute_with_retry(executar_assistente_local)
+         │     → gemma_service.executar_assistente_local()
+         │     → Gemma 4 Local via Ollama
+         │
+         └── [dificuldade="medio_dificil"]
+               ▼
+             execute_with_retry(ai_service.processar_requisicao_complexa)
+               → Gemini API na Nuvem
+         │
+         ▼
+[Passo 4: Resposta por Voz ao Usuário]
+ VoiceService.falar(resposta_texto)
+         │
+         ▼
+[GerenciadorDeSessao: Atualiza contexto e histórico]
+         │
+         ▼
 [Fim da Execução]
 ```
 
@@ -102,28 +161,42 @@ assistente-domestico/
 
 ## 4. Dependências e Acoplamento de Componentes
 
-1.  **`main.py`** atua como hub principal e acopla-se a:
-    *   `DatabaseService` para conexão.
-    *   `AudioService` para gravação de compras.
-    *   `ai_service.py` para estruturação inteligente das compras.
-    *   `InventoryAssistant` para verificação de estoques e interceptação de itens comprados.
-    *   `logger` (`logger_service.py`) para registrar eventos do fluxo geral de orquestração.
-2.  **`InventoryAssistant`** acopla-se a:
-    *   `DatabaseService` para ler/atualizar a tabela de consumo.
-    *   `VoiceService` para falar as estimativas do sistema.
-    *   `AudioService` para escutar e receber as respostas do usuário.
-    *   `google.genai` para realizar classificação de intenções direto em texto.
-    *   `logger` para gravar seu log especializado de inventário.
-3.  **`VoiceService`** depende de:
-    *   `edge_tts` para geração de áudio por API externa.
-    *   `pygame.mixer` para tocar o áudio através de hardware.
-    *   `logger` para logar o texto enviado à síntese.
-4.  **`AudioService`** consome:
-    *   `speech_recognition` e `winsound` do Windows.
-    *   `logger` para logar volume RMS capturado e status de calibração.
-5.  **`AIService`** depende de:
-    *   `google.genai` para consumo da API do Gemini.
-    *   `logger` para logar as interações de prompt e resposta da IA.
-6.  **`DatabaseService`** depende de:
-    *   `sqlite3` para persistência física.
-    *   `logger` para gravar o log de queries e abertura do banco de dados.
+1. **`main.py`** acopla-se a:
+   - `DatabaseService`, `AudioService`, `AIService`, `VoiceService`
+   - `LocalLLMProvider`, `CloudLLMProvider`
+   - `InventoryAssistant`, `ShoppingAssistant`
+   - `gemma_service.orquestrar_requisicao`, `gemma_service.executar_assistente_local`
+   - `resilience_service.execute_with_retry`
+   - `logger_service`
+
+2. **`ShoppingAssistant`** acopla-se a:
+   - `BaseLLMProvider` (injetado como `LocalLLMProvider`)
+   - `DatabaseService`
+   - `logger_service`
+
+3. **`InventoryAssistant`** acopla-se a:
+   - `BaseLLMProvider` (injetado como `LocalLLMProvider`)
+   - `DatabaseService`
+   - `VoiceService` (instanciado internamente)
+   - `AudioService` (instanciado internamente)
+   - `logger_service`
+
+4. **`LocalLLMProvider`** acopla-se a:
+   - SDK `ollama` (via `ollama.Client`)
+
+5. **`CloudLLMProvider`** acopla-se a:
+   - `AIService`
+
+6. **`gemma_service`** acopla-se a:
+   - SDK `ollama` (diretamente)
+   - `resilience_service.InvalidOrchestratorOutputException`
+   - `logger_service`
+
+7. **`AIService`** acopla-se a:
+   - SDK `google-genai`
+   - `logger_service`
+
+8. **`DatabaseService`** acopla-se a:
+   - `sqlite3`
+   - `core/config.DB_PATH`
+   - `logger_service`

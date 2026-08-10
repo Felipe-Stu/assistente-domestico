@@ -1,91 +1,145 @@
 # 04 - Integrações
 
-Este documento identifica e mapeia todos os fluxos de integração e conexões externas ou de hardware que o **Assistente Doméstico Inteligente (V2.1 - Patch de Correção 1)** realiza para viabilizar suas funções.
+Este documento identifica e mapeia todos os fluxos de integração e conexões — externas, internas e com hardware — que o **Assistente Doméstico Inteligente (V3)** realiza para viabilizar suas funções.
 
 ---
 
-## 1. APIs e Serviços Web Externos (SaaS)
+## 1. Comunicação com IA Local (NOVO na V3)
 
-### A. Google Gemini API (Modelagem de IA)
-*   **Origem:** [ai_service.py](file:///e:/Agente%20IA/assistente-domestico/services/ai_service.py) e [inventory_assistant.py](file:///e:/Agente%20IA/assistente-domestico/services/inventory_assistant.py).
-*   **Destino:** Servidores de LLM da Google Cloud.
+### A. Ollama — Servidor Local de Inferência
+*   **Tipo:** Comunicação com serviço local (processo separado na mesma máquina).
+*   **Origem:** `services/gemma_service.py` (orquestração) e `services/llm_provider.py` - `LocalLLMProvider` (extração de dados e classificação de inventário).
+*   **Destino:** Servidor Ollama em execução local, acessível via `http://127.0.0.1:11434`.
 *   **Finalidade:**
-    1.  *Processamento de Compras:* Transformar a transcrição de novas despesas em uma lista de JSON estruturada por estabelecimento.
-    2.  *Classificação de Intenção:* Analisar as falas curtas de confirmação do usuário e categorizá-las em um dos 4 cenários lógicos do inventário (Confirmação, Zera Estoque, Sem Consumo, Ajuste de Quantidade).
-*   **Tecnologia Utilizada:** Biblioteca `google-genai` e requisições HTTP seguras (HTTPS).
-*   **Melhoria na V2.1:** Adicionado o tratamento resiliente de erros na camada do orquestrador (`main.py`) para capturar falhas HTTP 503 (Serviço Temporariamente Indisponível / Alta Demanda), realizando novas tentativas automáticas a cada 5 segundos com a transcrição armazenada, notificando o usuário por meio de áudio.
-
-### B. Google Speech Recognition API (Transcrição de Fala)
-*   **Origem:** [audio_service.py](file:///e:/Agente%20IA/assistente-domestico/services/audio_service.py).
-*   **Destino:** Servidores de Reconhecimento de Voz do Google.
-*   **Finalidade:** Converter os buffers de áudio gravados pelo microfone local em texto bruto para processamento.
-*   **Tecnologia Utilizada:** Biblioteca `speech_recognition` realizando chamadas HTTP síncronas para a API web pública.
-
-### C. Microsoft Edge TTS API (Síntese de Voz)
-*   **Origem:** [voice_service.py](file:///e:/Agente%20IA/assistente-domestico/services/voice_service.py).
-*   **Destino:** Servidores de Voz Neural do Microsoft Edge (serviço gratuito de TTS).
-*   **Finalidade:** Gerar o arquivo físico MP3 de voz a partir de strings textuais enviadas pelo assistente de inventário.
-*   **Tecnologia Utilizada:** Biblioteca assíncrona `edge_tts` efetuando conexões web seguras e baixando o stream de áudio.
+    1. **Orquestração de Intenções:** Recebe a transcrição de voz do usuário e retorna um JSON classificando a dificuldade, contexto, ação e mudança de contexto da solicitação.
+    2. **Extração de Dados de Compras:** Recebe a transcrição completa de compras e retorna um JSON estruturado com estabelecimentos, itens, quantidades e valores.
+    3. **Classificação de Inventário:** Recebe a resposta do usuário sobre estoque e retorna o tipo de intenção identificada (quando a heurística Regex não é suficiente).
+*   **Tecnologia:** SDK Python `ollama`, com cliente configurado para `timeout=120.0` segundos.
+*   **Formato de envio:** Lista de mensagens `[{role, content}]` com parâmetro `format="json"` e `options={"temperature": 0.1}`.
+*   **Formato de retorno:** Dicionário JSON Python parseado via `json.loads()`.
+*   **Modelo utilizado:** `gemma4:e4b` (Gemma 4 e:4b, quantizado).
 
 ---
 
-## 2. Integração com Banco de Dados
+## 2. APIs e Serviços Web Externos (SaaS)
 
-### A. Base Relacional Local SQLite
-*   **Origem:** [db_service.py](file:///e:/Agente%20IA/assistente-domestico/services/db_service.py).
-*   **Destino:** Arquivo físico de banco de dados `core/database/assistente_casa.db`.
-*   **Finalidade:** Persistir registros de compras, itens e gerenciar a tabela `controle_consumo` que rastreia os níveis de estoque e a taxa média de uso de cada mercadoria.
-*   **Tecnologia Utilizada:** Módulo nativo `sqlite3` do Python.
+### A. Google Gemini API — Fallback de Nuvem
+*   **Tipo:** Comunicação externa via HTTPS.
+*   **Origem:** `services/ai_service.py` e indiretamente via `CloudLLMProvider` em `services/llm_provider.py`.
+*   **Destino:** Servidores de LLM da Google Cloud (modelo `gemini-2.5-flash`).
+*   **Finalidade na V3:** Atua exclusivamente como **camada de contingência**. É acionada apenas quando o LLM local (Gemma/Ollama) falha após esgotar todas as tentativas de retry, ou quando a orquestração classifica a solicitação como `medio_dificil`.
+*   **Tecnologia:** Biblioteca `google-genai`, requisições HTTPS. A API Key é lida do arquivo `.env` via `python-dotenv`.
+*   **Formato de envio:** Prompt textual com instrução de sistema e mensagem do usuário.
+*   **Formato de retorno:** Texto puro ou JSON parseado via `response_mime_type="application/json"`.
 
----
+> [!WARNING]
+> O método `processar_requisicao_complexa` em `ai_service.py` (L.115-128) contém uma referência a `self.gemini_client` que não foi implementada corretamente. Isso causa falha no fallback de nuvem e está documentado como dívida técnica no código da V3.
 
-## 3. Comunicação por Arquivos Locais e Logs
+### B. Google Speech Recognition API — Transcrição de Fala
+*   **Tipo:** Comunicação externa via HTTP.
+*   **Origem:** `services/audio_service.py`.
+*   **Destino:** API pública de Reconhecimento de Voz do Google.
+*   **Finalidade:** Converter os buffers de áudio capturados pelo microfone em texto bruto (`recognize_google(audio_objeto, language="pt-BR")`).
+*   **Tecnologia:** Biblioteca `speech_recognition`, chamada síncrona HTTP.
+*   **Formato de envio:** Objeto `sr.AudioData` (buffer PCM bruto do microfone).
+*   **Formato de retorno:** String de texto transcrita.
+*   **Momento:** Em toda captura de áudio (tanto para novos comandos quanto para respostas de inventário).
 
-### A. Arquivos de Log do Sistema
-*   **Origem:** Todos os módulos de serviços e o orquestrador (`main.py`).
-*   **Destino:** Pasta `Logs/` localizada na raiz do projeto.
-*   **Finalidade:** Registrar de forma persistente e diária as atividades de cada serviço (`Logs/ai_service/log.txt`, `Logs/audio_service/log.txt`, etc.) e o fluxo principal de orquestração (`Logs/main/main_log.txt`).
-*   **Tecnologia Utilizada:** Módulo `logger_service.py` utilizando manipulação e escrita física de arquivos (`open()`, `os.makedirs()`).
-
-### B. Arquivo de Configuração de Variáveis de Ambiente (.env)
-*   **Origem:** Raiz do projeto (arquivo `.env`).
-*   **Destino:** Módulo de configurações [config.py](file:///e:/Agente%20IA/assistente-domestico/core/config.py).
-*   **Finalidade:** Exportar chaves privadas (`GEMINI_API_KEY`) e limites de tempo de áudio para a memória do processo da aplicação.
-*   **Tecnologia Utilizada:** Biblioteca `python-dotenv`.
-
-### C. Arquivos Temporários de Voz (MP3)
-*   **Origem:** [voice_service.py](file:///e:/Agente%20IA/assistente-domestico/services/voice_service.py).
-*   **Destino:** Pasta `assets/temp_voice.mp3` no disco local.
-*   **Finalidade:** Armazenar temporariamente o arquivo sintetizado para que o player de som possa carregá-lo e reproduzi-lo no hardware. O arquivo é excluído pelo código imediatamente após a conclusão da fala.
-*   **Tecnologia Utilizada:** Módulo `os` do Python para escrita e remoção de arquivo.
-
----
-
-## 4. Integração com Placa de Som e Serviços do Sistema Operacional
-
-### A. Dispositivo de Reprodução de Áudio (Mixer)
-*   **Origem:** [voice_service.py](file:///e:/Agente%20IA/assistente-domestico/services/voice_service.py).
-*   **Destino:** Placa de som do sistema operacional (Alto-falantes / Fones).
-*   **Finalidade:** Reproduzir as respostas por voz neural geradas pelo assistente para conversação bidirecional.
-*   **Tecnologia Utilizada:** Módulo `pygame.mixer` da biblioteca pygame.
-
-### B. Dispositivo de Entrada de Áudio (Microfone)
-*   **Origem:** [audio_service.py](file:///e:/Agente%20IA/assistente-domestico/services/audio_service.py).
-*   **Destino:** Placa de som do sistema operacional (Microfone).
-*   **Finalidade:** Capturar em tempo real a fala do usuário para fins de gravação de comandos ou confirmações.
-*   **Tecnologia Utilizada:** Biblioteca `PyAudio` vinculada à API do microfone do sistema operacional Windows.
-
-### C. Alertas do Sistema Operacional (Bips Sonoros)
-*   **Origem:** [audio_service.py](file:///e:/Agente%20IA/assistente-domestico/services/audio_service.py).
-*   **Destino:** Alto-falante interno da placa-mãe ou saída padrão do Windows.
-*   **Finalidade:** Emitir frequências senoidais em hertz para notificar visualmente e sonoramente o usuário sobre a mudança de estado do gravador.
-*   **Tecnologia Utilizada:** Biblioteca nativa `winsound` do Windows (`winsound.Beep`).
+### C. Microsoft Edge TTS API — Síntese de Voz
+*   **Tipo:** Comunicação externa via conexão web assíncrona.
+*   **Origem:** `services/voice_service.py`.
+*   **Destino:** Servidores de Voz Neural Microsoft Edge.
+*   **Finalidade:** Gerar o arquivo de áudio MP3 sintetizado com a voz `pt-BR-AntonioNeural`.
+*   **Tecnologia:** Biblioteca assíncrona `edge_tts`, executada via `asyncio.run()`.
+*   **Formato de envio:** String de texto.
+*   **Formato de retorno:** Arquivo MP3 salvo em `assets/temp_voice.mp3`.
+*   **Momento:** A cada chamada `VoiceService.falar(texto)`.
 
 ---
 
-## 5. Categorias Não Identificadas Nesta Versão
+## 3. Integração com Banco de Dados Local
 
-*   **APIs REST Locais / Servidores HTTP:** "Não identificado nesta versão." (O sistema roda estritamente via linha de comando).
-*   **WebSocket:** "Não identificado nesta versão."
-*   **Subprocessos / IPC:** "Não identificado nesta versão." (Todas as integrações operam de forma direta sob a mesma thread do processo Python principal).
-*   **Modelos de IA Locais:** "Não identificado nesta versão."
+### A. SQLite — Base Relacional
+*   **Tipo:** Integração local (arquivo físico).
+*   **Origem:** `services/db_service.py`.
+*   **Destino:** `core/database/assistente_casa.db`.
+*   **Finalidade:** Persistência de compras (`compras`, `itens_compra`) e controle de inventário (`controle_consumo`).
+*   **Tecnologia:** Módulo nativo `sqlite3`.
+*   **Controle de Versão de Schema:** `PRAGMA user_version` — atualmente na versão 1.
+*   **Tabelas:**
+    *   `compras`: id, data_compra, nome_comercio, total_gasto.
+    *   `itens_compra`: id, compra_id (FK), produto, marca, quantidade, unidade, valor_unitario, valor_total, categoria.
+    *   `controle_consumo`: produto_nome (UNIQUE), categoria, tempo_medio_calculado, data_ultima_compra, quantidade_comprada, quantidade_residual_confirmada, status_estoque, validacao_pendente, ultima_qtd_comprada, quantidade_residual_esgotada.
+
+---
+
+## 4. Comunicação Interna entre Componentes
+
+```text
+[main.py]
+   ├── → gemma_service.orquestrar_requisicao()
+   │       → Ollama Local (Gemma 4)
+   ├── → execute_with_retry(shopping_assistant.processar_texto_compra)
+   │       → LocalLLMProvider.gerar_json()
+   │           → Ollama Local (Gemma 4)
+   │       → DatabaseService.salvar_compra_da_ia()
+   │           → SQLite
+   ├── → execute_with_retry(ai_service.processar_requisicao_complexa) [fallback]
+   │       → Google Gemini API (nuvem)
+   └── → inventory_assistant.verificar_itens_expirados_inicializacao()
+           → VoiceService.falar()
+               → Microsoft Edge TTS (externo)
+               → pygame.mixer (hardware)
+           → AudioService.capturar_audio_e_transcrever()
+               → Google Speech Recognition (externo)
+           → _heuristica_rapida() [Regex interno]
+           → LocalLLMProvider.gerar_json() [se heurística falhar]
+               → Ollama Local (Gemma 4)
+           → DatabaseService.executar_comando()
+               → SQLite
+```
+
+---
+
+## 5. Integração com Hardware
+
+### A. Microfone (Entrada de Áudio)
+*   **Origem:** `services/audio_service.py`.
+*   **Tecnologia:** `PyAudio` vinculado ao sistema operacional Windows.
+*   **Momento:** Em toda captura de voz do usuário.
+
+### B. Alto-falantes (Saída de Áudio)
+*   **Origem:** `services/voice_service.py`.
+*   **Tecnologia:** `pygame.mixer`.
+*   **Momento:** A cada chamada `VoiceService.falar()`.
+
+### C. Bips do Sistema (Feedback Sonoro)
+*   **Origem:** `services/audio_service.py`.
+*   **Tecnologia:** `winsound.Beep()`.
+*   **Momento:** Início de gravação (800Hz), aviso de tempo próximo (600Hz × 2), fim de gravação (440Hz).
+
+---
+
+## 6. Integração com Sistema de Arquivos
+
+### A. Logs Persistentes
+*   **Origem:** Todos os módulos de serviço via `logger_service.py`.
+*   **Destino:** `Logs/{nome_modulo}/log.txt`.
+
+### B. Arquivo de Configuração (`.env`)
+*   **Origem:** `core/config.py` via `python-dotenv`.
+*   **Variáveis:** `GEMINI_API_KEY`, `AUDIO_SAMPLE_RATE`, `AUDIO_CHANNELS`, `AUDIO_CHUNK_SIZE`, `AUDIO_RECORD_SECONDS`.
+
+### C. Arquivos Temporários de Voz
+*   **Origem:** `services/voice_service.py`.
+*   **Destino:** `assets/temp_voice.mp3` — criado e excluído automaticamente a cada síntese de voz.
+
+---
+
+## 7. Categorias Não Identificadas na V3
+
+*   **APIs REST Locais / Servidores HTTP:** Não identificado. O sistema roda via linha de comando.
+*   **WebSocket:** Não identificado.
+*   **Subprocessos / IPC:** Não identificado. Todas as integrações operam sob o mesmo processo Python.
+*   **OCR / Visão Computacional:** Não identificado.
+*   **STT Local (Whisper):** Não identificado. A transcrição de voz utiliza API externa Google.

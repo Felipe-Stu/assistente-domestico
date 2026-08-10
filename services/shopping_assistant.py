@@ -1,6 +1,8 @@
 from datetime import datetime
-import json
 import logging
+from typing import Dict, Any, List, Optional
+
+from services.llm_provider import BaseLLMProvider
 from services.logger_service import logger as custom_logger
 
 # Logger do console (terminal)
@@ -8,15 +10,32 @@ logging_logger = logging.getLogger(__name__)
 
 NOME_ASSISTENTE = "shopping_assistant"
 
+
 class ShoppingAssistant:
-    def __init__(self, ai_service, db_service):
+    def __init__(
+        self, 
+        db_service: Any, 
+        ai_service: Any = None, 
+        llm_provider: Optional[BaseLLMProvider] = None
+    ):
         """
         Inicializa o assistente de compras.
-        Recebe as instâncias de ai_service (para LLM) e db_service (para persistência).
+        Suporta injeção flexível do serviço de IA (ai_service ou llm_provider desacoplado).
         """
-        self.ai_service = ai_service
         self.db_service = db_service
-        custom_logger.log_assistente(NOME_ASSISTENTE, "Inicialização do assistente.")
+        self.ai_service = ai_service
+        # Se llm_provider não for informado explicitamente, assume o ai_service como provedor
+        self.llm_provider = llm_provider or ai_service
+        
+        if not self.llm_provider:
+            logging_logger.warning(
+                "ShoppingAssistant inicializado sem 'llm_provider' ou 'ai_service' válido!"
+            )
+
+        custom_logger.log_assistente(
+            NOME_ASSISTENTE, 
+            "Inicialização do assistente de compras concluída com sucesso."
+        )
 
     def _validar_e_sanitizar_compra(self, dados_compra: dict) -> dict:
         """
@@ -30,11 +49,11 @@ class ShoppingAssistant:
 
         for item in itens:
             item_validado = item.copy()
-            
+
             produto = item_validado.get("produto", "").strip()
             if not produto:
                 continue
-                
+
             quantidade = item_validado.get("quantidade")
             valor_unitario = item_validado.get("valor_unitario")
             valor_total = item_validado.get("valor_total")
@@ -78,7 +97,7 @@ class ShoppingAssistant:
             item_validado["quantidade"] = quantidade
             item_validado["valor_unitario"] = round(valor_unitario, 2)
             item_validado["valor_total"] = round(valor_total, 2)
-            
+
             valor_total_calculado_compra += valor_total
             itens_validados.append(item_validado)
 
@@ -89,96 +108,131 @@ class ShoppingAssistant:
     def processar_texto_compra(self, texto_transcrito: str) -> dict:
         """
         Gera o prompt especializado em parsing de compras (multi-mercados),
-        solicita a estruturação ao ai_service e persiste as compras no banco.
+        solicita a estruturação ao llm_provider e persiste as compras no banco.
         """
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Áudio recebido: '{texto_transcrito}'")
-        
+
+        if not self.llm_provider:
+            erro_msg = "Nenhum provedor de LLM configurado para processar a compra."
+            logging_logger.error(erro_msg)
+            return {"status": "erro", "mensagem": erro_msg, "compras_processadas": 0}
+
         data_atual = datetime.now().strftime("%Y-%m-%d")
-        
-        prompt = f"""
-            Você é um assistente especializado em transformar descrições de compras em registros estruturados.
 
-            Sua única função é analisar o texto informado e retornar APENAS um JSON válido, sem explicações, sem markdown e sem qualquer texto adicional.
+        prompt_sistema = f"""
+        Você é um extrator de dados de compras em formato JSON rigoroso.
+        Sua única tarefa é converter a transcrição de voz fornecida pelo usuário em um JSON válido.
 
-            REGRAS
+        ### REGRAS CRÍTICAS DE SAÍDA:
+        1. Responda APENAS com o JSON. 
+        2. NÃO use blocos de código (NÃO use ```json ou ```).
+        3. NÃO inclua nenhum texto de apresentação, explicação ou comentário antes ou depois do JSON.
 
-            1. Identifique todos os estabelecimentos mencionados. O usuário pode relatar compras em mais de um mercado no mesmo relato (ex: "comprei tal coisa no Moreschi e tal coisa no Proença").
-            2. Se houver mais de um estabelecimento, separe os produtos correspondentes a cada um deles em objetos de compras distintos dentro da lista principal "compras".
-            3. A data atual de cada compra é obrigatoriamente: {data_atual}.
-            4. Extraia todos os produtos comprados e associe-os ao mercado correto com base no contexto do texto.
-            5. Sempre que possível identifique para cada item:
-            - nome do produto
-            - marca
-            - quantidade
-            - unidade de medida
-            - valor total do item
-            - valor unitário
-            - categoria (ex: carne, laticínio, limpeza, mercearia, hortifruti, bebida, higiene, etc.)
-            6. Caso o valor unitário não seja informado mas exista quantidade e valor total:
-            valor_unitario = valor_total / quantidade
-            7. Caso quantidade não seja informada:
-            quantidade = 1
-            8. Caso a unidade não seja informada:
-            unidade = "un"
-            9. Caso a marca não seja identificada:
-            marca = null
-            10. Caso o estabelecimento não seja identificado para um grupo de itens:
-                estabelecimento = null
-            11. Todos os valores monetários devem ser números (float), sem "R$".
-            12. Identifique a categoria com base no tipo do produto e preencha como uma string em letras minúsculas (ex: "carne", "laticínio", "limpeza", "bebida", "mercearia").
-            13. Não invente informações.
+        ---
 
-            FORMATO DA RESPOSTA
+        ### REGRAS DE CONVERSÃO E CÁLCULO:
 
+        1. QUANTIDADES COMPOSTAS (PESOS E VOLUMES):
+        - Some quilos e gramas em um único valor decimal em quilos (kg).
+            * Exemplo: "3 kg 124 g" ou "3 kg e 124 g" -> quantidade: 3.124, unidade: "kg"
+            * Exemplo: "106 gramas" ou "106 g" -> quantidade: 0.106, unidade: "kg"
+            * Exemplo: "484 g" -> quantidade: 0.484, unidade: "kg"
+        - Some litros e mililitros em um único valor decimal em litros (litro).
+            * Exemplo: "1 litro e 250 ml" -> quantidade: 1.25, unidade: "litro"
+
+        2. PREÇOS E CÁLCULOS:
+        - valor_unitario: O preço por unidade (kg, litro, un, pacote).
+        - valor_total (item): Arredonde para 2 casas decimais -> quantidade * valor_unitario
+        - valor_total_compra: Soma dos valores totais dos itens do estabelecimento.
+
+        3. VALORES PADRÃO (QUANDO NÃO INFORMADO):
+        - marca -> null
+        - estabelecimento -> "Não informado" (se nenhum for dito)
+        - data_compra -> "{data_atual}"
+
+        ---
+
+        ### EXEMPLOS DE CONVERSÃO (Siga este padrão estritamente):
+
+        ENTRADA:
+        "eu fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 e alho 27,99 o quilo eu comprei 106 gramas"
+
+        SAÍDA:
+        {{
+        "compras": [
             {{
-                "compras": [
-                    {{
-                        "estabelecimento": "Nome do Mercado A",
-                        "data_compra": "{data_atual}",
-                        "itens": [
-                            {{
-                                "produto": "",
-                                "marca": null,
-                                "quantidade": 1,
-                                "unidade": "un",
-                                "valor_unitario": 0.0,
-                                "valor_total": 0.0,
-                                "categoria": ""
-                            }}
-                        ],
-                        "valor_total_compra": 0.0
-                    }},
-                    {{
-                        "estabelecimento": "Nome do Mercado B",
-                        "data_compra": "{data_atual}",
-                        "itens": [
-                            {{
-                                "produto": "",
-                                "marca": null,
-                                "quantidade": 1,
-                                "unidade": "un",
-                                "valor_unitario": 0.0,
-                                "valor_total": 0.0,
-                                "categoria": ""
-                            }}
-                        ],
-                        "valor_total_compra": 0.0
-                    }}
-                ]
+            "estabelecimento": "Moreschi",
+            "data_compra": "{data_atual}",
+            "itens": [
+                {{
+                "produto": "peito de frango",
+                "marca": null,
+                "quantidade": 3.124,
+                "unidade": "kg",
+                "valor_unitario": 16.99,
+                "valor_total": 53.08,
+                "categoria": "carne"
+                }},
+                {{
+                "produto": "detergente",
+                "marca": "Minuano",
+                "quantidade": 1.0,
+                "unidade": "un",
+                "valor_unitario": 2.69,
+                "valor_total": 2.69,
+                "categoria": "limpeza"
+                }},
+                {{
+                "produto": "alho",
+                "marca": null,
+                "quantidade": 0.106,
+                "unidade": "kg",
+                "valor_unitario": 27.99,
+                "valor_total": 2.97,
+                "categoria": "hortifruti"
+                }}
+            ],
+            "valor_total_compra": 58.74
             }}
+        ]
+        }}
 
-            Texto informado:
+        ---
 
-            "{texto_transcrito}"
+        ### FORMATO FINAL OBRIGATÓRIO:
+
+        {{
+        "compras": [
+            {{
+            "estabelecimento": "Nome do Estabelecimento",
+            "data_compra": "{data_atual}",
+            "itens": [
+                {{
+                "produto": "nome do produto",
+                "marca": null,
+                "quantidade": 1.0,
+                "unidade": "un",
+                "valor_unitario": 0.0,
+                "valor_total": 0.0,
+                "categoria": "categoria"
+                }}
+            ],
+            "valor_total_compra": 0.0
+            }}
+        ]
+        }}
         """
 
-        logging_logger.info("Enviando texto de compras para estruturação no ShoppingAssistant...")
-        custom_logger.log_assistente(NOME_ASSISTENTE, "Envio para o Gemini")
-        
-        # Chama o ai_service de forma agnóstica
-        resposta_json = self.ai_service.enviar_prompt_json(prompt)
-        custom_logger.log_assistente(NOME_ASSISTENTE, "Retorno do Gemini")
-        
+        logging_logger.info("Enviando texto de compras para estruturação via LLMProvider...")
+        custom_logger.log_assistente(NOME_ASSISTENTE, "Solicitando extração de compras em JSON ao LLMProvider.")
+
+        # Solicita a estrutura JSON através do provedor de LLM configurado (Local ou Nuvem)
+        resposta_json = self.llm_provider.gerar_json(
+            prompt_sistema=prompt_sistema,
+            mensagem_usuario=texto_transcrito
+        )
+        custom_logger.log_assistente(NOME_ASSISTENTE, "Estrutura JSON retornada pelo LLMProvider com sucesso.")
+
         listagem_compras = []
         if isinstance(resposta_json, dict):
             listagem_compras = resposta_json.get("compras", [resposta_json])
@@ -188,12 +242,14 @@ class ShoppingAssistant:
         # Persiste no banco SQLite através do db_service
         compras_salvas = 0
         for dados_compra in listagem_compras:
+            if not isinstance(dados_compra, dict):
+                continue
             dados_validados = self._validar_e_sanitizar_compra(dados_compra)
             compra_id = self.db_service.salvar_compra_da_ia(dados_validados)
             qtd_itens = len(dados_validados.get("itens", []))
-            
-            msg_db = f"Procedimentos feitos: Compra (ID: {compra_id}) e {qtd_itens} itens gravados no banco de dados SQLite."
-            logging_logger.info("Compra gravada com sucesso pelo ShoppingAssistant! ID: %d", compra_id)
+
+            msg_db = f"Procedimentos feitos: Compra (ID: {compra_id}) e {qtd_itens} itens gravados no banco SQLite."
+            logging_logger.info("Compra gravada com sucesso pelo ShoppingAssistant! ID: %s", compra_id)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_db)
             compras_salvas += 1
 
@@ -202,5 +258,4 @@ class ShoppingAssistant:
         return {
             "status": "sucesso",
             "mensagem": "Informações inseridas com sucesso!",
-            "compras_processadas": compras_salvas
-        }
+            "compras_processadas": compras_salvas}

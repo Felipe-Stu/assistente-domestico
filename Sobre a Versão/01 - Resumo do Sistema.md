@@ -1,89 +1,80 @@
 # 01 - Resumo do Sistema
 
-Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 2.1 - V2.1)**. O sistema representa uma evolução direta da Versão 2, estabilizando funcionalidades existentes por meio de um patch corretivo que inclui resiliência a congestionamentos na API do Gemini e um sistema centralizado de logs locais.
+Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 3 - V3)**. O sistema representa uma evolução arquitetural significativa em relação à V2.1, introduzindo um **LLM local** (Gemma 4 e:4b via Ollama) como camada primária de orquestração e processamento, reduzindo a dependência de APIs externas de IA para operações do fluxo principal.
 
 ---
 
 ## 1. Objetivo do Sistema
 
-O objetivo central do sistema na **Versão 2.1** é **gerenciar de forma autônoma e preditiva o estoque de produtos domésticos por meio de comandos de voz interativos**. A partir de relatos informais de compras ou de baixas manuais, o sistema rastreia o consumo estimado dos itens, calcula resíduos físicos em estoque e interage ativamente via síntese de voz (TTS) para validar e atualizar as quantidades reais armazenadas no domicílio.
+O objetivo central do sistema na **Versão 3** é o mesmo da V2.1: **gerenciar de forma autônoma e preditiva o estoque de produtos domésticos por meio de comandos de voz interativos**. A principal mudança desta versão é **onde e como** a inteligência artificial processa as solicitações. A V3 introduz um modelo local executado na própria máquina do usuário, tornando o sistema mais resiliente e menos dependente de conectividade com a internet para as tarefas principais.
 
 ---
 
 ## 2. Resumo das Principais Funcionalidades
 
-*   **Captação de Áudio com Controle Avançado de Silêncio:** Captura comandos de voz gerenciando o tempo global de execução (máximo de 120 segundos) e realizando cortes cirúrgicos de gravação após 5 segundos de silêncio real ou cancelando após 15 segundos de inatividade inicial.
-*   **Transcrição de Voz (Speech-to-Text):** Conversão de fala analógica do microfone em texto por meio do serviço Speech Recognition do Google, com bips de aviso no início, no fim e alertas de término próximo.
-*   **Interpretação Inteligente de Notas de Compras Multiestabelecimento:** Uso da API do Google Gemini (`gemini-2.5-flash`) com instruções para extrair informações de compras de múltiplos estabelecimentos comerciais diferentes descritas em um único comando de voz contínuo.
-*   **Síntese de Voz Neural (Text-to-Speech):** Resposta por voz artificial realista e humanizada (voz masculina `pt-BR-AntonioNeural`) para fazer perguntas e confirmar o status de estoques diretamente ao usuário.
-*   **Motor de Gestão Preditiva de Estoque e Consumo:** Varredura automática na inicialização para identificar itens cuja autonomia estimada expirou. No registro de novas compras, calcula o resíduo antigo baseado no tempo médio de consumo do usuário.
-*   **Árvore de Decisão Conversacional de Estoque:** Motor que interpreta respostas de voz do usuário em 4 cenários:
-    1.  *Confirmação:* Validação do resíduo estimado pelo sistema.
-    2.  *Negativa Zerado:* O produto acabou antes da nova compra (recalcula ritmo de consumo).
-    3.  *Negativa Sem Consumo:* O produto antigo não foi aberto (preserva o estoque anterior).
-    4.  *Divergência de Quantidade:* Usuário informa uma quantidade real diferente (corrige o inventário e ajusta dinamicamente a taxa de consumo).
-*   **Baixa Direta e Voluntária de Itens:** Permite zerar diretamente o estoque de um produto de forma voluntária, recalculando sua taxa de uso e marcando-o como esgotado no banco de dados SQLite.
-*   **Resiliência a Erro 503 (Indisponibilidade do Gemini):** Tratamento do erro de indisponibilidade ou alta demanda da API do Gemini (`ServiceUnavailableException`), com loop de reenvio de 5 segundos, mantendo a transcrição salva e notificando o usuário por áudio e texto.
-*   **Sistema de Log Estruturado:** Geração automática de logs detalhados, registrando o histórico de execução tanto em um arquivo geral quanto em arquivos específicos por assistente.
+*   **Captação de Áudio com Controle Avançado de Silêncio:** Captura comandos de voz gerenciando o tempo global de execução (máximo de 120 segundos), com corte automático após 5 segundos de silêncio real e cancelamento após 15 segundos de inatividade inicial.
+*   **Transcrição de Voz (Speech-to-Text):** Conversão de fala analógica em texto por meio da API do Google Speech Recognition.
+*   **Orquestração por LLM Local (NOVO na V3):** O Gemma 4 e:4b, executado localmente via Ollama, analisa a transcrição de voz e classifica a solicitação em: dificuldade (`facil`/`medio_dificil`), contexto (`compras`, `agenda`, `inventario`, `outro`, `geral`), ação (`criar`, `corrigir`, `consultar`, `delegar`) e mudança de contexto. Isso determina para qual assistente especializado o fluxo será roteado.
+*   **Processamento Local de Compras (NOVO na V3):** O `ShoppingAssistant` utiliza o `LocalLLMProvider` (Gemma 4 e:4b via Ollama) para estruturar a fala do usuário em JSON de compras, sem depender da nuvem para esse fluxo.
+*   **Classificação Local de Intenções de Estoque (NOVO na V3):** O `InventoryAssistant` utiliza uma cadeia de processamento com dois níveis: primeiramente uma heurística rápida via Regex (0ms de latência) e, caso não resolva, delega ao Gemma 4 e:4b local para classificar a intenção do usuário nos 4 cenários de inventário.
+*   **Resiliência com Retry Automático (Mantido e Expandido):** O sistema possui uma camada de resiliência (`resilience_service.py`) que realiza até 3 tentativas automáticas em qualquer chamada, com aviso de voz ao usuário em caso de reprocessamento e fallback para a nuvem (Gemini) em caso de falha crítica local.
+*   **Fallback para Gemini na Nuvem (Mantido):** Caso o LLM local falhe de forma persistente, o sistema tenta encaminhar a solicitação para a API do Gemini como contingência.
+*   **Síntese de Voz Neural (Text-to-Speech):** Resposta por voz artificial realista com voz masculina `pt-BR-AntonioNeural` via Microsoft Edge TTS.
+*   **Motor de Gestão Preditiva de Estoque:** Varredura automática na inicialização para identificar itens com autonomia estimada esgotada, com cálculo de resíduos e atualização dinâmica da taxa de consumo.
+*   **Árvore de Decisão Conversacional de Estoque (4 cenários):** Confirmação, Negativa Zerado, Negativa Sem Consumo, Divergência de Quantidade.
+*   **Baixa Direta e Voluntária de Itens:** Zeramento manual de estoque com resolução de ambiguidade por voz.
+*   **Sistema de Log Estruturado:** Logs persistentes em disco, segmentados por módulo, com cabeçalhos diários.
 
 ---
 
 ## 3. Responsabilidades Gerais
 
-As responsabilidades no sistema estão distribuídas nos seguintes componentes:
-*   **Orquestrador (`app/main.py`):** Coordena o ciclo de vida inicial, aciona o assistente de inventário e gerencia o fluxo de gravação de novas despesas e persistência relacional.
-*   **Configuração (`core/config.py`):** Centraliza as variáveis de ambiente e parâmetros físicos do áudio.
-*   **Serviço de Áudio (`services/audio_service.py`):** Gerencia buffers de entrada do microfone, bips sonoros e integra-se à API de transcrição do Google.
-*   **Serviço de Voz (`services/voice_service.py`):** Conecta-se à API Edge TTS para gerar a voz neural e utiliza o `pygame.mixer` para reproduzi-la localmente.
-*   **Serviço de Inteligência Artificial (`services/ai_service.py`):** Prepara os prompts estruturados e executa as chamadas ao modelo Gemini da Google, capturando e tratando erros de infraestrutura como falhas de cota e indisponibilidade de serviço.
-*   **Serviço de Inventário (`services/inventory_assistant.py`):** Contém as regras de negócio de estoque, cálculo de autonomia preditiva e classificação lógica de intenções conversacionais via Gemini.
-*   **Serviço de Banco de Dados (`services/db_service.py`):** Gerencia a persistência relacional das compras, tabelas de controle de consumo e funções genéricas de escrita/leitura SQL.
-*   **Serviço de Logging (`services/logger_service.py`):** Centraliza a gravação física de logs no disco, gerenciando as pastas e arquivos de logs e garantindo a inclusão de cabeçalhos diários.
+*   **Orquestrador (`app/main.py`):** Inicializa serviços, coordena o ciclo de execução, gerencia o roteamento de solicitações entre os assistentes e implementa a lógica de retry via `execute_with_retry`.
+*   **Serviço Gemma (`services/gemma_service.py`):** Realiza a chamada direta ao Ollama para orquestração de intenções. Valida o schema de saída do modelo e lança exceções estruturadas em caso de falha.
+*   **Provedores LLM (`services/llm_provider.py`):** Camada de abstração com interface `BaseLLMProvider`. Implementa `LocalLLMProvider` (Gemma via Ollama) e `CloudLLMProvider` (Gemini via AIService).
+*   **Serviço de Resiliência (`services/resilience_service.py`):** Módulo de retry parametrizável, com suporte a callbacks de validação, avisos de voz em reprocessamento e exceções estruturadas.
+*   **Assistente de Compras (`services/shopping_assistant.py`):** Processa transcrições de compras de voz, estrutura os dados em JSON via LLM local e persiste no banco.
+*   **Assistente de Inventário (`services/inventory_assistant.py`):** Gerencia a lógica de controle preditivo de estoque, com classificação de intenções via heurística local + Gemma 4 e:4b.
+*   **Configuração (`core/config.py`):** Centraliza variáveis de ambiente, caminhos do banco e parâmetros de áudio.
+*   **Serviço de Áudio (`services/audio_service.py`):** Captura de microfone com monitoramento de RMS, bips sonoros e controle de silêncio.
+*   **Serviço de Voz (`services/voice_service.py`):** Síntese de voz neural via Edge TTS e reprodução com `pygame.mixer`.
+*   **Serviço de Banco de Dados (`services/db_service.py`):** Persistência relacional via SQLite com suporte a migrações por schema version.
+*   **Serviço de Logging (`services/logger_service.py`):** Logger transversal com arquivos separados por módulo e cabeçalhos diários.
 
 ---
 
-## 4. Visão Macro do Funcionamento
-
-O fluxo síncrono geral do sistema na inicialização e processamento de compras ocorre de forma interativa:
+## 4. Visão Macro do Funcionamento (V3)
 
 ```mermaid
 graph TD
-    A[Início: main.py] --> B[Carrega Serviços & Banco]
+    A[Início: main.py] --> B[Carrega Serviços, Banco e Provedores LLM]
     B --> C[InventoryAssistant: Varredura de Itens Expirados]
-    C -->|Itens vencidos?| D[VoiceService: Pergunta se produto acabou]
-    D --> E[AudioService: Captura resposta & Gemini classifica intenção]
-    E -->|Atualiza banco| F[AudioService: Captura nova compra de voz]
-    F --> G[AIService: Gemini estrutura despesas e lojas]
-    G -->|Erro 503?| G1[VoiceService: Avisa tráfego congestionado]
-    G1 -->|Espera 5s| G
-    G -->|Sucesso| H[InventoryAssistant: Compara itens com estoque residual]
-    H -->|Se houver sobra| I[VoiceService: Pergunta se confirma quantidade estimada]
-    I --> J[AudioService: Captura resposta e atualiza estoque residual]
-    J --> K[DatabaseService: Grava compras e itens no SQLite]
-    K --> L[Fim do Fluxo]
+    C -->|Para cada item vencido| D[VoiceService: Pergunta se produto acabou]
+    D --> E[AudioService: Captura resposta do usuário]
+    E --> F{Heurística Rápida Regex resolve?}
+    F -->|Sim| G[Classifica intenção localmente - 0ms]
+    F -->|Não| H[Gemma 4 Local via llm_provider classifica intenção]
+    G --> I[Atualiza banco SQLite]
+    H --> I
+    I --> J[AudioService: Captura nova compra via voz]
+    J --> K[Gemma 4: orquestrar_requisicao - classifica contexto e dificuldade]
+    K -->|facil + compras| L[ShoppingAssistant: processa via LocalLLMProvider]
+    K -->|facil + outro contexto| M[executar_assistente_local]
+    K -->|medio_dificil| N[AIService: Gemini na Nuvem]
+    L -->|Falha após 3 tentativas| N
+    L -->|Sucesso| O[DatabaseService: Grava compra e itens no SQLite]
+    N -->|Sucesso| P[VoiceService: Resposta por voz ao usuário]
+    O --> P
+    P --> Q[Fim do Fluxo]
 ```
 
 ---
 
-## Evolução da V1 para V2
+## 5. Principais Alterações em Relação à V2.1
 
-Abaixo está o resumo da transição evolutiva do sistema da V1 para a V2 (mantido como referência histórica):
-*   **Controle de Áudio:** O módulo de áudio evoluiu de uma captação simples por temporizador fixo para um sistema inteligente com cálculo dinâmico de RMS de som, corte automático por silêncio (5s) e cancelamento por inatividade inicial (15s).
-*   **Estruturação de Compras:** A IA agora é instruída a separar e retornar múltiplos estabelecimentos comerciais descritos em um único comando de voz contínuo.
-*   **Interatividade por Voz (TTS):** Geração de feedback falado com voz neural realista masculina.
-*   **Gestão Preditiva de Estoque:** Tabela `controle_consumo` e controle de autonomia preditiva.
-*   **Árvore de Decisão de Resíduos:** Processamento conversacional em 4 vias baseadas na intenção do usuário para calcular estoque e ritmo de consumo médio.
-*   **Varredura Preditiva na Inicialização:** Alerta ativo ao iniciar a aplicação para itens com estoque esgotado.
-
----
-
-## Alterações da Versão 2.1
-
-A **Versão 2.1** representa um patch corretivo e de estabilização do sistema da Versão 2, introduzindo as seguintes melhorias:
-
-*   **Resiliência à Indisponibilidade da API do Gemini (Erro 503):** O sistema agora captura explicitamente erros de indisponibilidade temporária e alta demanda no Gemini. Ao detectar o erro `ServiceUnavailableException`, ele salva temporariamente a transcrição do áudio, avisa o usuário verbalmente ("Tráfego congestionado. Fazendo nova requisição.") e dispara uma nova tentativa após um intervalo de 5 segundos, impedindo que o sistema pare ou perca a fala gravada.
-*   **Implementação de Logs em Arquivo:** Foi criado o módulo transversal `logger_service.py` que implementa um CustomLogger. Ele grava dois tipos de arquivos físicos de logs na pasta `Logs/` na raiz do projeto:
-    *   *Log Geral (`Logs/main/main_log.txt`):* Registra eventos globais do sistema, como inicialização, áudios transcritos e qual assistente recebeu a demanda.
-    *   *Logs dos Assistentes (`Logs/<nome_do_assistente>/log.txt`):* Logs específicos de cada módulo de serviço (como `ai_service`, `audio_service`, `db_service`, `inventory_assistant`, `shopping_assistant` e `voice_service`), detalhando suas operações individuais.
-    *   *Divisores Diários:* Na primeira inicialização do dia, os arquivos recebem automaticamente um cabeçalho identificando a data (ex: `**************************** main_02/08/2026 ****************************`).
-*   **Funcionalidades Novas:** Nenhuma funcionalidade de negócio nova foi criada nesta versão. O foco foi em tolerância a falhas na integração com IA e rastreabilidade através de logs.
+*   **Implantação do LLM Local (Gemma 4 e:4b via Ollama):** Principal mudança da V3. O Gemma atua agora como orquestrador de intenções e como extrator de dados de compras no fluxo principal.
+*   **Nova Camada de Abstração de LLM (`llm_provider.py`):** Interface unificada `BaseLLMProvider` com duas implementações: `LocalLLMProvider` (Ollama) e `CloudLLMProvider` (Gemini).
+*   **Novo Serviço de Resiliência (`resilience_service.py`):** Retry parametrizável centralizado, substituindo a lógica de retry inline que existia no `main.py` da V2.1.
+*   **Novo Serviço de Orquestração Local (`gemma_service.py`):** Módulo dedicado às chamadas de orquestração ao Ollama, com validação de schema e sanitização de resposta.
+*   **Heurística Rápida no InventoryAssistant:** Antes de chamar qualquer LLM, o sistema tenta resolver a intenção do usuário via Regex/padrões de texto em ~0ms.
+*   **Sessão de Contexto no Orquestrador:** `GerenciadorDeSessao` mantém o contexto da conversa e o histórico de mensagens entre as interações.

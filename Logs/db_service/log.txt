@@ -1,0 +1,50 @@
+
+**************************** log_09/08/2026 ****************************
+[09/08/2026 - 10:18:13] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 10:18:14] Aplicando migração v1: garantindo coluna 'categoria' em controle_consumo.
+[09/08/2026 - 10:18:14] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 10:18:15] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 10:28:20] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 10:28:20] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 10:28:20] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 10:37:57] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 10:37:57] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 10:37:58] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 10:39:38] Procedimentos feitos: Compra (ID: 1) e 5 itens gravados no banco de dados SQLite.
+[09/08/2026 - 10:57:36] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 10:57:37] Aplicando migração v1: garantindo coluna 'categoria' em controle_consumo.
+[09/08/2026 - 10:57:37] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 10:57:38] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 11:00:03] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 11:00:03] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 11:00:04] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 15:49:08] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 15:49:08] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 15:49:09] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 15:50:51] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 15:50:52] Aplicando migração v1: garantindo coluna 'categoria' em controle_consumo.
+[09/08/2026 - 15:50:52] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 15:50:53] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 16:54:23] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 16:54:23] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 16:54:24] Consulta SQL executada (0 registros retornados).
+[09/08/2026 - 17:02:24] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[09/08/2026 - 17:02:24] Banco de dados SQLite inicializado/migrado na versão v1.
+[09/08/2026 - 17:02:25] Consulta SQL executada (0 registros retornados).
+
+**************************** log_10/08/2026 ****************************
+[10/08/2026 - 15:38:05] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[10/08/2026 - 15:38:06] Aplicando migração v1: garantindo coluna 'categoria' em controle_consumo.
+[10/08/2026 - 15:38:06] Banco de dados SQLite inicializado/migrado na versão v1.
+[10/08/2026 - 15:38:07] Consulta SQL executada (0 registros retornados).
+[10/08/2026 - 15:48:08] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[10/08/2026 - 15:48:08] Banco de dados SQLite inicializado/migrado na versão v1.
+[10/08/2026 - 15:48:09] Consulta SQL executada (0 registros retornados).
+[10/08/2026 - 15:56:16] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[10/08/2026 - 15:56:16] Banco de dados SQLite inicializado/migrado na versão v1.
+[10/08/2026 - 15:56:17] Consulta SQL executada (0 registros retornados).
+[10/08/2026 - 16:16:31] Inicialização do DatabaseService (DB Path: E:\Agente IA\assistente-domestico\core\database\assistente_casa.db).
+[10/08/2026 - 16:16:32] Aplicando migração v1: garantindo coluna 'categoria' em controle_consumo.
+[10/08/2026 - 16:16:32] Banco de dados SQLite inicializado/migrado na versão v1.
+[10/08/2026 - 16:16:33] Consulta SQL executada (0 registros retornados).
+[10/08/2026 - 16:18:35] Procedimentos feitos: Compra (ID: 1) e 5 itens gravados no banco de dados SQLite.

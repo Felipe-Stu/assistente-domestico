@@ -1,28 +1,45 @@
-import logging
-import json
-import re
 from datetime import datetime
-from typing import Optional, Dict, Any
-from google import genai
-from google.genai import types
-from services.voice_service import VoiceService
+import json
+import logging
+import re
+from typing import Any, Dict, Optional
+
 from services.audio_service import AudioService
+from services.llm_provider import BaseLLMProvider
 from services.logger_service import logger as custom_logger
+from services.voice_service import VoiceService
 
 # Logger de console (terminal)
 logger = logging.getLogger(__name__)
 
-# Identificador do serviço para o logger estruturado em arquivo
+# Identificador do serviço para o logger estruturado
 NOME_ASSISTENTE = "inventory_assistant"
 
+
 class InventoryAssistant:
-    def __init__(self, db_service):
+    def __init__(
+        self,
+        db_service: Any,
+        ai_service: Any = None,
+        llm_provider: Optional[BaseLLMProvider] = None
+    ):
+        """
+        Inicializa o assistente de controle de estoque.
+        Suporta o Gemma 4 local via llm_provider ou ai_service.
+        """
         self.db = db_service
         self.voice = VoiceService()
         self.audio = AudioService()
-        self.client = genai.Client()
-        
-        custom_logger.log_assistente(NOME_ASSISTENTE, "Inicialização do serviço InventoryAssistant concluída.")
+        self.ai_service = ai_service
+        self.llm_provider = llm_provider or ai_service
+
+        if not self.llm_provider:
+            logger.warning("InventoryAssistant inicializado sem 'llm_provider' ou 'ai_service' local configurado.")
+
+        custom_logger.log_assistente(
+            NOME_ASSISTENTE, 
+            "Inicialização do serviço InventoryAssistant (Gemma 4 Local) concluída com sucesso."
+        )
 
     def _calcular_dias_decorridos(self, data_anterior_str: str) -> int:
         """Calcula a diferença em dias entre a data atual e a data da última compra."""
@@ -41,40 +58,54 @@ class InventoryAssistant:
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro)
             return 0
 
-    def _classificar_resposta_localmente(self, resposta_texto: str) -> Optional[Dict[str, Any]]:
+    def _heuristica_rapida(self, resposta_texto: str) -> Optional[Dict[str, Any]]:
         """
-        Classifica a resposta localmente via Regex/Heurísticas para economizar latência/API.
+        Análise rápida via Regex/Heurística de baixíssima latência para termos diretos.
         """
         texto = resposta_texto.lower().strip().replace(".", "").replace(",", "").strip()
-        
-        confirmacoes = {"sim", "correto", "confirmo", "está certo", "esta certo", "procede", "exatamente", "isso mesmo", "pode manter", "confere", "certo", "ok", "beleza", "isso", "pode"}
-        zerados = {"acabou", "acabou tudo", "não tem mais", "nao tem mais", "zerou", "ficou sem", "terminou", "não sobrou nenhum", "nao sobrou nenhum", "acabou por completo", "acabou totalmente", "naum tem mais", "num tem mais", "não tem mas", "na um tem", "acabou tudu"}
-        sem_consumo = {"não usei", "nao usei", "não consumi", "nao consumi", "continua fechado", "está fechado", "esta fechado", "tá fechado", "ta fechado", "está lacrado", "esta lacrado", "nem abri", "continua inteiro", "continua cheio", "não mexi", "nao mexi", "está intacto", "esta intacto"}
-        
-        # 1. Match sem negações
+
+        confirmacoes = {
+            "sim", "correto", "confirmo", "está certo", "esta certo", "procede", 
+            "exatamente", "isso mesmo", "pode manter", "confere", "certo", "ok", "beleza", "isso", "pode"
+        }
+        zerados = {
+            "acabou", "acabou tudo", "não tem mais", "nao tem mais", "zerou", 
+            "ficou sem", "terminou", "não sobrou nenhum", "nao sobrou nenhum", 
+            "acabou por completo", "acabou totalmente", "naum tem mais", "num tem mais"
+        }
+        sem_consumo = {
+            "não usei", "nao usei", "não consumi", "nao consumi", "continua fechado", 
+            "está fechado", "esta fechado", "tá fechado", "ta fechado", "está lacrado", 
+            "esta lacrado", "nem abri", "continua inteiro", "continua cheio", "não mexi", "nao mexi"
+        }
+
+        # 1. Checagem de intenções diretas sem negação ambígua
         if any(c in texto for c in confirmacoes):
             if not any(neg in texto for neg in ["não", "nao", "num", "naum", "nem"]):
                 return {"intencao": "CONFIRMACAO", "quantidade_real": None}
-                
+
         if any(z in texto for z in zerados):
             if not any(neg + " acabou" in texto for neg in ["não", "nao", "num", "naum"]):
                 return {"intencao": "NEGATIVA_ZERADO", "quantidade_real": None}
-                
+
         if any(s in texto for s in sem_consumo):
             return {"intencao": "NEGATIVA_SEM_CONSUMO", "quantidade_real": None}
 
-        # 2. Detectar quantidade via Regex
+        # 2. Detecção de quantidade rápida via Regex
         mapa_numeros = {
             "meio": 0.5, "um": 1.0, "uma": 1.0, "dois": 2.0, "duas": 2.0,
             "três": 3.0, "tres": 3.0, "quatro": 4.0, "cinco": 5.0,
             "seis": 6.0, "sete": 7.0, "oito": 8.0, "nove": 9.0, "dez": 10.0
         }
-        
+
         padrao_qtd = r"\b(meio|uma?|dois|duas|três|tres|quatro|cinco|seis|sete|oito|nove|dez|\d+(?:[\.,]\d+)?)\b"
         matches = re.findall(padrao_qtd, texto)
-        
+
         if matches:
-            verbos_ou_palavras = ["tenho", "resta", "sobrou", "sobraram", "só", "so", "tem", "fica", "ficou", "unidade", "unidades", "litro", "litros", "kg", "quilo", "quilos", "pacote", "pacotes", "caixa", "caixas"]
+            verbos_ou_palavras = [
+                "tenho", "resta", "sobrou", "sobraram", "só", "so", "tem", "fica", "ficou", 
+                "unidade", "unidades", "litro", "litros", "kg", "quilo", "quilos", "pacote", "pacotes", "caixa", "caixas"
+            ]
             if len(texto.split()) <= 4 or any(palavra in texto for palavra in verbos_ou_palavras):
                 val_str = matches[0]
                 if val_str in mapa_numeros:
@@ -85,67 +116,83 @@ class InventoryAssistant:
                     except ValueError:
                         return None
                 return {"intencao": "DIVERGENCIA_QUANTIDADE", "quantidade_real": qtd_real}
-                
+
         return None
 
-    def _classificar_resposta_usuario(self, resposta_texto: str) -> Dict[str, Any]:
-        """Tenta classificação local e, se falhar, usa Gemini com Structured Output."""
-        analise_local = self._classificar_resposta_localmente(resposta_texto)
-        if analise_local:
-            msg_local = f"Intenção '{analise_local['intencao']}' classificada LOCALMENTE para: '{resposta_texto}'"
-            logger.info(msg_local)
-            custom_logger.log_assistente(NOME_ASSISTENTE, msg_local)
-            return analise_local
-            
-        msg_remoto = f"Classificação local falhou para: '{resposta_texto}'. Acionando a API do Gemini..."
-        logger.info(msg_remoto)
-        custom_logger.log_assistente(NOME_ASSISTENTE, msg_remoto)
-        
-        prompt = f"""
-        Você é um classificador de intenções para controle de estoque por voz.
-        Classifique a intenção do usuário no JSON indicado.
-
-        INTENÇÕES:
-        - CONFIRMACAO: Concorda com a estimativa.
-        - NEGATIVA_ZERADO: O produto acabou totalmente.
-        - NEGATIVA_SEM_CONSUMO: O produto não foi aberto/usado.
-        - DIVERGENCIA_QUANTIDADE: Mencionou uma quantidade física explícita (retorne em quantidade_real).
-
-        RESTRICÕES:
-        Retorne apenas a intenção e quantidade_real.
-
-        TEXTO DO USUÁRIO:
-        {resposta_texto}
+    def _classificar_resposta_localmente(self, resposta_texto: str) -> Dict[str, Any]:
         """
-        
-        try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.0
-                )
-            )
-            texto_puro = response.text.strip()
-            resultado = json.loads(texto_puro)
-            custom_logger.log_assistente(
-                NOME_ASSISTENTE, 
-                f"Classificação remota concluída pelo Gemini: {resultado}"
-            )
-            return resultado
-        except Exception as e:
-            msg_erro_llm = f"Falha na chamada/parse da LLM (Gemini): {e}. Aplicando fallback."
-            logger.error(msg_erro_llm)
-            custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro_llm)
+        Classifica a intenção do usuário priorizando a execução 100% local com Gemma 4.
+        Combina heurística ultra-rápida (padrões simples) com o poder do modelo Gemma 4 Local.
+        """
+        # Passagem 1: Heurística ultra-rápida (0 ms)
+        resultado_heuristica = self._heuristica_rapida(resposta_texto)
+        if resultado_heuristica:
+            msg_h = f"Intenção '{resultado_heuristica['intencao']}' identificada via Heurística Rápida Local para: '{resposta_texto}'"
+            logger.info(msg_h)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_h)
+            return resultado_heuristica
+
+        # Passagem 2: Processamento avançado com Gemma 4 Local
+        if not self.llm_provider:
+            logger.warning("Gemma 4 Local não disponível. Aplicando fallback de confirmação padrão.")
             return {"intencao": "CONFIRMACAO", "quantidade_real": None}
+
+        msg_gemma = f"Executando classificação inteligente com Gemma 4 Local para: '{resposta_texto}'"
+        logger.info(msg_gemma)
+        custom_logger.log_assistente(NOME_ASSISTENTE, msg_gemma)
+
+        prompt_sistema = """
+Você é um classificador local especializado em controle de estoque residencial por voz.
+Sua missão é extrair a intenção e quantidade informada pelo usuário a partir da transcrição de áudio.
+
+INTENÇÕES PERMITIDAS:
+1. "CONFIRMACAO": O usuário concorda com o valor estimado ou diz que está tudo certo.
+2. "NEGATIVA_ZERADO": O usuário afirma que o produto acabou, zerou, acabou tudo ou não tem mais nada.
+3. "NEGATIVA_SEM_CONSUMO": O usuário afirma que não abriu, não usou, continua lacrado ou intacto.
+4. "DIVERGENCIA_QUANTIDADE": O usuário menciona uma quantidade física explícita restante (ex: "tenho 2 pacotes", "sobraram 1.5 litros", "só tem meio quilo").
+
+REGRAS:
+- Se a intenção for "DIVERGENCIA_QUANTIDADE", extraia o número em "quantidade_real" (float).
+- Se não houver quantidade informada, "quantidade_real" deve ser null.
+- Retorne estritamente um JSON no formato exigido, sem markdown extra.
+
+FORMATO OBRIGATÓRIO DE SAÍDA:
+{
+    "intencao": "CONFIRMACAO" | "NEGATIVA_ZERADO" | "NEGATIVA_SEM_CONSUMO" | "DIVERGENCIA_QUANTIDADE",
+    "quantidade_real": float ou null
+}
+"""
+
+        try:
+            resultado_gemma = self.llm_provider.gerar_json(
+                prompt_sistema=prompt_sistema,
+                mensagem_usuario=resposta_texto
+            )
+
+            if isinstance(resultado_gemma, dict) and "intencao" in resultado_gemma:
+                custom_logger.log_assistente(
+                    NOME_ASSISTENTE, 
+                    f"Classificação concluída pelo Gemma 4 Local com sucesso: {resultado_gemma}"
+                )
+                return resultado_gemma
+
+        except Exception as e:
+            msg_erro_gemma = f"Erro ao processar classificação local com Gemma 4: {e}. Usando fallback."
+            logger.error(msg_erro_gemma)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro_gemma)
+
+        return {"intencao": "CONFIRMACAO", "quantidade_real": None}
+
+    def _classificar_resposta_usuario(self, resposta_texto: str) -> Dict[str, Any]:
+        """Interface unificada de classificação delegando inteiramente para a pipeline Local (Gemma 4)."""
+        return self._classificar_resposta_localmente(resposta_texto)
 
     def verificar_itens_expirados_inicializacao(self):
         """Passo 1: Executado na inicialização. Varre itens com autonomia esgotada."""
         msg_init = "Executando varredura preditiva de estoque..."
         logger.info(msg_init)
         custom_logger.log_assistente(NOME_ASSISTENTE, msg_init)
-        
+
         query = """
             SELECT id, produto_nome, tempo_medio_calculado, data_ultima_compra, 
                    quantidade_comprada, quantidade_residual_confirmada 
@@ -153,36 +200,36 @@ class InventoryAssistant:
             WHERE status_estoque = 1
         """
         itens_ativos = self.db.executar_consulta(query)
-        
+
         for item in itens_ativos:
             id_item, nome, ritmo, data_ultima, qtd_comprada, qtd_residual = item
-            
+
             dias_decorridos = self._calcular_dias_decorridos(data_ultima)
             estoque_antigo_total = qtd_comprada + qtd_residual
             autonomia_total = estoque_antigo_total * ritmo
-            
+
             if dias_decorridos > autonomia_total:
                 msg_expirado = f"Item expirado identificado: '{nome}' (Dias decorridos: {dias_decorridos}, Autonomia estimada: {autonomia_total})."
                 custom_logger.log_assistente(NOME_ASSISTENTE, msg_expirado)
-                
+
                 pergunta = f"Felipe, notei que o tempo estimado para o seu estoque de {nome} acabou. O produto chegou ao fim?"
                 self.voice.falar(pergunta)
-                
+
                 resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
                 custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta por voz capturada: '{resposta_bruta}'")
-                
+
                 analise = self._classificar_resposta_usuario(resposta_bruta)
                 intencao = str(analise.get("intencao", "")).upper().strip()
-                
+
                 data_atual_str = datetime.now().strftime("%Y-%m-%d")
-                
+
                 if intencao in ("CONFIRMACAO", "NEGATIVA_ZERADO") or any(w in resposta_bruta.lower() for w in ["sim", "acabou"]):
                     msg_esgotado = f"'{nome}' confirmado como esgotado na inicialização."
                     logger.info(msg_esgotado)
                     custom_logger.log_assistente(NOME_ASSISTENTE, msg_esgotado)
-                    
+
                     novo_ritmo = max(1.0, dias_decorridos / estoque_antigo_total) if (dias_decorridos > 0 and estoque_antigo_total > 0) else max(1.0, ritmo)
-                    
+
                     self.db.executar_comando(
                         """UPDATE controle_consumo 
                            SET tempo_medio_calculado = ?, 
@@ -207,7 +254,7 @@ class InventoryAssistant:
             NOME_ASSISTENTE, 
             f"Processando entrada de nova compra para '{nome_produto}' (Qtd: {nova_quantidade})."
         )
-        
+
         query = """
             SELECT id, produto_nome, tempo_medio_calculado, data_ultima_compra, 
                    quantidade_comprada, quantidade_residual_confirmada, status_estoque 
@@ -221,7 +268,7 @@ class InventoryAssistant:
 
         id_item, _, ritmo, data_ultima, qtd_comprada, qtd_residual, status_estoque = item
         data_atual_str = datetime.now().strftime("%Y-%m-%d")
-        
+
         if status_estoque == 0:
             custom_logger.log_assistente(NOME_ASSISTENTE, f"Produto '{nome_produto}' estava inativo. Reativando estoque.")
             self.db.executar_comando(
@@ -257,12 +304,12 @@ class InventoryAssistant:
             f"Confirma que possui essa quantidade?"
         )
         self.voice.falar(pergunta)
-        
+
         resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta do usuário para o resíduo de '{nome_produto}': '{resposta_bruta}'")
-        
+
         analise = self._classificar_resposta_usuario(resposta_bruta)
-        
+
         intencao = str(analise.get("intencao", "")).upper().strip()
         qtd_real = analise.get("quantidade_real")
 
@@ -270,10 +317,10 @@ class InventoryAssistant:
             msg_divergencia = f"Cenário: DIVERGENCIA_QUANTIDADE. Ajustando resíduo para {qtd_real} unidades."
             logger.info(msg_divergencia)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_divergencia)
-            
+
             consumo_real = estoque_antigo_total - qtd_real
             ritmo_atualizado = max(1.0, dias_decorridos / consumo_real) if (consumo_real > 0 and dias_decorridos > 0) else max(1.0, ritmo)
-            
+
             self.db.executar_comando(
                 """UPDATE controle_consumo 
                    SET tempo_medio_calculado = ?, data_ultima_compra = ?, quantidade_comprada = ?, 
@@ -287,7 +334,7 @@ class InventoryAssistant:
             msg_conf = "Cenário: CONFIRMACAO. Mantendo resíduo estimado."
             logger.info(msg_conf)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_conf)
-            
+
             self.db.executar_comando(
                 """UPDATE controle_consumo 
                    SET data_ultima_compra = ?, quantidade_comprada = ?, quantidade_residual_confirmada = ?, 
@@ -301,9 +348,9 @@ class InventoryAssistant:
             msg_zerado = "Cenário: NEGATIVA_ZERADO. Zerando resíduo e iniciando novo ciclo."
             logger.info(msg_zerado)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_zerado)
-            
+
             novo_ritmo = max(1.0, dias_decorridos / estoque_antigo_total) if (dias_decorridos > 0 and estoque_antigo_total > 0) else max(1.0, ritmo)
-            
+
             self.db.executar_comando(
                 """UPDATE controle_consumo 
                    SET tempo_medio_calculado = ?, data_ultima_compra = ?, quantidade_comprada = ?, 
@@ -318,7 +365,7 @@ class InventoryAssistant:
             msg_sem_consumo = "Cenário: NEGATIVA_SEM_CONSUMO. Mantém estoque antigo intacto."
             logger.info(msg_sem_consumo)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_sem_consumo)
-            
+
             self.db.executar_comando(
                 """UPDATE controle_consumo 
                    SET data_ultima_compra = ?, quantidade_comprada = ?, quantidade_residual_confirmada = ?, 
@@ -332,7 +379,7 @@ class InventoryAssistant:
             msg_fallback = "Intenção desconhecida. Aplicando Fallback para CONFIRMACAO."
             logger.warning(msg_fallback)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_fallback)
-            
+
             self.db.executar_comando(
                 """UPDATE controle_consumo 
                    SET data_ultima_compra = ?, quantidade_comprada = ?, quantidade_residual_confirmada = ?, 
@@ -349,10 +396,10 @@ class InventoryAssistant:
         if not item:
             custom_logger.log_assistente(NOME_ASSISTENTE, f"Não foi possível dar baixa: Item ID {id_item} não encontrado.")
             return
-            
+
         qtd_comprada, qtd_residual, ritmo, data_ultima = item
         data_atual_str = datetime.now().strftime("%Y-%m-%d")
-        
+
         dias_decorridos = self._calcular_dias_decorridos(data_ultima)
         estoque_antigo_total = qtd_comprada + qtd_residual
         novo_ritmo = max(1.0, dias_decorridos / estoque_antigo_total) if (dias_decorridos > 0 and estoque_antigo_total > 0) else max(1.0, ritmo)
@@ -360,7 +407,7 @@ class InventoryAssistant:
         msg_baixa = f"Baixa voluntária processada para: '{nome_produto}' (ID: {id_item})."
         logger.info(msg_baixa)
         custom_logger.log_assistente(NOME_ASSISTENTE, msg_baixa)
-        
+
         self.db.executar_comando(
             """UPDATE controle_consumo 
                SET tempo_medio_calculado = ?, 
@@ -378,16 +425,16 @@ class InventoryAssistant:
     def registrar_fim_estoque_direto(self, nome_produto: str) -> bool:
         """Zera o estoque voluntariamente com suporte a ambiguidade de áudio."""
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Solicitada baixa direta para produto: '{nome_produto}'")
-        
+
         query_exata = "SELECT id, produto_nome FROM controle_consumo WHERE produto_nome = ? AND status_estoque = 1"
         item = self.db.executar_consulta_uma_linha(query_exata, (nome_produto,))
-        
+
         if item:
             id_item, nome_real = item
             self._executar_baixa_estoque_id(id_item, nome_real)
             self.voice.falar(f"Entendido, Felipe. Já registrei que o seu estoque de {nome_real} acabou por completo.")
             return True
-            
+
         query_busca = """
             SELECT id, produto_nome 
             FROM controle_consumo 
@@ -395,35 +442,35 @@ class InventoryAssistant:
         """
         termo_like = f"%{nome_produto}%"
         itens_encontrados = self.db.executar_consulta(query_busca, (termo_like, termo_like))
-        
+
         if not itens_encontrados:
             msg_nao_encontrado = f"Produto '{nome_produto}' não localizado ativo para baixa."
             logger.warning(msg_nao_encontrado)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_nao_encontrado)
             self.voice.falar(f"Não localizei nenhum estoque ativo para {nome_produto}.")
             return False
-            
+
         if len(itens_encontrados) == 1:
             id_item, nome_real = itens_encontrados[0]
             self._executar_baixa_estoque_id(id_item, nome_real)
             self.voice.falar(f"Entendido, Felipe. Já registrei que o seu estoque de {nome_real} acabou por completo.")
             return True
-            
+
         # Tratamento de ambiguidade
         custom_logger.log_assistente(
             NOME_ASSISTENTE, 
             f"Ambiguidade detectada para '{nome_produto}'. Opções encontradas: {len(itens_encontrados)}."
         )
-        
+
         nomes_produtos = [it[1] for it in itens_encontrados]
         opcoes_fala = ", ".join(nomes_produtos[:-1]) + " ou " + nomes_produtos[-1]
-        
+
         pergunta = f"Você consumiu toda a {opcoes_fala}, ou realmente todas as opções?"
         self.voice.falar(pergunta)
-        
+
         resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False).lower()
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta sobre a ambiguidade: '{resposta_bruta}'")
-        
+
         if any(w in resposta_bruta for w in ["todos", "todas", "tudo"]):
             for id_item, nome_real in itens_encontrados:
                 self._executar_baixa_estoque_id(id_item, nome_real)
@@ -440,7 +487,7 @@ class InventoryAssistant:
                     self._executar_baixa_estoque_id(id_item, nome_real)
                     self.voice.falar(f"Entendido, Felipe. Já registrei que o seu estoque de {nome_real} acabou por completo.")
                     return True
-            
+
             custom_logger.log_assistente(NOME_ASSISTENTE, "Não foi possível desambiguar a resposta do usuário.")
             self.voice.falar("Não consegui compreender a opção. Nenhuma alteração foi realizada.")
             return False

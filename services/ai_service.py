@@ -111,3 +111,18 @@ class AIService:
     def enviar_prompt_json(self, prompt: str) -> Any:
         """Alias para chamar_llm com saída JSON."""
         return self.chamar_llm(prompt, json_output=True)
+    
+    def processar_requisicao_complexa(self, mensagem_usuario: str, contexto: str = None) -> str:
+        """
+        Método de Fallback acionado quando o LLM local falha.
+        Envia a requisição para a API do Gemini na nuvem.
+        """
+        prompt = f"""
+        Você é um assistente doméstico. Processe e estruture o seguinte texto de compras:
+        "{mensagem_usuario}"
+        
+        Retorne os itens e valores identificados.
+        """
+        # Execute a chamada ao modelo Gemini aqui (ex: google-genai ou httpx)
+        resposta = self.gemini_client.generate_content(prompt) # Adapte para sua chamada real
+        return resposta.text

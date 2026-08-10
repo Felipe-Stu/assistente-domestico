@@ -1,158 +1,244 @@
-# 05 - Engenharia de Software
+# 05 - Engenharia do Software
 
-Este documento detalha os aspectos de Engenharia de Software aplicados na **Versão 2.1 (V2.1 - Patch de Correção 1)** do **Assistente Doméstico Inteligente**, descrevendo o padrão arquitetural em camadas, a gestão de dados, as dependências internas e externas, e apresenta o diagrama arquitetural atualizado.
+Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente (V3)**.
 
----
-
-## 1. Arquitetura em Camadas
-
-O sistema adota uma **Arquitetura Modular em Camadas**, estruturada para desacoplar as regras de negócios locais das APIs em nuvem e dos drivers de hardware. As quatro camadas da V2.1 estão organizadas da seguinte forma:
-
-### A. Camada de Orquestração (Entrypoint)
-*   **Módulo:** [main.py](file:///e:/Agente%20IA/assistente-domestico/app/main.py)
-*   **Responsabilidade:** Inicialização do sistema, configuração do escopo de importação global (`sys.path`), gerenciamento de exceções não tratadas e controle de encerramento. Adiciona um loop resiliente contra erros temporários de indisponibilidade da API do Gemini (Erro 503), salvando a transcrição e realizando retentativas automáticas a cada 5 segundos.
-
-### B. Camada de Inteligência e Lógica de Negócios
-*   **Módulo:** [inventory_assistant.py](file:///e:/Agente%20IA/assistente-domestico/services/inventory_assistant.py)
-*   **Responsabilidade:** Implementar a lógica de inventário de despesas e controle preditivo de estoque doméstico. Ela calcula autonomias estimadas de consumo (relação de dias por quantidade), avalia resíduos e implementa a árvore conversacional de tomada de decisão baseada na resposta de voz do usuário.
-
-### C. Camada de Serviços Técnicos (Integrações e Hardware)
-*   **Módulos:** 
-    *   [audio_service.py](file:///e:/Agente%20IA/assistente-domestico/services/audio_service.py): Gerencia a captação analógica do microfone, bips sonoros e analisa a amplitude RMS para cortes inteligentes por silêncio.
-    *   [voice_service.py](file:///e:/Agente%20IA/assistente-domestico/services/voice_service.py): Recebe textos, solicita a geração de áudio neural na API Edge TTS, controla a reprodução de som local através do mixer e descarta o áudio gerado.
-    *   [ai_service.py](file:///e:/Agente%20IA/assistente-domestico/services/ai_service.py): Prepara e otimiza os prompts do Gemini para converter frases livres de compras em objetos JSON estruturados e trata exceções de limite de requisições ou indisponibilidade de serviço.
-    *   [db_service.py](file:///e:/Agente%20IA/assistente-domestico/services/db_service.py): Centraliza as queries SQL do SQLite para persistência relacional de dados de compras, itens e estoque.
-
-### D. Camada Core e Utilitários (Infraestrutura de Apoio)
-*   **Módulos:** 
-    *   [config.py](file:///e:/Agente%20IA/assistente-domestico/core/config.py): Fornece suporte básico de configuração carregando o arquivo `.env` para a memória do processo, mapeia caminhos físicos globais e assegura a existência dos diretórios de banco de dados locais.
-    *   [logger_service.py](file:///e:/Agente%20IA/assistente-domestico/services/logger_service.py): Centraliza a escrita e persistência de arquivos físicos de log no disco, fornecendo suporte transversal e individualizado para todos os componentes do sistema sob o diretório `Logs/`.
+> [!NOTE]
+> Todos os diagramas abaixo foram construídos a partir da análise direta do código-fonte da V3. Os componentes e fluxos representados refletem o estado real do sistema.
 
 ---
 
-## 2. Fluxo das Informações (Entradas e Saídas)
-
-O sistema possui pontos de entrada e saída bem delimitados que refletem o processamento físico e lógico das informações:
-
-*   **Pontos de Entrada (Inputs):**
-    *   *Sinais Analógicos de Áudio:* Capturados via microfone físico (`audio_service.py`).
-    *   *Parâmetros e Variáveis:* Lidos do arquivo local `.env` (`config.py`).
-    *   *Dados de Consulta Relacional:* Tabelas do banco `assistente_casa.db` (`db_service.py`).
-    *   *Retornos de APIs (JSON e Streams):* Transcrição do Google, JSON estruturado do Gemini e stream de voz em MP3 do Edge TTS.
-*   **Pontos de Saída (Outputs):**
-    *   *Áudio Analógico (Fala do Assistente):* Saída emitida nos alto-falantes do computador pelo mixer (`voice_service.py`).
-    *   *Bips do Sistema:* Sinais sonoros emitidos na placa de som (`audio_service.py`).
-    *   *Persistência Física:* Gravações relacionais estruturadas no arquivo local SQLite (`db_service.py`).
-    *   *Persistência de Logs:* Arquivos textuais gerados em `Logs/main/main_log.txt` e `Logs/<nome_do_assistente>/log.txt` (`logger_service.py`).
-    *   *Mensagens de Logs:* Rastreamento formatado impresso no console (`logging`).
-
----
-
-## 3. Diagrama Arquitetural V2.1 (Mermaid)
-
-O diagrama a seguir descreve as comunicações, dependências e a nova arquitetura de logs e tratamento de erros do Gemini na Versão 2.1:
+## 1. Diagrama de Arquitetura — Componentes Principais
 
 ```mermaid
-graph TD
-    %% Camada de Apresentação e Orquestração
-    subgraph Orchestration ["Orquestração (Ponto de Entrada)"]
-        CLI["Linha de Comando (app/main.py)"]
+graph TB
+    subgraph "Entrada do Usuário"
+        MIC["🎤 Microfone\n(PyAudio)"]
+        SPK["🔊 Alto-falantes\n(pygame.mixer)"]
     end
 
-    %% Camada de Negócio e Serviços
-    subgraph Services ["Camada de Serviços & Regras de Negócio"]
-        InvSvc["Assistente de Estoque (services/inventory_assistant.py)"]
-        AudioSvc["Captura de Áudio (services/audio_service.py)"]
-        VoiceSvc["Síntese de Voz (services/voice_service.py)"]
-        AISvc["Estruturação de Texto (services/ai_service.py)"]
-        DBSvc["Persistência Relacional (services/db_service.py)"]
+    subgraph "Transcrição"
+        STT["Google Speech\nRecognition API\n(Externo)"]
     end
 
-    %% Camada Core & Logs
-    subgraph Core ["Configuração & Utilitários Core"]
-        Config["Configurações Globais (core/config.py)"]
-        Logger["Serviço de Log (services/logger_service.py)"]
+    subgraph "app/main.py — Orquestrador"
+        MAIN["GerenciadorDeSessao\n+ processar_solicitacao()"]
+        RETRY["resilience_service\nexecute_with_retry()"]
     end
 
-    %% Recursos Externos e Hardware
-    subgraph Hardware ["Hardware Local"]
-        Mic["Microfone Físico (Entrada)"]
-        Speaker["Alto-falantes / Mixer (Saída)"]
-        BipSound["Placa de Som (Bips)"]
+    subgraph "LLM Local — Ollama"
+        OLLAMA["Servidor Ollama\nhttp://127.0.0.1:11434"]
+        GEMMA["Gemma 3 4B\n(gemma4:e4b)"]
+        OLLAMA --> GEMMA
     end
 
-    subgraph APIs ["APIs em Nuvem (SaaS)"]
-        GoogleSpeech["Google Speech API"]
-        GoogleGemini["Google Gemini API (gemini-2.5-flash)"]
-        EdgeTTS["Microsoft Edge TTS API"]
+    subgraph "Serviços Especializados"
+        GEMMA_SVC["gemma_service\norquestrar_requisicao()"]
+        SHOPPING["shopping_assistant\nprocessar_texto_compra()"]
+        INVENTORY["inventory_assistant\nverificar_itens_expirados()\nprocessar_estoque_nova_compra()"]
     end
 
-    subgraph DB ["Banco de Dados"]
-        SqliteDB[("SQLite (assistente_casa.db)")]
+    subgraph "Camada de Abstração LLM"
+        LOCAL_PROV["LocalLLMProvider\n(Ollama)"]
+        CLOUD_PROV["CloudLLMProvider\n(Gemini)"]
     end
 
-    subgraph LogFiles ["Arquivos de Log (Disco)"]
-        TxtLogs["Logs de Texto (Logs/main_log.txt & logs.txt)"]
+    subgraph "IA na Nuvem — Fallback"
+        AI_SVC["ai_service\nGemini 2.5 Flash\n(Google Cloud)"]
     end
 
-    %% Relacionamentos e Fluxo de Dados
-    CLI -->|1. Inicializa / Consulta| DBSvc
-    CLI -->|2. Executa Varredura Preditiva| InvSvc
-    CLI -->|3. Grava Compras de Voz| AudioSvc
-    CLI -->|4. Salva Compra Relacional| DBSvc
-    CLI -->|Retry em caso de Erro 503| GoogleGemini
-    
-    InvSvc -->|Acessa e Atualiza Estoque| DBSvc
-    InvSvc -->|Fala Pergunta de Estoque| VoiceSvc
-    InvSvc -->|Ouve Resposta do Usuário| AudioSvc
-    InvSvc -->|Classifica Intenção Conversacional| GoogleGemini
+    subgraph "Persistência"
+        DB["DatabaseService\nSQLite"]
+        DBFILE["assistente_casa.db\ncompras / itens_compra\ncontrole_consumo"]
+    end
 
-    AudioSvc -->|Lê Buffer de Entrada| Mic
-    AudioSvc -->|Envia Gravação de Áudio| GoogleSpeech
-    GoogleSpeech -->|Retorna Texto Transcrito| AudioSvc
-    AudioSvc -->|Emite Feedback Auditivo| BipSound
+    subgraph "Síntese de Voz"
+        TTS["voice_service\nedge-tts\n(Microsoft Edge)"]
+    end
 
-    VoiceSvc -->|Gera Voz Neural de Texto| EdgeTTS
-    EdgeTTS -->|Retorna Stream MP3| VoiceSvc
-    VoiceSvc -->|Reproduz Som Falado| Speaker
-
-    AISvc -->|Envia Texto Bruto de Compras| GoogleGemini
-    GoogleGemini -->|Retorna Compras Estruturadas JSON| AISvc
-    CLI -.->|Usa para Normalizar| AISvc
-
-    DBSvc -->|Leitura e Escrita Relacional| SqliteDB
-    Config -.->|Fornece Paths e Credenciais| CLI
-    Config -.->|Fornece Params de Áudio| AudioSvc
-
-    %% Comunicação Transversal de Logs
-    CLI -.->|Registra logs| Logger
-    InvSvc -.->|Registra logs| Logger
-    AudioSvc -.->|Registra logs| Logger
-    VoiceSvc -.->|Registra logs| Logger
-    AISvc -.->|Registra logs| Logger
-    DBSvc -.->|Registra logs| Logger
-    Logger -->|Escreve fisicamente| TxtLogs
-
-    %% Estilos Visuais
-    style CLI fill:#f9f,stroke:#333,stroke-width:2px
-    style InvSvc fill:#ffb,stroke:#333,stroke-width:2px
-    style Logger fill:#fdb,stroke:#333,stroke-width:2px
-    style SqliteDB fill:#9f9,stroke:#333,stroke-width:2px
-    style GoogleGemini fill:#9bf,stroke:#333,stroke-width:1px
-    style EdgeTTS fill:#9bf,stroke:#333,stroke-width:1px
-    style GoogleSpeech fill:#9bf,stroke:#333,stroke-width:1px
+    MIC --> STT --> MAIN
+    MAIN --> RETRY
+    RETRY --> GEMMA_SVC --> OLLAMA
+    RETRY --> SHOPPING --> LOCAL_PROV --> OLLAMA
+    RETRY --> AI_SVC
+    SHOPPING --> DB --> DBFILE
+    INVENTORY --> LOCAL_PROV
+    INVENTORY --> DB
+    MAIN --> INVENTORY
+    INVENTORY --> TTS --> SPK
+    MAIN --> TTS
+    LOCAL_PROV --> CLOUD_PROV
+    CLOUD_PROV --> AI_SVC
 ```
 
 ---
 
-## 4. Inconsistências e Pontos de Atenção Identificados
+## 2. Diagrama de Fluxo — Processamento de uma Solicitação
 
-Identificou-se a seguinte inconsistência de dados no banco físico herdada da versão V2 que permanece relevante:
+```mermaid
+flowchart TD
+    A([Início]) --> B[AudioService\nCaptura voz do microfone]
+    B --> C{Áudio\ndetectado?}
+    C -- Não --> Z([Fim: Nenhuma fala])
+    C -- Sim --> D[Google Speech Recognition\nTranscreve para texto]
+    D --> E[execute_with_retry\norquestrar_requisicao - Gemma Local]
+    E --> F{Orquestração\nbem-sucedida?}
+    F -- Falha após 3x --> G[Fallback para Gemini\ndificuldade=medio_dificil]
+    F -- Sucesso --> H{Dificuldade\ndo orquestrador}
 
-> [!WARNING]
-> **Inconsistência de Esquema SQL em Tempo de Execução:**
-> O método `initialize_database()` em [db_service.py](file:///e:/Agente%20IA/assistente-domestico/services/db_service.py) cria a tabela `controle_consumo` sem as colunas `ultima_qtd_comprada` e `quantidade_residual_esgotada`.
->
-> Contudo, o arquivo físico pré-existente do banco de dados (`assistente_casa.db`) já possui essas colunas injetadas, e o arquivo [inventory_assistant.py](file:///e:/Agente%20IA/assistente-domestico/services/inventory_assistant.py) realiza updates diretos apontando para elas.
->
-> **Impacto:** Se o arquivo de banco de dados for deletado ou inicializado em um novo computador, a aplicação falhará com erro de SQL (`no such column`), uma vez que a criação da tabela não contempla essas duas colunas. Recomenda-se corrigir a query de criação de tabela em futuras versões.
+    H -- facil + compras --> I[execute_with_retry\nShoppingAssistant]
+    H -- facil + outro --> J[execute_with_retry\nexecutar_assistente_local]
+    H -- medio_dificil --> G
+
+    I --> K{LocalLLM\nbem-sucedido?}
+    K -- Sim --> L[Valida e sanitiza JSON]
+    K -- Falha após 3x --> G
+    L --> M[DatabaseService\nsalvar_compra_da_ia]
+    M --> N[VoiceService\nResponde ao usuário]
+
+    J --> N
+    G --> O[execute_with_retry\nai_service Gemini]
+    O --> P{Gemini\nbem-sucedido?}
+    P -- Sim --> N
+    P -- Falha após 3x --> Q[Mensagem de erro\npor voz]
+
+    N --> R[GerenciadorDeSessao\nAtualiza contexto]
+    Q --> R
+    R --> Z2([Fim])
+```
+
+---
+
+## 3. Diagrama de Comunicação — Relações entre Componentes
+
+```mermaid
+graph LR
+    USER["👤 Usuário"] -->|Voz| AUDIO["audio_service"]
+    AUDIO -->|Buffer PCM| GOOGLE_STT["Google Speech\nRecognition\n(Externo)"]
+    GOOGLE_STT -->|Texto transcrito| MAIN["main.py"]
+
+    MAIN -->|texto_transcrito| GEMMA_SVC["gemma_service"]
+    GEMMA_SVC -->|POST /api/chat| OLLAMA["Ollama Local\nGemma 3 4B"]
+    OLLAMA -->|JSON classificado| GEMMA_SVC
+    GEMMA_SVC -->|decisao dict| MAIN
+
+    MAIN -->|processar_texto_compra| SHOPPING["shopping_assistant"]
+    SHOPPING -->|gerar_json prompt| LOCAL_LLM["LocalLLMProvider\nOllama"]
+    LOCAL_LLM -->|POST /api/chat| OLLAMA
+    OLLAMA -->|JSON compras| LOCAL_LLM
+    LOCAL_LLM -->|dados dict| SHOPPING
+    SHOPPING -->|dados validados| DB["DatabaseService\nSQLite"]
+
+    MAIN -->|verificar_itens_expirados| INVENTORY["inventory_assistant"]
+    INVENTORY -->|falar pergunta| VOICE["voice_service"]
+    VOICE -->|texto| EDGE_TTS["Microsoft\nEdge TTS\n(Externo)"]
+    EDGE_TTS -->|MP3| VOICE
+    VOICE -->|áudio| USER
+
+    INVENTORY -->|capturar resposta| AUDIO
+    INVENTORY -->|_heuristica_rapida| REGEX["Regex / Heurística\n(interno)"]
+    REGEX -->|Miss| LOCAL_LLM
+    INVENTORY -->|UPDATE| DB
+
+    MAIN -->|fallback| AI["ai_service\nGemini Nuvem"]
+    AI -->|HTTPS| GEMINI["Google Gemini API\n(Externo)"]
+    GEMINI -->|resposta| AI
+    AI -->|texto| MAIN
+    MAIN -->|resposta_texto| VOICE
+```
+
+---
+
+## 4. Diagrama de Sequência — Execução Típica (Registro de Compra)
+
+```mermaid
+sequenceDiagram
+    actor User as 👤 Usuário
+    participant Audio as AudioService
+    participant STT as Google STT
+    participant Main as main.py
+    participant Retry as execute_with_retry
+    participant Gemma as gemma_service
+    participant Ollama as Ollama Local
+    participant Shopping as ShoppingAssistant
+    participant LocalLLM as LocalLLMProvider
+    participant DB as DatabaseService
+    participant Voice as VoiceService
+
+    User->>Audio: Fala: "fui ao Moreschi, comprei frango..."
+    Audio->>Audio: Captura buffer PCM (RMS monitoring)
+    Audio->>STT: AudioData (pt-BR)
+    STT-->>Audio: "fui ao Moreschi, comprei frango..."
+    Audio-->>Main: texto_transcrito
+
+    Main->>Retry: execute_with_retry(orquestrar_requisicao)
+    Retry->>Gemma: orquestrar_requisicao(texto)
+    Gemma->>Ollama: POST /api/chat [format=json, temp=0.1]
+    Note over Ollama: Inferência ~40s
+    Ollama-->>Gemma: {"dificuldade":"facil","contexto":"compras",...}
+    Gemma->>Gemma: _validar_schema_orquestrador()
+    Gemma-->>Retry: decisao dict
+    Retry-->>Main: {dificuldade:"facil", contexto:"compras"}
+
+    Main->>Retry: execute_with_retry(processar_texto_compra)
+    Retry->>Shopping: processar_texto_compra(texto)
+    Shopping->>LocalLLM: gerar_json(prompt_sistema, texto)
+    LocalLLM->>Ollama: POST /api/chat [format=json]
+    Note over Ollama: Inferência JSON compras
+    Ollama-->>LocalLLM: {"compras":[{"estabelecimento":"Moreschi","itens":[...]}]}
+    LocalLLM-->>Shopping: dados dict
+    Shopping->>Shopping: _validar_e_sanitizar_compra()
+    Shopping->>DB: salvar_compra_da_ia(dados_validados)
+    DB-->>Shopping: compra_id
+    Shopping-->>Retry: {"status":"sucesso", "compras_processadas":1}
+    Retry-->>Main: resultado
+
+    Main->>Voice: falar("Informações inseridas com sucesso!")
+    Voice->>Voice: edge_tts.Communicate(texto).save(mp3)
+    Voice->>Voice: pygame.mixer.music.play()
+    Voice-->>User: 🔊 Resposta por voz
+```
+
+---
+
+## 5. Diagrama de Bifurcações — Pontos de Decisão do Sistema
+
+```mermaid
+flowchart TD
+    START([Texto Transcrito]) --> ORCH{Orquestrador\nGemma Local}
+
+    ORCH -->|dificuldade='facil'\ncontexto='compras'| COMP[ShoppingAssistant\nLocalLLMProvider → Gemma]
+    ORCH -->|dificuldade='facil'\ncontexto='agenda'| AGENDA[executar_assistente_local\nGemma Local]
+    ORCH -->|dificuldade='facil'\ncontexto='inventario'| INVENT["InventoryAssistant\n(não implementado no roteador\nda V3 para criação)"]
+    ORCH -->|dificuldade='facil'\ncontexto='geral' ou 'outro'| OUTRO[executar_assistente_local\nGemma Local]
+    ORCH -->|dificuldade='medio_dificil'| NUVEM[ai_service\nGemini API]
+    ORCH -->|Falha após 3x retry| NUVEM
+
+    COMP -->|Sucesso| DB[(SQLite)]
+    COMP -->|Falha após 3x retry| NUVEM
+
+    INVENTORY_INIT([Inicialização]) --> VARR{Para cada item\ncom autonomia esgotada}
+    VARR --> RESP{Resposta do\nusuário}
+    RESP -->|Heurística Regex\nresolve| CLASS1[Classifica\nlocalmente - 0ms]
+    RESP -->|Heurística\nnão resolve| CLASS2[Gemma 4 Local\nLocalLLMProvider]
+    CLASS1 --> INT{Intenção}
+    CLASS2 --> INT
+    INT -->|CONFIRMACAO| CONF[Mantém resíduo estimado]
+    INT -->|NEGATIVA_ZERADO| ZERO[Zera estoque\nAtualiza ritmo]
+    INT -->|NEGATIVA_SEM_CONSUMO| INTACT[Mantém estoque antigo]
+    INT -->|DIVERGENCIA_QUANTIDADE| DIV[Ajusta para\nquantidade real]
+```
+
+---
+
+## 6. Padrões de Engenharia Identificados no Código
+
+| Padrão | Onde é aplicado | Finalidade |
+|--------|-----------------|------------|
+| **Strategy Pattern** | `llm_provider.py` (`BaseLLMProvider`) | Permite trocar o provedor LLM (local/nuvem) sem alterar os assistentes |
+| **Dependency Injection** | `main.py` → `ShoppingAssistant`, `InventoryAssistant` | Provedores LLM são injetados externamente, facilitando testes e troca |
+| **Retry Pattern** | `resilience_service.execute_with_retry` | Resiliência uniforme a falhas em qualquer chamada de LLM |
+| **Fallback Chain** | `main.py`: Local → Gemini Nuvem | Garantia de processamento mesmo com falha do modelo local |
+| **Chain of Responsibility** | `InventoryAssistant`: Regex → Gemma | Processamento progressivo, do mais rápido para o mais custoso |
+| **Session Management** | `GerenciadorDeSessao` em `main.py` | Manutenção de contexto e histórico entre interações |
+| **Schema Validation** | `gemma_service._validar_schema_orquestrador` | Contrato rígido de saída do LLM orquestrador |
+| **Sanitization Pipeline** | `_sanitizar_resposta_json` (em múltiplos módulos) | Remove marcações Markdown residuais do LLM antes do parse |
