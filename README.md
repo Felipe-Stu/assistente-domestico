@@ -1,6 +1,4 @@
-================================================================================
 ASSISTENTE DOMÉSTICO INTELIGENTE MODULAR (V3)
-================================================================================
 
 Este é o repositório do Assistente Doméstico Inteligente, um sistema leve, 
 modular e orientado a serviços com Arquitetura Híbrida de IA. Ele captura 
