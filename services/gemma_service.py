@@ -10,13 +10,14 @@ from services.llm_provider import (
 )
 
 from services.resilience_service import InvalidOrchestratorOutputException
+from services.project_analyzer.command_parser import detectar_comando_projeto
 from services.logger_service import logger as custom_logger
 
 
 # Schema de Validação
 VALORES_PERMITIDOS = {
     "dificuldade": {"facil", "medio_dificil"},
-    "contexto": {"compras", "agenda", "inventario", "programacao", "outro", "geral"},
+    "contexto": {"compras", "agenda", "inventario", "programacao", "projetos", "outro", "geral"},
     "acao": {"criar", "corrigir", "consultar", "delegar", "chavear_modo"}
 }
 
@@ -254,6 +255,20 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
             "acao": "chavear_modo",
             "resposta_direta": "Modo Qwen desativado. Retornando ao Gemma 4 como orquestrador padrão."
         }
+
+    # 1.1 Comando da Skill ProjectAnalyzer (determinístico, sem LLM)
+    comando_projeto = detectar_comando_projeto(texto_transcrito)
+    if comando_projeto is not None:
+        decisao = {
+            "dificuldade": "facil",
+            "mudanca_de_contexto": True,
+            "contexto": "projetos",
+            "acao": "consultar",
+            "parametros": comando_projeto
+        }
+        if not comando_projeto.get("caminho"):
+            decisao["resposta_direta"] = "Informe o caminho da pasta do projeto. Exemplo: analisar projeto E:\\MOBA"
+        return decisao
 
     # 2. Obter o modelo ativo para orquestrar
     modelo_ativo = obter_modelo_ativo()

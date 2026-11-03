@@ -20,7 +20,10 @@ from services.ai_service import AIService, ServiceUnavailableException, TokenExh
 from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
 from services.inventory_assistant import InventoryAssistant
-from services.llm_provider import LocalLLMProvider, CloudLLMProvider
+from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
+import services.llm_provider as llm_provider_estado
+from core.config import PROJECT_ANALYZER_MODEL, PROJECT_ANALYZER_OUTPUT_DIR
+from services.project_analyzer import ProjectAnalyzer, ProjetoInvalidoError
 from services.logger_service import logger as custom_logger
 from services.resilience_service import (
     InvalidOrchestratorOutputException,
@@ -182,6 +185,16 @@ class AssistenteRuntime:
             )
             emitir_electron("debug_log", {"message": "✓ Assistentes de domínio prontos."})
 
+            # 5. Skill ProjectAnalyzer — 100% local; escreve somente na pasta de saída
+            self.project_analyzer = ProjectAnalyzer(
+                llm_provider=LocalLLMProvider(modelo=PROJECT_ANALYZER_MODEL, temperatura=0.1),
+                pasta_saida=str(PROJECT_ANALYZER_OUTPUT_DIR),
+                nome_modelo=PROJECT_ANALYZER_MODEL,
+                preparar_modelo=self._preparar_vram_analise,
+                liberar_modelo=self._liberar_vram_analise,
+                progresso=lambda m: emitir_electron("debug_log", {"message": m})
+            )
+
         except Exception as e:
             logger.critical(f"Erro fatal na inicialização dos serviços essenciais: {e}")
             emitir_electron("error", {"message": f"Erro fatal na inicialização: {e}"})
@@ -312,6 +325,35 @@ class AssistenteRuntime:
             logger.warning(f"Falha ao salvar memória semântica: {e}")
 
     # -------------------------------------------------------------------------
+    # Skill ProjectAnalyzer
+    # -------------------------------------------------------------------------
+
+    def _preparar_vram_analise(self):
+        """Mesmo mecanismo do modo Qwen: libera o Gemma da VRAM antes de carregar o modelo da análise."""
+        if not llm_provider_estado.MODO_QWEN_ATIVO and PROJECT_ANALYZER_MODEL != MODELO_PADRAO:
+            alternar_modelo_vram(MODELO_PADRAO)
+
+    def _liberar_vram_analise(self):
+        """Libera o modelo da análise; o Gemma volta a ser carregado na próxima solicitação."""
+        if not llm_provider_estado.MODO_QWEN_ATIVO and PROJECT_ANALYZER_MODEL != MODELO_PADRAO:
+            alternar_modelo_vram(PROJECT_ANALYZER_MODEL)
+
+    def _executar_analise_projeto(self, caminho):
+        """Executa a Skill de forma síncrona (o chat fica em PROCESSING até o fim). Nunca usa a nuvem."""
+        if not caminho:
+            return "Informe o caminho da pasta do projeto. Exemplo: analisar projeto E:\\MOBA"
+        emitir_electron("debug_log", {"message": f"ProjectAnalyzer: analisando '{caminho}'. Isso pode levar alguns minutos..."})
+        try:
+            resultado = self.project_analyzer.analisar(caminho)
+            return ProjectAnalyzer.formatar_resposta(resultado)
+        except ProjetoInvalidoError as e:
+            return f"Não foi possível analisar: {e}"
+        except Exception as e:
+            logger.error(f"Falha na análise de projeto: {e}")
+            custom_logger.log_geral(f"[ProjectAnalyzer] Falha na análise de '{caminho}': {e}")
+            return f"A análise do projeto falhou: {e}"
+
+    # -------------------------------------------------------------------------
     # Processamento de Solicitação (Orquestração)
     # -------------------------------------------------------------------------
 
@@ -366,6 +408,19 @@ class AssistenteRuntime:
             logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
             self._falar_se_permitido(resposta_texto)
 
+            emitir_electron("assistant_message", {"text": resposta_texto})
+            self._set_estado("WAITING_INPUT")
+            return resposta_texto
+
+        # =====================================================================
+        # INTERCEPTAÇÃO: Skill ProjectAnalyzer (local, sem fallback para nuvem)
+        # =====================================================================
+        if contexto == "projetos":
+            caminho = (decisao.get("parametros") or {}).get("caminho")
+            resposta_texto = self._executar_analise_projeto(caminho)
+            self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
+            # Por voz, apenas a primeira linha (sem caminhos de pasta)
+            self._falar_se_permitido(resposta_texto.split("\n", 1)[0])
             emitir_electron("assistant_message", {"text": resposta_texto})
             self._set_estado("WAITING_INPUT")
             return resposta_texto

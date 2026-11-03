@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [V4] — Skill ProjectAnalyzer (2026-11-02)
+
+### Adicionado
+- `services/project_analyzer/`: Skill de análise de projetos e geração de documentação técnica 100% local (ver `Sobre a Versão/07 - Skill ProjectAnalyzer.md`).
+- Comando no chat: `analisar projeto <caminho>` (detecção determinística no orquestrador, contexto `projetos`).
+- `scripts/analyze_project.py`: execução pela linha de comando.
+- `tests/test_project_analyzer.py`: 22 testes (`python -m unittest discover -s tests -v`).
+- `core/config.py`: `PROJECT_ANALYZER_OUTPUT_DIR` (padrão `E:\Agente IA\Documentacao_Gerada`) e `PROJECT_ANALYZER_MODEL` (padrão `qwen2.5-coder:7b`).
+
+### Decisões
+- Saída fora do repositório e do projeto analisado; execução síncrona (chat bloqueado); modelo fixo Qwen 2.5-Coder com troca de VRAM (Gemma descarregado antes e Qwen liberado depois).
+- A rota `projetos` nunca usa o fallback para o Gemini, o RAG ou a memória semântica.
+
 ## [V4] — 2026-11-02 (branch `V4`)
 
 ### Adicionado

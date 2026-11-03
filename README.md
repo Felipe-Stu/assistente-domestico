@@ -102,3 +102,13 @@ assistente-domestico/
 4. Executar o Assistente:
 
    python app/main.py
+
+--------------------------------------------------------------------------------
+5. SKILL PROJECTANALYZER (ANÁLISE E DOCUMENTAÇÃO DE PROJETOS)
+--------------------------------------------------------------------------------
+
+No chat: analisar projeto E:\MOBA
+Linha de comando: python scripts/analyze_project.py "E:\MOBA"
+Modelo local: ollama pull qwen2.5-coder:7b
+Testes: python -m unittest discover -s tests -v
+Detalhes: Sobre a Versão/07 - Skill ProjectAnalyzer.md

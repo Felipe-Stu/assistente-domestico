@@ -53,6 +53,7 @@ assistente-domestico/
 │   ├── resilience_service.py            # Retry centralizado e parametrizável
 │   ├── shopping_assistant.py            # Compras via LLM + SQLite + ChromaDB
 │   ├── voice_service.py                 # Síntese neural (Edge TTS) + pygame
+│   ├── project_analyzer/                # [NOVO V4] Skill ProjectAnalyzer (análise e documentação local de projetos)
 │   └── vector/                          # [NOVO V4] Pacote da Arquitetura Vetorial
 │       ├── __init__.py                  # Exporta os 5 serviços vetoriais
 │       ├── embedding_service.py         # Geração de embeddings na CPU (SentenceTransformers)
@@ -152,6 +153,10 @@ assistente-domestico/
 #### C.5. `context_retrieval_service.py`
 **Responsabilidade:** Executa recuperação de memória semântica e gera string formatada para injeção como contexto nos prompts da LLM. Formato de saída: bloco delimitado com categoria, data e conteúdo para cada memória relevante.
 
+### D. Skill ProjectAnalyzer (`services/project_analyzer/`) — NOVO na V4
+
+**Responsabilidade:** Analisar um diretório de projeto (somente leitura) e gerar documentação Markdown na pasta `PROJECT_ANALYZER_OUTPUT_DIR`, usando Python para extração/indexação e o LLM local (`qwen2.5-coder:7b`) apenas para interpretação. Acionada pelo comando `analisar projeto <caminho>` (contexto `projetos`), sem fallback para a nuvem. Detalhes em `07 - Skill ProjectAnalyzer.md`.
+
 ---
 
 ## 3. Ciclo de Execução da Aplicação (Fluxo Principal V4)
@@ -198,6 +203,9 @@ assistente-domestico/
          │     │
          │     ├── [INTERCEPTAÇÃO: resposta_direta]
          │     │   → Retorna imediatamente sem roteamento
+         │     │
+         │     ├── [INTERCEPTAÇÃO: contexto="projetos"]
+         │     │   → ProjectAnalyzer (Qwen local) → Documentacao_Gerada
          │     │
          │     ├── [PASSO 2: Roteamento]
          │     │   ├── [facil + compras] → ShoppingAssistant → SQLite + ChromaDB

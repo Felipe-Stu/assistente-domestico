@@ -27,3 +27,9 @@ CHANNELS = int(os.getenv("AUDIO_CHANNELS", "1"))
 CHUNK_SIZE = int(os.getenv("AUDIO_CHUNK_SIZE", "1024"))
 # Alterado o padrão de 7 para 20 segundos de tolerância para você começar a falar
 RECORD_SECONDS = int(os.getenv("AUDIO_RECORD_SECONDS", "20"))
+
+# Skill ProjectAnalyzer — análise de projetos 100% local
+# Única pasta onde a Skill pode escrever (uma subpasta por projeto analisado)
+PROJECT_ANALYZER_OUTPUT_DIR = Path(os.getenv("PROJECT_ANALYZER_OUTPUT_DIR", str(BASE_DIR.parent / "Documentacao_Gerada")))
+# Modelo local usado para interpretar e redigir a análise
+PROJECT_ANALYZER_MODEL = os.getenv("PROJECT_ANALYZER_MODEL", "qwen2.5-coder:7b")
