@@ -1,8 +1,0 @@
-.venv/
-venv/
-ENV/
-*.db
-*.db-journal
-*.log
-.env
-secret_key.json
