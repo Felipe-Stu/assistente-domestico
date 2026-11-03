@@ -151,11 +151,19 @@ class AssistenteRuntime:
             self.cloud_llm = CloudLLMProvider(ai_service=self.ai_service)
             emitir_electron("debug_log", {"message": "✓ Provedores LLM configurados."})
 
-            # 3. Assistentes de Domínio
+            # 3. Serviços de voz em modo lazy (construtor leve, sem init de hardware).
+            #    Criados antes dos assistentes para serem compartilhados com eles.
+            self.voice_service = VoiceService()
+            self.audio_service = AudioService()
+
+            # 4. Assistentes de Domínio
             self.inventory_assistant = InventoryAssistant(
                 db_service=self.db_service,
                 llm_provider=self.local_llm,
-                ai_service=self.ai_service
+                ai_service=self.ai_service,
+                voice_service=self.voice_service,
+                audio_service=self.audio_service,
+                modo_voz_ativo=lambda: self.voice_mode_active
             )
 
             self.shopping_assistant = ShoppingAssistant(
@@ -165,10 +173,6 @@ class AssistenteRuntime:
                 vector_store=self.vector_store
             )
             emitir_electron("debug_log", {"message": "✓ Assistentes de domínio prontos."})
-
-            # 4. Instanciar serviços de voz em modo lazy (construtor leve, sem init de hardware)
-            self.voice_service = VoiceService()
-            self.audio_service = AudioService()
 
         except Exception as e:
             logger.critical(f"Erro fatal na inicialização dos serviços essenciais: {e}")

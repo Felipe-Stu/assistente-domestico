@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from services.audio_service import AudioService
 from services.llm_provider import BaseLLMProvider
@@ -21,15 +21,23 @@ class InventoryAssistant:
         self,
         db_service: Any,
         ai_service: Any = None,
-        llm_provider: Optional[BaseLLMProvider] = None
+        llm_provider: Optional[BaseLLMProvider] = None,
+        voice_service: Optional[VoiceService] = None,
+        audio_service: Optional[AudioService] = None,
+        modo_voz_ativo: Optional[Callable[[], bool]] = None
     ):
         """
         Inicializa o assistente de controle de estoque.
         Suporta o Gemma 4 local via llm_provider ou ai_service.
+
+        voice_service / audio_service: instâncias compartilhadas do runtime (V4).
+        modo_voz_ativo: função que informa se o usuário ativou o modo voz na interface.
+        Sem modo voz, o assistente não fala nem escuta (modelo Text-First).
         """
         self.db = db_service
-        self.voice = VoiceService()
-        self.audio = AudioService()
+        self.voice = voice_service or VoiceService()
+        self.audio = audio_service or AudioService()
+        self._modo_voz_ativo = modo_voz_ativo
         self.ai_service = ai_service
         self.llm_provider = llm_provider or ai_service
 
@@ -40,6 +48,12 @@ class InventoryAssistant:
             NOME_ASSISTENTE, 
             "Inicialização do serviço InventoryAssistant (Gemma 4 Local) concluída com sucesso."
         )
+
+    def _voz_disponivel(self) -> bool:
+        """True somente se o modo voz está ativo e TTS + microfone estão prontos."""
+        if self._modo_voz_ativo is not None and not self._modo_voz_ativo():
+            return False
+        return self.voice.esta_disponivel() and self.audio.esta_disponivel()
 
     def _calcular_dias_decorridos(self, data_anterior_str: str) -> int:
         """Calcula a diferença em dias entre a data atual e a data da última compra."""
@@ -212,6 +226,15 @@ class InventoryAssistant:
                 msg_expirado = f"Item expirado identificado: '{nome}' (Dias decorridos: {dias_decorridos}, Autonomia estimada: {autonomia_total})."
                 custom_logger.log_assistente(NOME_ASSISTENTE, msg_expirado)
 
+                if not self._voz_disponivel():
+                    # Modo texto: não pergunta por voz; marca para validação posterior
+                    self.db.marcar_validacao_pendente(id_item)
+                    custom_logger.log_assistente(
+                        NOME_ASSISTENTE,
+                        f"Modo voz inativo. '{nome}' marcado com validação pendente."
+                    )
+                    continue
+
                 pergunta = f"Felipe, notei que o tempo estimado para o seu estoque de {nome} acabou. O produto chegou ao fim?"
                 self.voice.falar(pergunta)
 
@@ -303,12 +326,21 @@ class InventoryAssistant:
             f"Pelo que consta, você deve possuir ainda cerca de {residuos_estimado:.1f} unidades ou litros de {nome_produto} em estoque. "
             f"Confirma que possui essa quantidade?"
         )
-        self.voice.falar(pergunta)
+        if self._voz_disponivel():
+            self.voice.falar(pergunta)
 
-        resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
-        custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta do usuário para o resíduo de '{nome_produto}': '{resposta_bruta}'")
+            resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
+            custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta do usuário para o resíduo de '{nome_produto}': '{resposta_bruta}'")
 
-        analise = self._classificar_resposta_usuario(resposta_bruta)
+            analise = self._classificar_resposta_usuario(resposta_bruta)
+        else:
+            # Modo texto: sem pergunta por voz, mantém o resíduo estimado
+            resposta_bruta = ""
+            analise = {"intencao": "CONFIRMACAO"}
+            custom_logger.log_assistente(
+                NOME_ASSISTENTE,
+                f"Modo voz inativo. Resíduo estimado de '{nome_produto}' mantido sem confirmação."
+            )
 
         intencao = str(analise.get("intencao", "")).upper().strip()
         qtd_real = analise.get("quantidade_real")
