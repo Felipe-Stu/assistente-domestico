@@ -142,25 +142,25 @@ class InventoryAssistant:
         custom_logger.log_assistente(NOME_ASSISTENTE, msg_gemma)
 
         prompt_sistema = """
-Você é um classificador local especializado em controle de estoque residencial por voz.
-Sua missão é extrair a intenção e quantidade informada pelo usuário a partir da transcrição de áudio.
+        Você é um classificador local especializado em controle de estoque residencial por voz.
+        Sua missão é extrair a intenção e quantidade informada pelo usuário a partir da transcrição de áudio.
 
-INTENÇÕES PERMITIDAS:
-1. "CONFIRMACAO": O usuário concorda com o valor estimado ou diz que está tudo certo.
-2. "NEGATIVA_ZERADO": O usuário afirma que o produto acabou, zerou, acabou tudo ou não tem mais nada.
-3. "NEGATIVA_SEM_CONSUMO": O usuário afirma que não abriu, não usou, continua lacrado ou intacto.
-4. "DIVERGENCIA_QUANTIDADE": O usuário menciona uma quantidade física explícita restante (ex: "tenho 2 pacotes", "sobraram 1.5 litros", "só tem meio quilo").
+        INTENÇÕES PERMITIDAS:
+        1. "CONFIRMACAO": O usuário concorda com o valor estimado ou diz que está tudo certo.
+        2. "NEGATIVA_ZERADO": O usuário afirma que o produto acabou, zerou, acabou tudo ou não tem mais nada.
+        3. "NEGATIVA_SEM_CONSUMO": O usuário afirma que não abriu, não usou, continua lacrado ou intacto.
+        4. "DIVERGENCIA_QUANTIDADE": O usuário menciona uma quantidade física explícita restante (ex: "tenho 2 pacotes", "sobraram 1.5 litros", "só tem meio quilo").
 
-REGRAS:
-- Se a intenção for "DIVERGENCIA_QUANTIDADE", extraia o número em "quantidade_real" (float).
-- Se não houver quantidade informada, "quantidade_real" deve ser null.
-- Retorne estritamente um JSON no formato exigido, sem markdown extra.
+        REGRAS:
+        - Se a intenção for "DIVERGENCIA_QUANTIDADE", extraia o número em "quantidade_real" (float).
+        - Se não houver quantidade informada, "quantidade_real" deve ser null.
+        - Retorne estritamente um JSON no formato exigido, sem markdown extra.
 
-FORMATO OBRIGATÓRIO DE SAÍDA:
-{
-    "intencao": "CONFIRMACAO" | "NEGATIVA_ZERADO" | "NEGATIVA_SEM_CONSUMO" | "DIVERGENCIA_QUANTIDADE",
-    "quantidade_real": float ou null
-}
+        FORMATO OBRIGATÓRIO DE SAÍDA:
+        {
+            "intencao": "CONFIRMACAO" | "NEGATIVA_ZERADO" | "NEGATIVA_SEM_CONSUMO" | "DIVERGENCIA_QUANTIDADE",
+            "quantidade_real": float ou null
+        }
 """
 
         try:

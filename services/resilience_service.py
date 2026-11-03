@@ -1,4 +1,6 @@
 import time
+import json
+import re
 from typing import Callable, Any, Tuple, Type
 from services.logger_service import logger as custom_logger
 
@@ -16,6 +18,36 @@ class MaxRetriesExceededException(ResilienceException):
 class InvalidOrchestratorOutputException(ResilienceException):
     """Lançada quando a resposta do Orquestrador não respeita o schema esperado."""
     pass
+
+
+def parse_json_com_fallback(texto_llm: str) -> dict:
+    """
+    Tenta decodificar o JSON recebido da LLM local.
+    Se falhar, aplica regras de higienização Regex e tenta novamente.
+    Caso persista, lança ValueError para acionar o Fallback de nuvem.
+    """
+    texto_limpo = texto_llm.strip()
+    
+    # 1. Tentativa de Parse Direto
+    try:
+        return json.loads(texto_limpo)
+    except json.JSONDecodeError:
+        custom_logger.log_geral("[Resilience] JSON direto falhou. Iniciando higienização...")
+
+    # 2. Higienização: Remove blocos ```json ... ``` e pega apenas o conteúdo entre { e }
+    match = re.search(r'\{.*\}', texto_limpo, re.DOTALL)
+    if match:
+        json_extraido = match.group(0)
+        try:
+            dados = json.loads(json_extraido)
+            custom_logger.log_geral("[Resilience] JSON recuperado com sucesso após higienização por Regex.")
+            return dados
+        except json.JSONDecodeError as e:
+            custom_logger.log_geral(f"[Resilience] Falha ao decodificar JSON mesmo após Regex: {e}")
+
+    # 3. Se todas as tentativas locais falharem
+    custom_logger.log_geral("[Resilience] Falha crítica de parsing no JSON local. Disparando exceção de fallback.")
+    raise ValueError("INVALID_JSON_LOCAL")
 
 
 def execute_with_retry(

@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional
 
 from services.llm_provider import BaseLLMProvider
 from services.logger_service import logger as custom_logger
+from services.vector.vector_store_service import VectorStoreService, VectorDocument
 
 # Logger do console (terminal)
 logging_logger = logging.getLogger(__name__)
@@ -16,16 +17,16 @@ class ShoppingAssistant:
         self, 
         db_service: Any, 
         ai_service: Any = None, 
-        llm_provider: Optional[BaseLLMProvider] = None
+        llm_provider: Optional[BaseLLMProvider] = None,
+        vector_store: Optional[VectorStoreService] = None
     ):
         """
-        Inicializa o assistente de compras.
-        Suporta injeção flexível do serviço de IA (ai_service ou llm_provider desacoplado).
+        Inicializa o assistente de compras com suporte a SQLite e Banco Vetorial (ChromaDB).
         """
         self.db_service = db_service
         self.ai_service = ai_service
-        # Se llm_provider não for informado explicitamente, assume o ai_service como provedor
         self.llm_provider = llm_provider or ai_service
+        self.vector_store = vector_store or VectorStoreService()
         
         if not self.llm_provider:
             logging_logger.warning(
@@ -34,7 +35,7 @@ class ShoppingAssistant:
 
         custom_logger.log_assistente(
             NOME_ASSISTENTE, 
-            "Inicialização do assistente de compras concluída com sucesso."
+            "Inicialização do assistente de compras (com vetorização integrada) concluída com sucesso."
         )
 
     def _validar_e_sanitizar_compra(self, dados_compra: dict) -> dict:
@@ -251,6 +252,48 @@ class ShoppingAssistant:
             msg_db = f"Procedimentos feitos: Compra (ID: {compra_id}) e {qtd_itens} itens gravados no banco SQLite."
             logging_logger.info("Compra gravada com sucesso pelo ShoppingAssistant! ID: %s", compra_id)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_db)
+
+            # Vetorização automática dos itens gravados no ChromaDB
+            try:
+                data_c = dados_validados.get("data_compra") or data_atual
+                comercio_c = dados_validados.get("estabelecimento") or "Não informado"
+                docs_vetoriais = []
+
+                for idx, item in enumerate(dados_validados.get("itens", []), 1):
+                    prod = item.get("produto", "produto")
+                    marca = item.get("marca")
+                    marca_str = f" da marca {marca}" if marca else ""
+                    qtd = item.get("quantidade", 1.0)
+                    unid = item.get("unidade", "un")
+                    v_tot = item.get("valor_total", 0.0)
+                    v_unit = item.get("valor_unitario", 0.0)
+                    cat = item.get("categoria", "geral")
+
+                    texto_item = (
+                        f"Compra de {qtd} {unid} de {prod}{marca_str} no estabelecimento {comercio_c} "
+                        f"por R$ {v_tot:.2f} (R$ {v_unit:.2f}/{unid}) na data {data_c}. Categoria: {cat}."
+                    )
+
+                    doc_id = f"purchase_item_live_{compra_id}_{idx}"
+                    meta = {
+                        "assistant": "compras",
+                        "category": str(cat).lower(),
+                        "entity_type": "purchase_item",
+                        "compra_id": compra_id,
+                        "produto": str(prod).lower(),
+                        "estabelecimento": str(comercio_c).lower(),
+                        "created_at": data_c,
+                        "source": "live_purchase"
+                    }
+                    docs_vetoriais.append(VectorDocument(id=doc_id, content=texto_item, metadata=meta))
+
+                if docs_vetoriais:
+                    self.vector_store.upsert_documents(docs_vetoriais)
+                    logging_logger.info(f"Vetorização de {len(docs_vetoriais)} itens da compra ID {compra_id} concluída no ChromaDB.")
+            except Exception as e_vec:
+                logging_logger.error(f"Erro ao vetorizar itens da compra ID {compra_id} no ChromaDB: {e_vec}")
+                custom_logger.log_assistente(NOME_ASSISTENTE, f"Alerta ao vetorizar compra no ChromaDB: {e_vec}")
+
             compras_salvas += 1
 
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Dados de processamento: {compras_salvas} compras salvas com sucesso.")

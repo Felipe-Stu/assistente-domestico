@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente Doméstico Inteligente</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-icon">🏠</span>
+                <h1>Assistente Doméstico</h1>
+            </div>
+            <div class="status-panel">
+                <div class="status-indicator">
+                    <span id="status-dot" class="dot dot-starting"></span>
+                    <span id="status-text">Conectando...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-main">
+            <!-- Sidebar Panel -->
+            <aside class="control-panel">
+                <div class="panel-section">
+                    <h2>Controles</h2>
+                    <div class="control-group">
+                        <!-- Toggle Switch de Modo Voz -->
+                        <div class="voice-toggle-container">
+                            <div class="voice-toggle-header">
+                                <span class="voice-toggle-label">Modo Voz</span>
+                                <label class="toggle-switch" id="voice-mode-switch">
+                                    <input type="checkbox" id="voice-mode-checkbox">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div id="voice-status-badge" class="voice-status-badge badge-inactive">
+                                <span class="badge-icon">🔇</span>
+                                <span class="badge-text">Desativado</span>
+                            </div>
+                        </div>
+
+                        <hr class="control-divider">
+
+                        <!-- Botão Mute (TTS) -->
+                        <button id="mute-toggle-btn" class="btn btn-audio-on">
+                            <span class="btn-icon">🔊</span>
+                            <span class="btn-text">Áudio Ativado</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h2>Terminal Interno</h2>
+                    <div id="debug-log-area" class="debug-log">
+                        <p class="debug-msg system-msg">[Sistema] Conectando ao back-end...</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Container -->
+            <section class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="message assistant-msg">
+                        <div class="msg-avatar">🤖</div>
+                        <div class="msg-content">
+                            <p>Olá! Estou pronto para ajudar você na gestão doméstica. O que deseja fazer?</p>
+                            <span class="msg-time">Sistema</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input area — HABILITADO desde o início -->
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="Digite sua mensagem aqui...">
+                    <button id="send-btn" class="btn btn-send">➤</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>

@@ -1,21 +1,192 @@
 import json
-import ollama
+from typing import Dict, Any, List, Optional
+
+from services.llm_provider import (
+    obter_provedor_local,
+    ativar_modo_qwen,
+    desativar_modo_qwen,
+    obter_modelo_ativo,
+    _atualizar_timestamp_atividade
+)
+
 from services.resilience_service import InvalidOrchestratorOutputException
 from services.logger_service import logger as custom_logger
 
-NOME_MODELO = "gemma4:e4b"
 
+# Schema de Validação
 VALORES_PERMITIDOS = {
     "dificuldade": {"facil", "medio_dificil"},
-    "contexto": {"compras", "agenda", "inventario", "outro", "geral"},
-    "acao": {"criar", "corrigir", "consultar", "delegar"}
+    "contexto": {"compras", "agenda", "inventario", "programacao", "outro", "geral"},
+    "acao": {"criar", "corrigir", "consultar", "delegar", "chavear_modo"}
 }
 
 
+# Prompt Assistente Especialista de Programação
+PROMPT_PROGRAMACAO = """
+    # PAPEL
+
+    Você é o **Copilot de Programação e Engenheiro de Software Sênior** do projeto **Assistente Doméstico**.
+
+    Sua função é analisar, desenvolver, corrigir, documentar e evoluir o sistema **sem quebrar funcionalidades existentes**.
+
+    # RESPONSABILIDADES
+
+    Você pode auxiliar em:
+
+    1. **Código**
+
+    * Analisar, criar, corrigir, refatorar e otimizar código.
+    * Tecnologias principais: Python, SQL, JavaScript, HTML/CSS, Docker e outras necessárias ao projeto.
+    * Priorize simplicidade, legibilidade, reutilização e manutenção.
+
+    2. **Arquitetura**
+
+    * Analisar a arquitetura existente antes de propor mudanças.
+    * Respeitar os padrões, serviços, estruturas e convenções já utilizados no projeto.
+    * Evitar reescrever componentes que já funcionam.
+    * Não introduzir tecnologias ou complexidade sem necessidade.
+
+    3. **Bugs e erros**
+
+    * Identificar a causa provável do problema antes de alterar o código.
+    * Explicar brevemente a causa.
+    * Propor a menor alteração necessária para corrigir o problema.
+    * Considerar efeitos colaterais e compatibilidade com o restante do sistema.
+
+    4. **Documentação**
+
+    * Criar e atualizar documentação Markdown.
+    * Seguir o padrão dos documentos existentes em:
+        `E:\Agente IA\assistente-domestico\Sobre a Versão`
+    * Manter documentação objetiva, técnica e organizada.
+
+    5. **Arquivos do projeto**
+
+    * Atualizar `README`, `requirements`, `.gitignore` e demais arquivos de configuração quando necessário.
+    * Só altere arquivos quando a mudança estiver relacionada ao trabalho solicitado.
+
+    6. **Testes**
+
+    * Executar testes locais quando solicitado.
+    * Pode utilizar PowerShell, CMD, Docker e ferramentas disponíveis no ambiente, desde que a ação esteja relacionada à tarefa solicitada.
+    * Antes de executar comandos potencialmente destrutivos, confirme com o usuário.
+
+    7. **Registro de desenvolvimento**
+
+    * Ao finalizar uma tarefa, produza um resumo curto contendo:
+
+        * o que foi alterado;
+        * arquivos afetados;
+        * problema resolvido;
+        * testes realizados;
+        * resultado.
+
+    # REGRAS DE DESENVOLVIMENTO
+
+    Siga sempre esta ordem:
+
+    ```text
+    1. Entender a solicitação
+    2. Analisar o código relacionado
+    3. Identificar a causa ou necessidade
+    4. Verificar padrões existentes
+    5. Propor a solução
+    6. Implementar somente o necessário
+    7. Testar
+    8. Verificar possíveis efeitos colaterais
+    9. Resumir as alterações
+    ```
+
+    ## REGRAS IMPORTANTES
+
+    * **Não invente arquivos, funções, classes ou comportamentos que não existem.**
+    * Quando precisar de informações que não estão disponíveis, informe o que está faltando.
+    * Não faça alterações grandes quando uma alteração pequena resolve o problema.
+    * Preserve compatibilidade com o código existente.
+    * Não remova funcionalidades sem justificar.
+    * Não duplique lógica existente; reutilize componentes quando possível.
+    * Não altere arquivos não relacionados à tarefa.
+    * Não assuma que uma solução é correta apenas porque funciona isoladamente.
+    * Considere sempre o impacto da alteração no restante do sistema.
+    * Prefira soluções simples e robustas a soluções excessivamente complexas.
+
+    # AO ANALISAR UM PROJETO
+
+    Quando a solicitação envolver arquitetura ou mudanças estruturais:
+
+    1. Analise primeiro os arquivos relevantes.
+    2. Identifique como os componentes atuais se comunicam.
+    3. Localize os pontos de entrada e saída.
+    4. Identifique dependências e efeitos colaterais.
+    5. Só então proponha alterações.
+
+    Para mudanças maiores, apresente primeiro:
+
+    ```text
+    DIAGNÓSTICO
+    SOLUÇÃO PROPOSTA
+    ARQUIVOS AFETADOS
+    PLANO DE IMPLEMENTAÇÃO
+    ```
+
+    Depois execute a implementação.
+
+    # FORMATO DAS RESPOSTAS
+
+    Responda sempre em **Markdown**, de forma:
+
+    * clara;
+    * objetiva;
+    * técnica;
+    * estruturada.
+
+    Evite explicações longas quando uma resposta curta for suficiente.
+
+    Para código, utilize blocos de código com a linguagem correta.
+
+    Para alterações, informe claramente:
+
+    ```text
+    Alterado:
+    - arquivo
+    - arquivo
+
+    Motivo:
+    - explicação curta
+
+    Teste:
+    - teste executado
+
+    Resultado:
+    - resultado
+    ```
+
+    # PRIORIDADES
+
+    Ao tomar decisões, siga esta ordem:
+
+    1. **Não quebrar funcionalidades existentes**
+    2. **Correção**
+    3. **Compatibilidade com a arquitetura atual**
+    4. **Simplicidade**
+    5. **Manutenibilidade**
+    6. **Desempenho**
+    7. **Novas funcionalidades**
+
+    Você é um **engenheiro de software dentro de um projeto existente**.
+
+    Não tente reinventar o projeto.
+
+    **Analise antes de alterar, altere somente o necessário e valide o resultado.**
+"""
+
+
+# ==============================================================================
+# SANITIZAÇÃO E VALIDAÇÃO DE SCHEMA
+# ==============================================================================
+
 def _sanitizar_resposta_json(conteudo_bruto: str) -> str:
-    """
-    Remove marcações de código Markdown (```json ... ```) e espaços extras.
-    """
+    """Remove marcações de código Markdown (```json ... ```) e espaços extras."""
     conteudo = conteudo_bruto.strip()
     if conteudo.startswith("```"):
         linhas = conteudo.splitlines()
@@ -29,16 +200,16 @@ def _sanitizar_resposta_json(conteudo_bruto: str) -> str:
 
 def _validar_schema_orquestrador(dados: dict) -> None:
     """
-    Valida rigorosamente se o dicionário atende ao contrato exigido do Orquestrador.
+    Valida se o dicionário atende ao contrato do Orquestrador.
     Lança InvalidOrchestratorOutputException se qualquer regra for violada.
     """
     if not isinstance(dados, dict):
-        raise InvalidOrchestratorOutputException("O retorno do Gemma não é um objeto JSON/dicionário válido.")
+        raise InvalidOrchestratorOutputException("O retorno da IA não é um objeto JSON/dicionário válido.")
 
     campos_obrigatorios = ["dificuldade", "mudanca_de_contexto", "contexto", "acao"]
     for campo in campos_obrigatorios:
         if campo not in dados:
-            raise InvalidOrchestratorOutputException(f"Campo obrigatório ausente no JSON do Gemma: '{campo}'")
+            raise InvalidOrchestratorOutputException(f"Campo obrigatório ausente no JSON: '{campo}'")
 
     if not isinstance(dados["mudanca_de_contexto"], bool):
         raise InvalidOrchestratorOutputException("O campo 'mudanca_de_contexto' deve ser booleano (true/false).")
@@ -51,10 +222,41 @@ def _validar_schema_orquestrador(dados: dict) -> None:
             )
 
 
-def orquestrar_requisicao(texto_transcrito: str, contexto_atual: str = None) -> dict:
+# ==============================================================================
+# ORQUESTRAÇÃO E EXECUÇÃO
+# ==============================================================================
+
+def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] = None) -> dict:
     """
-        O Orquestrador analisa a solicitação do usuário e o contexto atual e determina a dificuldade, o contexto e a ação necessária.
+    O Orquestrador analisa a solicitação usando o modelo ativo (Gemma ou Qwen)
+    e classifica a dificuldade, o contexto e a ação necessária.
     """
+    _atualizar_timestamp_atividade()
+    
+    # 1. Tratamento de Comandos Diretos de Chaveamento de Modo
+    texto_lower = texto_transcrito.lower()
+    if any(cmd in texto_lower for cmd in ["ativar qwen", "modo qwen", "modo programador", "chamar qwen", "usar qwen"]):
+        ativar_modo_qwen()
+        return {
+            "dificuldade": "facil",
+            "mudanca_de_contexto": True,
+            "contexto": "programacao",
+            "acao": "chavear_modo",
+            "resposta_direta": "Modo Qwen ativado com sucesso! Assumi o controle. Como posso te ajudar?"
+        }
+
+    if any(cmd in texto_lower for cmd in ["desativar qwen", "voltar gemma", "modo normal", "sair do qwen"]):
+        desativar_modo_qwen()
+        return {
+            "dificuldade": "facil",
+            "mudanca_de_contexto": True,
+            "contexto": "geral",
+            "acao": "chavear_modo",
+            "resposta_direta": "Modo Qwen desativado. Retornando ao Gemma 4 como orquestrador padrão."
+        }
+
+    # 2. Obter o modelo ativo para orquestrar
+    modelo_ativo = obter_modelo_ativo()
 
     system_prompt = f"""
         Você é o ORQUESTRADOR do assistente virtual.
@@ -226,55 +428,44 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: str = None) -> 
     """
 
     try:
-        cliente_ollama = ollama.Client(timeout=120.0)
-        response = cliente_ollama.chat(
-            model=NOME_MODELO,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": texto_transcrito}
-            ],
-            format="json",
-            options={"temperature": 0.1}
-        )
-
-        conteudo_bruto = response['message']['content']
-        conteudo_sanitizado = _sanitizar_resposta_json(conteudo_bruto)
+        provedor = obter_provedor_local(temperatura=0.1)
+        dados = provedor.gerar_json(system_prompt, texto_transcrito)
         
-        dados = json.loads(conteudo_sanitizado)
         _validar_schema_orquestrador(dados)
-
         return dados
 
-    except json.JSONDecodeError as e:
-        msg = f"Erro de parse no JSON retornado pelo Gemma: {e}"
-        custom_logger.log_geral(f"[GemmaService] {msg}")
+    except InvalidOrchestratorOutputException as e:
+        msg = f"Erro de validação ou parse no JSON retornado pelo Orquestrador ({modelo_ativo}): {e}"
+        custom_logger.log_geral(f"[LLMService] {msg}")
         raise InvalidOrchestratorOutputException(msg) from e
     except Exception as e:
-        if not isinstance(e, InvalidOrchestratorOutputException):
-            custom_logger.log_geral(f"[GemmaService] Erro inesperado na chamada do Gemma: {e}")
+        custom_logger.log_geral(f"[LLMService] Erro inesperado no Orquestrador ({modelo_ativo}): {e}")
         raise
 
 
-def executar_assistente_local(contexto: str, historico_mensagens: list, instrucao_usuario: str) -> str:
+def executar_assistente_local(
+    contexto: str, 
+    historico_mensagens: List[Dict[str, str]], 
+    instrucao_usuario: str
+) -> str:
     """
-    Executa demandas simples no modelo local especialista.
+    Executa a tarefa utilizando a IA ativa (Gemma ou Qwen).
+    Funciona de forma unificada para qualquer contexto ou assistente.
     """
+    _atualizar_timestamp_atividade()
+
     system_prompts = {
         "compras": "Você é o Assistente de Compras e Gastos. Extraia valores, produtos e locais em JSON para gravação no banco.",
-        "agenda": "Você é o Assistente de Agenda. Extraia eventos, datas e horários em JSON."
+        "agenda": "Você é o Assistente de Agenda. Extraia eventos, datas e horários em JSON.",
+        "programacao": PROMPT_PROGRAMACAO
     }
 
     prompt_sistema = system_prompts.get(contexto, "Você é um assistente pessoal prestativo.")
 
-    messages = [{"role": "system", "content": prompt_sistema}]
-    messages.extend(historico_mensagens)
-    messages.append({"role": "user", "content": instrucao_usuario})
+    provedor = obter_provedor_local(temperatura=0.2)
 
-    cliente_ollama = ollama.Client(timeout=120.0)
-    response = cliente_ollama.chat(
-        model=NOME_MODELO,
-        messages=messages,
-        format="json" if contexto in ["compras", "agenda"] else None
-    )
-
-    return response['message']['content']
+    if contexto in ["compras", "agenda"]:
+        dados_json = provedor.gerar_json(prompt_sistema, instrucao_usuario, historico_mensagens)
+        return json.dumps(dados_json, ensure_ascii=False)
+    else:
+        return provedor.gerar_texto(prompt_sistema, instrucao_usuario, historico_mensagens)

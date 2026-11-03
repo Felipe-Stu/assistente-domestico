@@ -1,0 +1,567 @@
+/* Global variables and color scheme */
+:root {
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #1e293b;
+    --border-color: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    
+    --color-primary: #3b82f6;      /* Blue */
+    --color-primary-hover: #2563eb;
+    --color-success: #10b981;      /* Emerald */
+    --color-success-hover: #059669;
+    --color-danger: #ef4444;       /* Red */
+    --color-danger-hover: #dc2626;
+    --color-warning: #f59e0b;      /* Amber */
+    --color-purple: #a855f7;       /* Purple */
+    
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    overflow: hidden;
+    height: 100vh;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-icon {
+    font-size: 1.5rem;
+}
+
+.logo-area h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* Status Indicator */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--bg-main);
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.dot-starting {
+    background-color: var(--text-secondary);
+}
+
+.dot-initializing {
+    background-color: var(--color-primary);
+    box-shadow: 0 0 10px var(--color-primary);
+    animation: pulse 1.5s infinite;
+}
+
+.dot-ready {
+    background-color: var(--color-success);
+    box-shadow: 0 0 10px var(--color-success);
+}
+
+.dot-processing {
+    background-color: var(--color-warning);
+    box-shadow: 0 0 10px var(--color-warning);
+    animation: pulse 1.5s infinite;
+}
+
+.dot-responding {
+    background-color: var(--color-purple);
+    box-shadow: 0 0 10px var(--color-purple);
+    animation: pulse 1.5s infinite;
+}
+
+.dot-error {
+    background-color: var(--color-danger);
+    box-shadow: 0 0 10px var(--color-danger);
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.5; }
+}
+
+/* Main workspace */
+.app-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Control Panel (Sidebar) */
+.control-panel {
+    width: 260px;
+    background-color: var(--bg-card);
+    border-right: 1px solid var(--border-color);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    overflow-y: auto;
+}
+
+.panel-section h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.control-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 0.25rem 0;
+}
+
+/* ==========================================================================
+   Toggle Switch de Modo Voz
+   ========================================================================== */
+
+.voice-toggle-container {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.voice-toggle-container.voice-active {
+    border-color: var(--color-success);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+.voice-toggle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.voice-toggle-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    border-radius: 24px;
+    transition: background-color 0.3s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-primary);
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--color-success);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+.toggle-switch.loading .toggle-slider {
+    background-color: var(--color-warning);
+    animation: togglePulse 1.2s infinite;
+}
+
+@keyframes togglePulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+/* Voice Status Badge */
+.voice-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.badge-icon {
+    font-size: 0.85rem;
+}
+
+.badge-inactive {
+    background-color: rgba(148, 163, 184, 0.1);
+    color: var(--text-secondary);
+}
+
+.badge-loading {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--color-warning);
+    animation: badgePulse 1.5s infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.badge-active {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: var(--color-success);
+}
+
+.badge-listening {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: var(--color-success);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    animation: listeningPulse 1.5s infinite;
+}
+
+@keyframes listeningPulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.badge-error {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--color-danger);
+}
+
+.badge-partial {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--color-warning);
+}
+
+/* Buttons */
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.btn-mic-off {
+    background-color: var(--bg-main);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.btn-mic-off:hover {
+    background-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-mic-on {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.btn-mic-on:hover {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+.btn-mic-listening {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    animation: micPulse 1.5s infinite;
+}
+
+@keyframes micPulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Audio toggle buttons */
+.btn-audio-on {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.btn-audio-on:hover {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.btn-audio-off {
+    background-color: var(--bg-main);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.btn-audio-off:hover {
+    background-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Terminal Log */
+.debug-log {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    max-height: 250px;
+    min-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.debug-msg {
+    word-break: break-all;
+    line-height: 1.3;
+}
+
+.system-msg { color: var(--text-secondary); }
+.success-msg { color: var(--color-success); }
+.error-msg { color: var(--color-danger); }
+.process-msg { color: var(--color-warning); }
+
+/* Chat Container */
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-main);
+    overflow: hidden;
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.message {
+    display: flex;
+    gap: 0.75rem;
+    max-width: 80%;
+    align-self: flex-start;
+}
+
+.user-msg {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.msg-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.user-msg .msg-avatar {
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+}
+
+.msg-content {
+    background-color: var(--bg-card);
+    padding: 0.85rem 1.15rem;
+    border-radius: 12px;
+    border-top-left-radius: 0;
+    border: 1px solid var(--border-color);
+}
+
+.user-msg .msg-content {
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: 12px;
+    border-top-right-radius: 0;
+    border: none;
+}
+
+.msg-content p {
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.msg-time {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 0.35rem;
+    text-align: right;
+}
+
+.user-msg .msg-time {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Chat Input Area */
+.chat-input-area {
+    padding: 1rem 1.5rem;
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 0.75rem;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.chat-input-area input:focus {
+    border-color: var(--color-primary);
+}
+
+.chat-input-area input:disabled {
+    background-color: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+.btn-send {
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    width: auto;
+    padding: 0.75rem 1.5rem;
+}
+
+.btn-send:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+}
+
+.btn-send:disabled {
+    background-color: var(--bg-main);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}

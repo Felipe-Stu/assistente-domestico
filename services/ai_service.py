@@ -24,18 +24,18 @@ class ServiceUnavailableException(Exception):
 
 class AIService:
     """
-    Infraestrutura central de LLM.
-    Responsável pela comunicação com a API do Gemini, 
-    gerenciamento de chamadas e roteamento de intenção.
+    Infraestrutura central de LLM (Nuvem).
+    Responsável pela comunicação com a API do Gemini e rotas de fallback.
     """
 
     def __init__(self, model_name: str = "gemini-2.5-flash"):
+        # O Client() lê a GEMINI_API_KEY automaticamente do ambiente (.env)
         self.client = genai.Client()
         self.model_name = model_name
-        custom_logger.log_assistente(NOME_ASSISTENTE, "Serviço AIService inicializado com sucesso.")
+        custom_logger.log_assistente(NOME_ASSISTENTE, "Serviço AIService (Gemini) inicializado com sucesso.")
 
     def chamar_llm(self, prompt: str, json_output: bool = True) -> Any:
-        """Envia o prompt para o Gemini e retorna a resposta pura ou em JSON."""
+        """Envia o prompt para o Gemini na nuvem e retorna a resposta pura ou em JSON."""
         custom_logger.log_assistente(NOME_ASSISTENTE, "Envio para o Gemini iniciado.")
         
         try:
@@ -86,7 +86,7 @@ class AIService:
             raise
 
     def classificar_intencao_usuario(self, texto_usuario: str) -> Dict[str, Any]:
-        """Roteador primário de intenções do sistema."""
+        """Roteador secundário de intenções do sistema (em nuvem)."""
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Classificando intenção do texto: '{texto_usuario}'")
         
         prompt = f"""
@@ -121,8 +121,13 @@ class AIService:
         Você é um assistente doméstico. Processe e estruture o seguinte texto de compras:
         "{mensagem_usuario}"
         
+        Contexto prévio: {contexto if contexto else "Nenhum"}
+        
         Retorne os itens e valores identificados.
         """
-        # Execute a chamada ao modelo Gemini aqui (ex: google-genai ou httpx)
-        resposta = self.gemini_client.generate_content(prompt) # Adapte para sua chamada real
-        return resposta.text
+        # CORRIGIDO: Chamada usando o cliente padronizado e a sintaxe oficial google-genai
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt
+        )
+        return response.text

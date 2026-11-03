@@ -9,9 +9,14 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_DIR = BASE_DIR / "core" / "database"
 DB_PATH = DB_DIR / "assistente_casa.db"
+CHROMA_DIR = DB_DIR / "chroma_db"
 
-# Garantir que o diretório do banco de dados exista
+# Garantir que os diretórios do banco de dados existam
 DB_DIR.mkdir(parents=True, exist_ok=True)
+CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Configurações do Banco Vetorial e Embeddings Locais (CPU)
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "paraphrase-multilingual-MiniLM-L12-v2")
 
 # Credenciais e chaves
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

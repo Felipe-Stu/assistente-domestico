@@ -1,9 +1,9 @@
 # 03 - Arquitetura Geral
 
-Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência na **Versão 3 (V3)** do **Assistente Doméstico Inteligente**.
+Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência na **Versão 4 (V4)** do **Assistente Doméstico Inteligente**.
 
 > [!IMPORTANT]
-> A V3 representa uma expansão arquitetural em relação à V2.1. Foram adicionados três novos módulos de serviço (`gemma_service.py`, `llm_provider.py`, `resilience_service.py`) e uma nova camada de abstração de LLM, alterando o fluxo de processamento de IA do sistema.
+> A V4 representa uma expansão arquitetural significativa em relação à V3. Foram adicionados: uma camada de interface desktop (Electron), um novo pacote de serviços vetoriais (`services/vector/`) com 5 módulos, scripts de gestão do banco vetorial, e uma arquitetura de persistência híbrida (SQLite + ChromaDB). O modelo de inicialização foi reformulado para Text-First com ativação dinâmica de voz.
 
 ---
 
@@ -11,17 +11,18 @@ Este documento detalha a estrutura de diretórios, os módulos constituintes, su
 
 ```text
 assistente-domestico/
-├── assets/                      # Armazenamento temporário de arquivos de voz (temp_voice.mp3)
+├── assets/                              # Armazenamento temporário de arquivos de voz (temp_voice.mp3)
 ├── app/
-│   └── main.py                  # Orquestrador principal, sessão de contexto e roteamento de fluxo
+│   └── main.py                          # Runtime principal (AssistenteRuntime) com event loop e IPC
 ├── core/
 │   ├── database/
-│   │   └── assistente_casa.db   # Banco de dados SQLite (compras, itens, controle_consumo)
+│   │   ├── assistente_casa.db           # Banco de dados SQLite (compras, itens, controle_consumo)
+│   │   └── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (persistência local)
 │   ├── __init__.py
-│   └── config.py                # Configurações globais, variáveis de ambiente e caminhos
-├── Logs/                        # Logs persistentes em disco (gerados automaticamente)
+│   └── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
+├── Logs/                                # Logs persistentes em disco (gerados automaticamente)
 │   ├── main/
-│   │   └── main_log.txt         # Log geral da orquestração do sistema
+│   │   └── main_log.txt
 │   ├── ai_service/
 │   │   └── log.txt
 │   ├── audio_service/
@@ -34,169 +35,263 @@ assistente-domestico/
 │   │   └── log.txt
 │   └── voice_service/
 │       └── log.txt
+├── node_modules/                        # [NOVO V4] Dependências do Electron (npm)
+├── scripts/                             # [NOVO V4] Scripts de gestão do banco vetorial
+│   ├── inspect_vector_database.py       # CLI interativa para inspeção do ChromaDB
+│   ├── migrate_vector_database.py       # Migração idempotente SQLite → ChromaDB
+│   ├── rebuild_embeddings.py            # Reconstrução completa dos embeddings
+│   └── validate_vector_database.py      # Testes automatizados de busca semântica
 ├── services/
 │   ├── __init__.py
-│   ├── ai_service.py            # Interface com a API Gemini (nuvem) - fallback
-│   ├── audio_service.py         # Captura de microfone com monitoramento RMS e bips
-│   ├── db_service.py            # Persistência SQLite com suporte a migrações de schema
-│   ├── gemma_service.py         # [NOVO V3] Orquestrador local via Ollama/Gemma 3 4B
-│   ├── inventory_assistant.py   # Controle preditivo de estoque com heurística + Gemma local
-│   ├── llm_provider.py          # [NOVO V3] Abstração de provedores LLM (Local/Nuvem)
-│   ├── logger_service.py        # CustomLogger transversal com logs segmentados por módulo
-│   ├── resilience_service.py    # [NOVO V3] Serviço de retry centralizado e parametrizável
-│   ├── shopping_assistant.py    # Processamento de compras via LLM local e persistência
-│   └── voice_service.py         # Síntese de voz neural (Edge TTS) e reprodução (pygame)
-├── Sobre a Versão/              # Documentação técnica da versão atual
-├── .env                         # Variáveis de ambiente (GEMINI_API_KEY)
-├── requirements.txt             # Dependências do projeto
-└── README.md                    # Documentação de alto nível
+│   ├── ai_service.py                    # Interface com a API Gemini (nuvem) — fallback
+│   ├── audio_service.py                 # Captura de microfone com RMS e bips
+│   ├── db_service.py                    # Persistência SQLite com migrações de schema
+│   ├── gemma_service.py                 # Orquestrador local via Ollama/Gemma 4 e:4b
+│   ├── inventory_assistant.py           # Controle preditivo de estoque (Regex + Gemma)
+│   ├── llm_provider.py                  # Abstração de provedores LLM (Local/Nuvem)
+│   ├── logger_service.py                # CustomLogger transversal
+│   ├── resilience_service.py            # Retry centralizado e parametrizável
+│   ├── shopping_assistant.py            # Compras via LLM + SQLite + ChromaDB
+│   ├── voice_service.py                 # Síntese neural (Edge TTS) + pygame
+│   └── vector/                          # [NOVO V4] Pacote da Arquitetura Vetorial
+│       ├── __init__.py                  # Exporta os 5 serviços vetoriais
+│       ├── embedding_service.py         # Geração de embeddings na CPU (SentenceTransformers)
+│       ├── vector_store_service.py      # Wrapper desacoplado do ChromaDB PersistentClient
+│       ├── memory_service.py            # Gerenciador de Memória de Curto/Longo Prazo
+│       ├── semantic_search_service.py   # Busca Semântica Híbrida (Vector + SQLite)
+│       └── context_retrieval_service.py # Montador de Contexto RAG para prompts
+├── Sobre a Versão/                      # Documentação técnica da versão atual
+├── .env                                 # Variáveis de ambiente (GEMINI_API_KEY, EMBEDDING_MODEL_NAME)
+├── .gitignore.txt                       # Regras de exclusão do Git
+├── index.html                           # [NOVO V4] Interface HTML do Electron (chat + controles)
+├── index.css                            # [NOVO V4] Estilos da interface desktop
+├── main.js                              # [NOVO V4] Processo principal Electron (BrowserWindow + spawn Python)
+├── preload.js                           # [NOVO V4] Bridge seguro IPC (contextBridge + window.api)
+├── renderer.js                          # [NOVO V4] Lógica do Renderer (chat UI + controles + estado)
+├── package.json                         # [NOVO V4] Manifesto npm do Electron
+├── package-lock.json                    # [NOVO V4] Lock de dependências npm
+├── requirements.txt                     # Dependências Python (atualizado na V4)
+└── README.md                            # Documentação de alto nível
 ```
 
 ---
 
 ## 2. Descrição dos Módulos e Suas Responsabilidades
 
-### A. Orquestrador (`app/main.py`)
-**Responsabilidade:** Ponto de entrada do sistema. Inicializa todos os serviços e assistentes via injeção de dependências. Gerencia a `GerenciadorDeSessao` para manter o contexto e histórico da conversa. Implementa a função `processar_solicitacao` que representa o ciclo principal de execução: chama o `gemma_service.orquestrar_requisicao` via `execute_with_retry`, interpreta a decisão de dificuldade/contexto e roteia o fluxo para o assistente especializado correspondente. Define constantes `TEMPO_RETRY = 3.0` e `MAX_TENTATIVAS = 3`.
+### A. Camada Electron (Desktop) — NOVO na V4
 
-### B. Serviço de Orquestração Local (`services/gemma_service.py`) — NOVO na V3
-**Responsabilidade:** Encapsula as chamadas diretas ao modelo Gemma 4 e:4b via Ollama para orquestração de intenções. Fornece `orquestrar_requisicao()` que envia a transcrição do usuário ao Gemma e retorna um dicionário classificado com `dificuldade`, `mudanca_de_contexto`, `contexto` e `acao`. Valida o schema de saída via `_validar_schema_orquestrador()` e sanitiza o JSON via `_sanitizar_resposta_json()`. Também fornece `executar_assistente_local()` para execuções genéricas de contextos como agenda. Todas as chamadas ao Ollama utilizam `ollama.Client(timeout=120.0)`.
+#### A.1. Processo Principal (`main.js`)
+**Responsabilidade:** Ponto de entrada da aplicação desktop. Cria a `BrowserWindow` com dimensões 800×600 (mínimo 600×500), configurações de segurança (`contextIsolation: true`, `nodeIntegration: false`). Inicia o back-end Python como processo filho via `spawn('python', ['-u', 'app/main.py'])`. Implementa `sendToRenderer()` com proteção contra envios durante carregamento do DOM (`isLoading()`). Gerencia a comunicação IPC bidirecional: recebe JSON do stdout do Python, converte nomes de tipo de `snake_case` para `kebab-case` e repassa ao renderer via `webContents.send()`. Listeners IPC: `send-text`, `toggle-voice-mode`, `toggle-mute`, `toggle-microphone` (compatibilidade). Implementa shutdown graceful via `cleanupAndExit()` com timeout de 2 segundos antes de `SIGKILL`.
 
-### C. Camada de Abstração LLM (`services/llm_provider.py`) — NOVO na V3
-**Responsabilidade:** Define a interface abstrata `BaseLLMProvider` com os métodos `gerar_texto()` e `gerar_json()`. Implementa:
-- `LocalLLMProvider`: Chama o Ollama local com `ollama.Client(timeout=120.0)`, usando `format="json"` para respostas estruturadas. Sanitiza e faz parse do JSON retornado.
-- `CloudLLMProvider`: Delega para `ai_service.processar_requisicao_complexa()` como fallback de nuvem.
+#### A.2. Preload Bridge (`preload.js`)
+**Responsabilidade:** Expõe a API `window.api` no `contextBridge` para comunicação segura entre o Renderer e o Main Process. Métodos de envio: `sendText()`, `toggleVoiceMode()`, `toggleMute()`, `toggleMicrophone()` (compatibilidade). Listeners de recebimento: `onStateChanged()`, `onUserMessage()`, `onAssistantMessage()`, `onRespostaBackend()` (alias), `onVoiceModeStatus()`, `onMicrophoneStatus()` (compatibilidade), `onDebugLog()`, `onError()`, `onSystemReady()`. Todos os listeners incluem logging detalhado de diagnóstico via `logIPC()`.
 
-### D. Serviço de Resiliência (`services/resilience_service.py`) — NOVO na V3
-**Responsabilidade:** Implementa `execute_with_retry()`, uma função genérica que executa qualquer callable com retry parametrizável. Configura: número máximo de tentativas, tempo de espera entre tentativas, exceções recuperáveis, callbacks de validação de retorno e alertas de voz ao usuário em caso de reprocessamento. Lança `MaxRetriesExceededException` ao esgotar tentativas.
-
-### E. Assistente de Compras (`services/shopping_assistant.py`)
-**Responsabilidade:** Processa transcrições de compras de voz. Gera o prompt especializado, chama `self.llm_provider.gerar_json()` (que na V3 resolve para `LocalLLMProvider`) e percorre a lista de compras retornada. Valida e sanitiza os dados financeiros de cada item via `_validar_e_sanitizar_compra()` antes da persistência.
-
-### F. Assistente de Inventário (`services/inventory_assistant.py`)
-**Responsabilidade:** Gerencia o controle preditivo de estoque. Na V3, a classificação de intenções do usuário é realizada em dois níveis: (1) `_heuristica_rapida()` via Regex (0ms) e, em caso de falha, (2) `self.llm_provider.gerar_json()` com Gemma 3 4B local. Executa varredura de itens expirados na inicialização, gerencia os 4 cenários de intenção conversacional e suporta baixa voluntária com resolução de ambiguidade.
-
-### G. Serviço de Banco de Dados (`services/db_service.py`)
-**Responsabilidade:** Persistência relacional em SQLite com controle de versão de schema via `PRAGMA user_version`. Cria e migra as tabelas `compras`, `itens_compra` e `controle_consumo`. Expõe métodos genéricos (`executar_comando`, `executar_consulta`, `executar_consulta_uma_linha`) e o método especializado `salvar_compra_da_ia()`.
-
-### H. Serviço de IA na Nuvem (`services/ai_service.py`)
-**Responsabilidade:** Interface com a API Google Gemini. Na V3, atua como fallback. Trata explicitamente erros `TokenExhaustedException` (429) e `ServiceUnavailableException` (503). O método `processar_requisicao_complexa()` destina-se ao fallback de solicitações complexas, porém contém uma dívida técnica (`self.gemini_client` não instanciado).
-
-### I. Serviço de Voz (`services/voice_service.py`)
-**Responsabilidade:** Síntese de voz neural via `edge_tts` com voz `pt-BR-AntonioNeural`, salvando temporariamente o áudio em `assets/temp_voice.mp3` e reproduzindo via `pygame.mixer`. Remove o arquivo temporário após a reprodução.
-
-### J. Serviço de Áudio (`services/audio_service.py`)
-**Responsabilidade:** Captura de microfone com calibração de ruído ambiente, monitoramento de volume RMS, bips sonoros de status e controle de tempo (limite global de 120s, corte por silêncio de 5s, cancelamento por inatividade de 15s). Transcrição via Google Speech Recognition API.
-
-### K. Serviço de Log (`services/logger_service.py`)
-**Responsabilidade:** Logger transversal com arquivos segmentados por módulo e cabeçalhos diários automáticos. Métodos: `log_geral()` (para `Logs/main/main_log.txt`) e `log_assistente(nome, mensagem)` (para `Logs/{nome}/log.txt`).
+#### A.3. Renderer — Interface Visual (`renderer.js` + `index.html` + `index.css`)
+**Responsabilidade:** Renderiza a interface completa do chat: mensagens do usuário (avatar 👤) e do assistente (avatar 🤖) com timestamps. Painel lateral com: toggle de Modo Voz (checkbox estilizado), badge de status de voz com 5 estados visuais (`inactive`, `loading`, `active`, `partial`, `listening`, `error`), botão Mute (TTS). Terminal de debug com mensagens categorizadas (`system`, `error`, `success`, `process`). Gerencia estado local (`isMuted`, `voiceModeEnabled`, `backendState`). O input do chat permanece **sempre habilitado** (modelo Text-First), exceto durante estados `PROCESSING`, `RESPONDING` e `ERROR`.
 
 ---
 
-## 3. Ciclo de Execução da Aplicação (Fluxo Principal V3)
+### B. Back-End Python
+
+#### B.1. Runtime Principal (`app/main.py`)
+**Responsabilidade:** Classe `AssistenteRuntime` — núcleo do sistema. Implementa:
+- **Inicialização em 2 fases:** Fase 1 (essencial): `DatabaseService`, `VectorStoreService`, `MemoryService`, `ContextRetrievalService`, `AIService`, `LocalLLMProvider`, `CloudLLMProvider`, `InventoryAssistant`, `ShoppingAssistant`, `VoiceService`, `AudioService`. Fase 2 (sob demanda): ativação de hardware de voz via `_ativar_modo_voz()`.
+- **Event Loop:** Baseado em `queue.Queue` com 3 threads: `_leitor_stdin()` (leitura de comandos do Electron), `_loop_microfone()` (captura contínua condicional) e `_varredura_background()` (estoque).
+- **Protocolo IPC:** Função `emitir_electron()` padroniza saída JSON para stdout.
+- **Estados do sistema:** `STARTING`, `INITIALIZING`, `READY`, `WAITING_INPUT`, `PROCESSING`, `STOPPING`, `ERROR`.
+- **Processamento:** `_processar_solicitacao()` implementa o pipeline Orquestração → Roteamento → Execução → Resposta.
+
+#### B.2. Orquestrador Local (`services/gemma_service.py`)
+**Responsabilidade:** Encapsula chamadas ao Gemma 4 e:4b via Ollama. Fornece `orquestrar_requisicao()` com validação de schema (`_validar_schema_orquestrador`) e sanitização JSON (`_sanitizar_resposta_json`). Fornece `executar_assistente_local()` para fluxos genéricos.
+
+#### B.3. Abstração LLM (`services/llm_provider.py`)
+**Responsabilidade:** `BaseLLMProvider` (abstrata) → `LocalLLMProvider` (Ollama, `timeout=120.0`) e `CloudLLMProvider` (Gemini via AIService).
+
+#### B.4. Resiliência (`services/resilience_service.py`)
+**Responsabilidade:** `execute_with_retry()` centralizado com suporte a callbacks de validação, alertas de voz e exceções recuperáveis.
+
+#### B.5. Assistente de Compras (`services/shopping_assistant.py`) — Atualizado na V4
+**Responsabilidade:** Processa transcrições de compras via LLM local. **Na V4, recebe `VectorStoreService` como dependência injetada** e, após cada compra gravada no SQLite, **vetoriza automaticamente cada item no ChromaDB** com representação em linguagem natural contendo produto, marca, estabelecimento, preço e data.
+
+#### B.6. Assistente de Inventário (`services/inventory_assistant.py`)
+**Responsabilidade:** Controle preditivo de estoque. Classificação em dois níveis: Regex → Gemma 4 local. Sem alterações na V4.
+
+#### B.7. Banco de Dados (`services/db_service.py`)
+**Responsabilidade:** Persistência relacional SQLite com `PRAGMA user_version`. Tabelas: `compras`, `itens_compra`, `controle_consumo`, `historico_conversas`. Sem alterações de responsabilidade na V4.
+
+#### B.8. IA na Nuvem (`services/ai_service.py`)
+**Responsabilidade:** Interface Gemini API. Fallback. Dívida técnica de `self.gemini_client` permanece.
+
+#### B.9. Serviços de Voz e Áudio
+- **`voice_service.py`:** Síntese neural via edge-tts + pygame. Inicialização lazy na V4.
+- **`audio_service.py`:** Captura de microfone com RMS. Inicialização lazy na V4.
+
+#### B.10. Log (`services/logger_service.py`)
+**Responsabilidade:** Logger transversal. Sem alterações.
+
+---
+
+### C. Pacote Vetorial (`services/vector/`) — NOVO na V4
+
+#### C.1. `embedding_service.py`
+**Responsabilidade:** Carrega o modelo `paraphrase-multilingual-MiniLM-L12-v2` como Singleton na CPU. Expõe `gerar_embedding(texto)` para vetorização individual e `gerar_embeddings_em_lote(textos)` para processamento em batch (batch_size=32). Latência típica: 15-30ms por vetor.
+
+#### C.2. `vector_store_service.py`
+**Responsabilidade:** Wrapper desacoplado sobre `chromadb.PersistentClient`. Opera com Singleton do cliente. Coleção padrão: `assistente_domestico_memory` (cosseno). Expõe: `upsert_documents()` (idempotente, com vetorização em lote automática), `search_similarity()` (com score de corte e filtro de metadados), `delete_documents()`, `count_documents()`. Define a dataclass `VectorDocument(id, content, metadata, embedding)`.
+
+#### C.3. `memory_service.py`
+**Responsabilidade:** Avalia se uma interação tem valor semântico para persistência via `_deve_salvar_em_longo_prazo()`. Filtra automaticamente saudações, interjeições, e comandos de infraestrutura. Persiste fatos relevantes com metadados estruturados (`assistant`, `category`, `entity_type`, `importance`, `created_at`). Recupera memórias por relevância semântica com filtro de metadados.
+
+#### C.4. `semantic_search_service.py`
+**Responsabilidade:** Busca vetorial pura (`busca_semantica_pura()`) e busca híbrida de compras (`busca_hibrida_compra()`) que localiza itens no ChromaDB e hidrata dados exatos do SQLite via JOIN em `itens_compra` + `compras`.
+
+#### C.5. `context_retrieval_service.py`
+**Responsabilidade:** Executa recuperação de memória semântica e gera string formatada para injeção como contexto nos prompts da LLM. Formato de saída: bloco delimitado com categoria, data e conteúdo para cada memória relevante.
+
+---
+
+## 3. Ciclo de Execução da Aplicação (Fluxo Principal V4)
 
 ```
-[Inicialização: main.py]
+[Usuário abre o Electron Desktop]
          │
          ▼
-[Instanciação de Serviços via Injeção de Dependências]
- DatabaseService, AudioService, AIService, VoiceService
- LocalLLMProvider(modelo="gemma4:e4b")
- CloudLLMProvider(ai_service=ai_service)
- InventoryAssistant(db, llm_provider=local_llm)
- ShoppingAssistant(db, llm_provider=local_llm)
+[main.js: BrowserWindow + spawn Python]
          │
          ▼
-[Passo 1: Varredura de Itens Expirados]
- inventory_assistant.verificar_itens_expirados_inicializacao()
-   → Para cada item com autonomia esgotada:
-     → VoiceService.falar(pergunta)
-     → AudioService.capturar_audio_e_transcrever()
-     → _heuristica_rapida() → ou → LocalLLMProvider.gerar_json() [Gemma 4 Local]
-     → DatabaseService: atualiza controle_consumo
+[AssistenteRuntime.__init__()]
          │
          ▼
-[Passo 2: Captura de Nova Solicitação por Voz]
- AudioService.capturar_audio_e_transcrever()
+[FASE 1: Inicialização Essencial (Text-First)]
+ DatabaseService → SQLite conectado
+ VectorStoreService → ChromaDB inicializado (CPU)
+ MemoryService + ContextRetrievalService → Prontos
+ AIService → Fallback Gemini configurado
+ LocalLLMProvider(gemma4:e4b) + CloudLLMProvider
+ InventoryAssistant + ShoppingAssistant (com vector_store)
+ VoiceService + AudioService (construtor leve, sem init de hardware)
          │
          ▼
-[Passo 3: Orquestração Local com Gemma 3 4B]
- execute_with_retry(orquestrar_requisicao, texto_transcrito)
-   → gemma_service.orquestrar_requisicao()
-     → ollama.Client(timeout=120).chat(model="gemma4:e4b", format="json")
-     → _sanitizar_resposta_json() → json.loads() → _validar_schema_orquestrador()
-   → Retorna: {dificuldade, mudanca_de_contexto, contexto, acao}
+[Thread: _leitor_stdin() ← Comandos do Electron]
+[Thread: _loop_microfone() ← Em espera, aguarda voice_mode_active=True]
+[Thread: _varredura_background() ← Estoque preditivo]
          │
-         ├── [dificuldade="facil" + contexto="compras"]
+         ▼
+[Estado: READY → WAITING_INPUT]
+[emitir_electron("system_ready")]
+[Chat desbloqueado no Electron!]
+         │
+         ▼
+[EVENT LOOP: queue.Queue.get()]
+         │
+         ├── [type="send_text" ou "user_message"]
          │     ▼
-         │   execute_with_retry(shopping_assistant.processar_texto_compra)
-         │     → LocalLLMProvider.gerar_json() → Gemma 4 Local
-         │     → _validar_e_sanitizar_compra()
-         │     → DatabaseService.salvar_compra_da_ia()
-         │     → [Falha após 3 tentativas] → Gemini Nuvem (fallback)
+         │   _processar_solicitacao(texto)
+         │     │
+         │     ├── [PASSO 1: Orquestração Gemma 4]
+         │     │   execute_with_retry(orquestrar_requisicao)
+         │     │   → Gemma 4 local classifica {dificuldade, contexto, ação}
+         │     │
+         │     ├── [INTERCEPTAÇÃO: resposta_direta]
+         │     │   → Retorna imediatamente sem roteamento
+         │     │
+         │     ├── [PASSO 2: Roteamento]
+         │     │   ├── [facil + compras] → ShoppingAssistant → SQLite + ChromaDB
+         │     │   ├── [facil + outro] → executar_assistente_local → Gemma 4
+         │     │   └── [medio_dificil / falha 3x] → Gemini API (nuvem)
+         │     │
+         │     └── [PASSO 3: Resposta]
+         │         → emitir_electron("assistant_message")
+         │         → VoiceService.falar() (se modo voz ativo e não mutado)
          │
-         ├── [dificuldade="facil" + outro contexto]
-         │     ▼
-         │   execute_with_retry(executar_assistente_local)
-         │     → gemma_service.executar_assistente_local()
-         │     → Gemma 4 Local via Ollama
+         ├── [type="voice_input"]
+         │     → Mesmo pipeline de _processar_solicitacao()
          │
-         └── [dificuldade="medio_dificil"]
-               ▼
-             execute_with_retry(ai_service.processar_requisicao_complexa)
-               → Gemini API na Nuvem
+         ├── [type="toggle_voice_mode"]
+         │     → _ativar_modo_voz() / _desativar_modo_voz()
+         │     → emitir_electron("voice_mode_status")
          │
-         ▼
-[Passo 4: Resposta por Voz ao Usuário]
- VoiceService.falar(resposta_texto)
+         ├── [type="toggle_mute"]
+         │     → Alterna is_muted (controla apenas TTS)
          │
-         ▼
-[GerenciadorDeSessao: Atualiza contexto e histórico]
-         │
-         ▼
-[Fim da Execução]
+         └── [type="shutdown"]
+               → Shutdown graceful (encerra threads, desativa hardware)
+
 ```
 
 ---
 
 ## 4. Dependências e Acoplamento de Componentes
 
-1. **`main.py`** acopla-se a:
-   - `DatabaseService`, `AudioService`, `AIService`, `VoiceService`
+1. **`main.js` (Electron Main)** acopla-se a:
+   - `electron` (BrowserWindow, ipcMain)
+   - `child_process.spawn` (inicia Python)
+   - `preload.js` (via webPreferences)
+
+2. **`preload.js`** acopla-se a:
+   - `electron` (contextBridge, ipcRenderer)
+
+3. **`renderer.js`** acopla-se a:
+   - `window.api` (exposto pelo preload)
+   - DOM elements (`index.html`)
+
+4. **`app/main.py` (AssistenteRuntime)** acopla-se a:
+   - `DatabaseService`, `AIService`, `VoiceService`, `AudioService`
    - `LocalLLMProvider`, `CloudLLMProvider`
    - `InventoryAssistant`, `ShoppingAssistant`
+   - `VectorStoreService`, `MemoryService`, `ContextRetrievalService`
    - `gemma_service.orquestrar_requisicao`, `gemma_service.executar_assistente_local`
    - `resilience_service.execute_with_retry`
    - `logger_service`
 
-2. **`ShoppingAssistant`** acopla-se a:
+5. **`ShoppingAssistant`** acopla-se a:
    - `BaseLLMProvider` (injetado como `LocalLLMProvider`)
    - `DatabaseService`
+   - `VectorStoreService` (injetado — **NOVO na V4**)
    - `logger_service`
 
-3. **`InventoryAssistant`** acopla-se a:
+6. **`InventoryAssistant`** acopla-se a:
    - `BaseLLMProvider` (injetado como `LocalLLMProvider`)
    - `DatabaseService`
-   - `VoiceService` (instanciado internamente)
-   - `AudioService` (instanciado internamente)
+   - `VoiceService` e `AudioService` (instanciados internamente)
    - `logger_service`
 
-4. **`LocalLLMProvider`** acopla-se a:
-   - SDK `ollama` (via `ollama.Client`)
+7. **`VectorStoreService`** acopla-se a:
+   - `chromadb` (PersistentClient)
+   - `EmbeddingService`
+   - `core/config.CHROMA_DIR`
 
-5. **`CloudLLMProvider`** acopla-se a:
-   - `AIService`
+8. **`EmbeddingService`** acopla-se a:
+   - `sentence_transformers` (SentenceTransformer)
+   - `core/config.EMBEDDING_MODEL_NAME`
 
-6. **`gemma_service`** acopla-se a:
-   - SDK `ollama` (diretamente)
-   - `resilience_service.InvalidOrchestratorOutputException`
-   - `logger_service`
+9. **`MemoryService`** acopla-se a:
+   - `VectorStoreService`
 
-7. **`AIService`** acopla-se a:
-   - SDK `google-genai`
-   - `logger_service`
+10. **`SemanticSearchService`** acopla-se a:
+    - `VectorStoreService`
+    - `DatabaseService`
 
-8. **`DatabaseService`** acopla-se a:
-   - `sqlite3`
-   - `core/config.DB_PATH`
-   - `logger_service`
+11. **`ContextRetrievalService`** acopla-se a:
+    - `SemanticSearchService`
+    - `MemoryService`
+
+12. **`LocalLLMProvider`** acopla-se a:
+    - SDK `ollama` (via `ollama.Client`)
+
+13. **`CloudLLMProvider`** acopla-se a:
+    - `AIService`
+
+14. **`gemma_service`** acopla-se a:
+    - SDK `ollama` (diretamente)
+    - `resilience_service.InvalidOrchestratorOutputException`
+    - `logger_service`
+
+15. **`AIService`** acopla-se a:
+    - SDK `google-genai`
+    - `logger_service`
+
+16. **`DatabaseService`** acopla-se a:
+    - `sqlite3`
+    - `core/config.DB_PATH`
+    - `logger_service`

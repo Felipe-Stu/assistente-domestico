@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 import sqlite3
 import logging
 from typing import Dict, List, Any, Optional
@@ -49,6 +50,16 @@ class DatabaseService:
             data_compra TEXT NOT NULL,
             nome_comercio TEXT,
             total_gasto REAL NOT NULL
+        );
+        """
+
+        query_hisorico = """
+        CREATE TABLE IF NOT EXISTS historico_conversas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            papel TEXT NOT NULL, -- 'user' ou 'assistant'
+            conteudo TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         );
         """
 

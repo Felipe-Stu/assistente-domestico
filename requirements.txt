@@ -8,3 +8,6 @@ PyAudio>=0.2.14
 ollama>=0.1.8
 # Biblioteca HTTP para comunicação com serviços e APIs
 requests>=2.31.0
+# Banco Vetorial e Embeddings Locais (CPU)
+chromadb>=0.4.22
+sentence-transformers>=2.5.0

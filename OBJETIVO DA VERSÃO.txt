@@ -1,0 +1,23 @@
+Adicionar o Electron no sistema e um chat para que possam ser enviados arquivos de texto.
+> Ter a possibilidade de conversar com o sistema por chat vai trazer uma facilidade tremenda para testes
+>> Layout simples, só pra ligar e desligar o microfone, assim como mandar mensagens.
+
+Adicionar uma 2 IA local
+
+IA parruda: Qwen2.5-Coder 7B
+
+Esse ponto é interessante pois eu desejo inserir uma IA para me ajudar a codar, um assistente parrudo no meu PC
+> Futuramente desejo que ele faça leitura de tela, pesquisa no google, etc
+
+Problema:
+O orquestrador do sistema é o Gemma 4, ou seja, o sistema já sobre com ele ativo.
+
+No que isso implica?
+Se o sistema, que já possui uma IA ativa, inicia uma segunda IA vai sobrecarregar o sistema.
+
+Possíveis soluções:
+Como o Orquestrador roda com o Gemma 4, podemos deixar o sistema iniciar normalmente com o Gemma 4 e ele acompanha o usuário.
+Na hora que o usuário fala por áudio que vai programar, ou ativa a função "QWEN" no Electron, ou fala por chat que vai programar, ou que deseja mudar de IA local, ou que deseja da IA mais forte local disponível, o orquestrador muda para a IA Qwen2.5-Coder 7B e ele assume tanto o papel de assistente quanto de orquestrador e o Gemma 4 desativa.
+
+Quando volta a ser o Gemma 4?
+Quando o usuário solicita o retorno do Gemma 4; quando o usuário reinicia o sistema; quando o computador fica sem atividade humana por mais de meia hora

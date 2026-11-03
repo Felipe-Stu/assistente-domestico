@@ -1,0 +1,101 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+console.log('⚡ [PRELOAD] Script preload.js inicializado.');
+
+const logIPC = (canal, dados) => {
+    console.log(`📡 [IPC RECEBIDO no Preload -> ${canal}]:`, dados !== undefined ? dados : '(sem payload)');
+};
+
+contextBridge.exposeInMainWorld('api', {
+    // =========================================================================
+    // Envio de mensagens (Renderer -> Main -> Python)
+    // =========================================================================
+
+    sendText: (text) => {
+        console.log('📤 [IPC ENVIADO -> send-text]:', text);
+        ipcRenderer.send('send-text', text);
+    },
+
+    // NOVO: Toggle unificado de Modo Voz (microfone + TTS)
+    toggleVoiceMode: (enabled) => {
+        console.log('📤 [IPC ENVIADO -> toggle-voice-mode]:', enabled);
+        ipcRenderer.send('toggle-voice-mode', enabled);
+    },
+
+    // Toggle Mute (silencia apenas o TTS, sem desativar microfone)
+    toggleMute: (muted) => {
+        console.log('📤 [IPC ENVIADO -> toggle-mute]:', muted);
+        ipcRenderer.send('toggle-mute', muted);
+    },
+
+    // Compatibilidade: toggleMicrophone antigo redireciona para toggleVoiceMode
+    toggleMicrophone: (enabled) => {
+        console.log('📤 [IPC ENVIADO -> toggle-voice-mode (compat)]:', enabled);
+        ipcRenderer.send('toggle-voice-mode', enabled);
+    },
+
+    // =========================================================================
+    // Recebimento de mensagens (Python -> Main -> Renderer)
+    // =========================================================================
+
+    onStateChanged: (callback) => {
+        ipcRenderer.on('state-changed', (event, data) => {
+            logIPC('state-changed', data);
+            callback(data);
+        });
+    },
+    onUserMessage: (callback) => {
+        ipcRenderer.on('user-message', (event, data) => {
+            logIPC('user-message', data);
+            callback(data);
+        });
+    },
+    onAssistantMessage: (callback) => {
+        ipcRenderer.on('assistant-message', (event, data) => {
+            logIPC('assistant-message', data);
+            callback(data);
+        });
+    },
+    // Alias mantido para retrocompatibilidade se necessário
+    onRespostaBackend: (callback) => {
+        ipcRenderer.on('assistant-message', (event, data) => {
+            logIPC('assistant-message', data);
+            callback(data);
+        });
+    },
+
+    // NOVO: Status detalhado do modo voz (hardware, TTS, microfone)
+    onVoiceModeStatus: (callback) => {
+        ipcRenderer.on('voice-mode-status', (event, data) => {
+            logIPC('voice-mode-status', data);
+            callback(data);
+        });
+    },
+
+    // Compatibilidade: microphone-status antigo
+    onMicrophoneStatus: (callback) => {
+        ipcRenderer.on('microphone-status', (event, data) => {
+            logIPC('microphone-status', data);
+            callback(data);
+        });
+    },
+
+    onDebugLog: (callback) => {
+        ipcRenderer.on('debug-log', (event, data) => {
+            logIPC('debug-log', data);
+            callback(data);
+        });
+    },
+    onError: (callback) => {
+        ipcRenderer.on('error', (event, data) => {
+            logIPC('error', data);
+            callback(data);
+        });
+    },
+    onSystemReady: (callback) => {
+        ipcRenderer.on('system-ready', (event, data) => {
+            logIPC('system-ready', data);
+            callback(data);
+        });
+    }
+});
