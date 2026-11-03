@@ -1,4 +1,5 @@
-google-generativeai>=0.8.0
+# SDK oficial do Gemini (o código usa 'from google import genai')
+google-genai>=1.0.0
 python-dotenv>=1.0.1
 SpeechRecognition>=3.10.0
 # PyAudio é necessário para capturar áudio do microfone.
@@ -11,3 +12,6 @@ requests>=2.31.0
 # Banco Vetorial e Embeddings Locais (CPU)
 chromadb>=0.4.22
 sentence-transformers>=2.5.0
+# Síntese de voz neural (TTS) e reprodução de áudio
+edge-tts>=6.1.0
+pygame>=2.5.0

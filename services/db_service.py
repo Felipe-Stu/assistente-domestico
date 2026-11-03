@@ -1,4 +1,3 @@
-from asyncio.windows_events import NULL
 import sqlite3
 import logging
 from typing import Dict, List, Any, Optional
@@ -110,6 +109,7 @@ class DatabaseService:
 
                 # 1. Cria a estrutura base do banco (DDL idempotente)
                 cursor.execute(query_compras)
+                cursor.execute(query_hisorico)
                 cursor.execute(query_itens)
                 cursor.execute(query_controle_consumo)
                 cursor.execute(query_indice_estoque)
