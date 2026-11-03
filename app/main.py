@@ -33,6 +33,7 @@ from services.shopping_assistant import ShoppingAssistant
 from services.vector.vector_store_service import VectorStoreService
 from services.vector.memory_service import MemoryService
 from services.vector.context_retrieval_service import ContextRetrievalService
+from services.vector.semantic_search_service import SemanticSearchService
 
 # Serviços de voz/áudio — importados mas NÃO instanciados no startup
 from services.voice_service import VoiceService
@@ -140,7 +141,14 @@ class AssistenteRuntime:
 
             self.vector_store = VectorStoreService()
             self.memory_service = MemoryService(vector_store=self.vector_store)
-            self.context_retrieval = ContextRetrievalService(memory_service=self.memory_service)
+            self.semantic_search = SemanticSearchService(
+                vector_store=self.vector_store,
+                db_service=self.db_service
+            )
+            self.context_retrieval = ContextRetrievalService(
+                semantic_search_service=self.semantic_search,
+                memory_service=self.memory_service
+            )
             emitir_electron("debug_log", {"message": "✓ Banco vetorial (ChromaDB) e Memória Semântica prontos."})
 
             self.ai_service = AIService()
@@ -268,6 +276,42 @@ class AssistenteRuntime:
                 logger.error(f"Erro ao reproduzir áudio: {e}")
 
     # -------------------------------------------------------------------------
+    # Memória Semântica (RAG) — falhas nunca interrompem o pipeline
+    # -------------------------------------------------------------------------
+
+    # Contextos que geram JSON estruturado não recebem contexto RAG no prompt
+    CONTEXTOS_SEM_RAG = {"compras", "agenda"}
+    # Compras já são vetorizadas pelo ShoppingAssistant; consultas de estoque não são fatos
+    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario"}
+
+    def _enriquecer_com_memoria(self, texto: str, contexto: str) -> str:
+        """Anexa memórias semânticas relevantes à instrução enviada à LLM."""
+        if contexto in self.CONTEXTOS_SEM_RAG:
+            return texto
+        try:
+            bloco = self.context_retrieval.montar_contexto_recuperado(texto)
+        except Exception as e:
+            logger.warning(f"Falha ao recuperar contexto semântico (seguindo sem RAG): {e}")
+            return texto
+        if not bloco:
+            return texto
+        return f"{bloco}\nSolicitação do usuário: {texto}"
+
+    def _registrar_memoria(self, texto: str, contexto: str):
+        """Persiste a fala do usuário na memória de longo prazo (o MemoryService filtra o que é irrelevante)."""
+        if contexto in self.CONTEXTOS_SEM_MEMORIA:
+            return
+        try:
+            self.memory_service.salvar_memoria_longo_prazo(
+                conteudo=texto,
+                assistant=contexto,
+                category="conversa",
+                source="user"
+            )
+        except Exception as e:
+            logger.warning(f"Falha ao salvar memória semântica: {e}")
+
+    # -------------------------------------------------------------------------
     # Processamento de Solicitação (Orquestração)
     # -------------------------------------------------------------------------
 
@@ -310,6 +354,7 @@ class AssistenteRuntime:
         dificuldade = decisao.get("dificuldade", "medio_dificil")
         contexto = decisao.get("contexto", "outro")
         mudanca_contexto = decisao.get("mudanca_de_contexto", False)
+        acao = decisao.get("acao", "")
 
         # =====================================================================
         # INTERCEPTAÇÃO: Resposta direta
@@ -347,12 +392,19 @@ class AssistenteRuntime:
                     resposta_texto = res_compra.get("mensagem", "Compra registrada com sucesso.")
 
                 elif contexto == "inventario":
-                    resposta_texto = "Consulta ao inventário realizada com sucesso."
+                    if acao in ("criar", "corrigir"):
+                        # Alteração de estoque por texto ainda não implementada (depende de diálogo por chat)
+                        resposta_texto = (
+                            "Por enquanto consigo apenas consultar o estoque por texto. "
+                            "Alterações de estoque ainda não estão disponíveis neste modo."
+                        )
+                    else:
+                        resposta_texto = self.inventory_assistant.consultar_estoque(solicitacao_original)
 
                 else:
                     resposta_texto = execute_with_retry(
                         func=executar_assistente_local,
-                        args=(contexto, self.sessao.historico, solicitacao_original),
+                        args=(contexto, self.sessao.historico, self._enriquecer_com_memoria(solicitacao_original, contexto)),
                         max_tentativas=MAX_TENTATIVAS,
                         tempo_espera=TEMPO_RETRY,
                         voice_service=self.voice_service if self.voice_mode_active else None,
@@ -370,7 +422,7 @@ class AssistenteRuntime:
             try:
                 resposta_texto = execute_with_retry(
                     func=self.ai_service.processar_requisicao_complexa,
-                    args=(solicitacao_original, self.sessao.historico),
+                    args=(self._enriquecer_com_memoria(solicitacao_original, contexto), self.sessao.historico),
                     max_tentativas=MAX_TENTATIVAS,
                     tempo_espera=TEMPO_RETRY,
                     excecoes_recuperaveis=(ServiceUnavailableException, Exception),
@@ -386,6 +438,7 @@ class AssistenteRuntime:
                 return resposta_texto
 
         self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
+        self._registrar_memoria(solicitacao_original, contexto)
 
         # =====================================================================
         # PASSO 3: Resposta

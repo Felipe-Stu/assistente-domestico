@@ -55,6 +55,84 @@ class InventoryAssistant:
             return False
         return self.voice.esta_disponivel() and self.audio.esta_disponivel()
 
+    # =========================================================================
+    # CONSULTA DE ESTOQUE (V4) — somente leitura, sem LLM
+    # =========================================================================
+
+    PALAVRAS_IGNORADAS_CONSULTA = {
+        "ainda", "tenho", "temos", "tem", "quanto", "quantos", "quantas", "quanta",
+        "qual", "quais", "que", "meu", "minha", "meus", "minhas", "nosso", "nossa",
+        "estoque", "inventario", "inventário", "casa", "sobrou", "sobra", "resta",
+        "restam", "falta", "faltando", "acabando", "acabou", "possuo", "existe",
+        "consulta", "consultar", "verifica", "verificar", "mostra", "mostrar",
+        "lista", "listar", "itens", "produtos", "produto", "item", "para", "com",
+        "por", "dos", "das", "nos", "nas", "uma", "algum", "alguma", "tudo",
+        "todos", "todas", "agora", "hoje", "aqui", "ali", "isso", "esse", "essa",
+        "pode", "poderia", "favor", "sabe", "saber", "dizer", "fala", "ver",
+    }
+
+    @staticmethod
+    def _formatar_numero(valor: float) -> str:
+        return f"{valor:.1f}".replace(".", ",")
+
+    def _estimar_estoque_restante(self, qtd_comprada, qtd_residual, ritmo, data_ultima) -> float:
+        """Mesma fórmula de processar_estoque_nova_compra: total - dias/ritmo."""
+        dias = self._calcular_dias_decorridos(data_ultima)
+        total = (qtd_comprada or 0.0) + (qtd_residual or 0.0)
+        consumo = dias / ritmo if ritmo and ritmo > 0 else 0.0
+        return max(0.0, total - consumo)
+
+    def _extrair_termos_produto(self, texto: str) -> list:
+        palavras = re.findall(r"[a-zà-ú]+", (texto or "").lower())
+        return [p for p in palavras if len(p) >= 3 and p not in self.PALAVRAS_IGNORADAS_CONSULTA]
+
+    def consultar_estoque(self, texto_usuario: str, limite: int = 15) -> str:
+        """
+        Responde consultas de estoque ("ainda tenho leite?", "o que tenho em estoque?").
+        Lê controle_consumo (status_estoque = 1) e estima o restante pelo ritmo de consumo.
+        Não altera o banco.
+        """
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Consulta de estoque recebida: '{texto_usuario}'")
+
+        itens = self.db.executar_consulta(
+            """SELECT produto_nome, quantidade_comprada, quantidade_residual_confirmada,
+                      tempo_medio_calculado, data_ultima_compra, validacao_pendente
+               FROM controle_consumo
+               WHERE status_estoque = 1
+               ORDER BY produto_nome"""
+        )
+
+        if not itens:
+            return "Seu estoque ativo está vazio no momento. Nenhum produto registrado."
+
+        termos = self._extrair_termos_produto(texto_usuario)
+        if termos:
+            def corresponde(nome: str) -> bool:
+                nome_lower = nome.lower()
+                return any(t in nome_lower or (t.endswith("s") and t[:-1] in nome_lower) for t in termos)
+            selecionados = [it for it in itens if corresponde(it[0])]
+            if not selecionados:
+                msg = f"Não encontrei estoque ativo para: {', '.join(termos)}."
+                custom_logger.log_assistente(NOME_ASSISTENTE, msg)
+                return msg
+        else:
+            selecionados = list(itens)
+
+        linhas = []
+        for nome, qtd_comprada, qtd_residual, ritmo, data_ultima, pendente in selecionados[:limite]:
+            restante = self._estimar_estoque_restante(qtd_comprada, qtd_residual, ritmo, data_ultima)
+            linha = f"{nome}: cerca de {self._formatar_numero(restante)} restante(s) (última compra em {data_ultima})"
+            if pendente:
+                linha += " — aguardando sua confirmação"
+            linhas.append(linha)
+
+        if len(selecionados) > limite:
+            linhas.append(f"... e mais {len(selecionados) - limite} item(ns).")
+
+        resposta = "Estimativa do seu estoque:\n" + "\n".join(f"- {l}" for l in linhas)
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Consulta respondida com {len(selecionados)} item(ns).")
+        return resposta
+
     def _calcular_dias_decorridos(self, data_anterior_str: str) -> int:
         """Calcula a diferença em dias entre a data atual e a data da última compra."""
         try:

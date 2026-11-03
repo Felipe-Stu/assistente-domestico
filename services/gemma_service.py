@@ -412,6 +412,10 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
         Saída:
         {{"dificuldade":"facil","mudanca_de_contexto":false,"contexto":"compras","acao":"consultar"}}
 
+        Entrada: "Ainda tenho leite em casa?"
+        Saída:
+        {{"dificuldade":"facil","mudanca_de_contexto":false,"contexto":"inventario","acao":"consultar"}}
+
         ==================================================
         VALIDAÇÃO FINAL
         ==================================================

@@ -482,6 +482,7 @@ body {
 .msg-content p {
     font-size: 0.95rem;
     line-height: 1.45;
+    white-space: pre-wrap; /* preserva quebras de linha das respostas (ex.: consulta de estoque) */
 }
 
 .msg-time {
