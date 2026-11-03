@@ -62,7 +62,7 @@ assistente-domestico/
 │       └── context_retrieval_service.py # Montador de Contexto RAG para prompts
 ├── Sobre a Versão/                      # Documentação técnica da versão atual
 ├── .env                                 # Variáveis de ambiente (GEMINI_API_KEY, EMBEDDING_MODEL_NAME)
-├── .gitignore.txt                       # Regras de exclusão do Git
+├── .gitignore                           # Regras de exclusão do Git (ignora .db, chroma_db, Logs, __pycache__, node_modules)
 ├── index.html                           # [NOVO V4] Interface HTML do Electron (chat + controles)
 ├── index.css                            # [NOVO V4] Estilos da interface desktop
 ├── main.js                              # [NOVO V4] Processo principal Electron (BrowserWindow + spawn Python)
@@ -100,6 +100,7 @@ assistente-domestico/
 - **Protocolo IPC:** Função `emitir_electron()` padroniza saída JSON para stdout.
 - **Estados do sistema:** `STARTING`, `INITIALIZING`, `READY`, `WAITING_INPUT`, `PROCESSING`, `STOPPING`, `ERROR`.
 - **Processamento:** `_processar_solicitacao()` implementa o pipeline Orquestração → Roteamento → Execução → Resposta.
+- **Memória semântica:** `_enriquecer_com_memoria()` anexa o contexto do `ContextRetrievalService` às instruções do assistente local genérico e do Gemini (não em `compras`/`agenda`, que geram JSON). `_registrar_memoria()` salva a fala do usuário no `MemoryService` (exceto `compras`, já vetorizadas pelo ShoppingAssistant, e `inventario`). Falhas no ChromaDB não interrompem o pipeline.
 
 #### B.2. Orquestrador Local (`services/gemma_service.py`)
 **Responsabilidade:** Encapsula chamadas ao Gemma 4 e:4b via Ollama. Fornece `orquestrar_requisicao()` com validação de schema (`_validar_schema_orquestrador`) e sanitização JSON (`_sanitizar_resposta_json`). Fornece `executar_assistente_local()` para fluxos genéricos.
@@ -114,7 +115,10 @@ assistente-domestico/
 **Responsabilidade:** Processa transcrições de compras via LLM local. **Na V4, recebe `VectorStoreService` como dependência injetada** e, após cada compra gravada no SQLite, **vetoriza automaticamente cada item no ChromaDB** com representação em linguagem natural contendo produto, marca, estabelecimento, preço e data.
 
 #### B.6. Assistente de Inventário (`services/inventory_assistant.py`)
-**Responsabilidade:** Controle preditivo de estoque. Classificação em dois níveis: Regex → Gemma 4 local. Sem alterações na V4.
+**Responsabilidade:** Controle preditivo de estoque. Classificação em dois níveis: Regex → Gemma 4 local. **Atualizado na V4:**
+- Recebe `VoiceService`/`AudioService` compartilhados do runtime e a função `modo_voz_ativo`. Sem modo voz ativo, não fala nem escuta.
+- Na varredura inicial em modo texto, itens com autonomia esgotada são marcados com `validacao_pendente = 1` (perguntados quando o modo voz estiver ativo numa próxima varredura).
+- Novo método `consultar_estoque(texto)`: somente leitura de `controle_consumo` (itens ativos), filtro por termos do produto e estimativa do restante (`quantidade_comprada + residual − dias/ritmo`, mínimo 0). Sem LLM.
 
 #### B.7. Banco de Dados (`services/db_service.py`)
 **Responsabilidade:** Persistência relacional SQLite com `PRAGMA user_version`. Tabelas: `compras`, `itens_compra`, `controle_consumo`, `historico_conversas`. Sem alterações de responsabilidade na V4.
@@ -197,8 +201,9 @@ assistente-domestico/
          │     │
          │     ├── [PASSO 2: Roteamento]
          │     │   ├── [facil + compras] → ShoppingAssistant → SQLite + ChromaDB
-         │     │   ├── [facil + outro] → executar_assistente_local → Gemma 4
-         │     │   └── [medio_dificil / falha 3x] → Gemini API (nuvem)
+         │     │   ├── [facil + inventario] → consultar_estoque (criar/corrigir: informa limitação)
+         │     │   ├── [facil + outro] → executar_assistente_local → Gemma 4 (com contexto RAG)
+         │     │   └── [medio_dificil / falha 3x] → Gemini API (nuvem, com contexto RAG)
          │     │
          │     └── [PASSO 3: Resposta]
          │         → emitir_electron("assistant_message")
