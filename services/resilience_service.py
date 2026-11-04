@@ -57,6 +57,7 @@ def execute_with_retry(
     max_tentativas: int = 3,
     tempo_espera: float = 2.0,
     excecoes_recuperaveis: Tuple[Type[Exception], ...] = (Exception,),
+    excecoes_fatais: Tuple[Type[Exception], ...] = (),
     voice_service: Any = None,
     mensagem_espera_voz: str = "Aguarde um instante, estou reprocessando sua solicitação.",
     callback_validacao: Callable[[Any], None] = None,
@@ -89,6 +90,10 @@ def execute_with_retry(
 
             custom_logger.log_geral(f"[{nome_servico}] Chamada executada com sucesso na tentativa {tentativa}.")
             return resultado
+
+        except excecoes_fatais:
+            # Novas tentativas não resolvem (ex.: cota esgotada)
+            raise
 
         except excecoes_recuperaveis as e:
             import traceback

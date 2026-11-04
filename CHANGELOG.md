@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [V4] — Fase 1: base confiável (2026-11-03)
+
+### Adicionado
+- `services/intent_router.py`: roteamento por regras para frases conhecidas, sem chamar o LLM.
+- Confirmação de compras em caso de dúvida e comando "desfazer última compra", limitado ao último registro da sessão.
+- Preço por embalagem: colunas `embalagem_quantidade` e `embalagem_unidade` em `itens_compra` (schema v2).
+- `tests/test_fase1.py`: 41 testes. A suíte passa a ter 70 testes.
+
+### Alterado
+- Só contextos `geral` e `outro` podem ir ao Gemini, fora do Modo Qwen; histórico e memórias restritos não são enviados.
+- Com o orquestrador indisponível, frases sem regra não são enviadas à nuvem.
+- A data da compra é calculada no Python; o LLM não define "ontem" ou "anteontem".
+- A divergência entre total, quantidade e preço gera confirmação, sem recálculo silencioso.
+- `GEMINI_API_KEY` passa a ser opcional.
+
+### Corrigido
+- Consultas de compras não gravam mais registros (P4).
+- Novas tentativas não duplicam compras; a gravação ocorre em transação única (P5).
+- Prompt geral no Gemini, sem o texto fixo de compras (P3), e tratamento correto de cota esgotada (P15).
+- Sistema inicia sem chave do Gemini (P11).
+- Agenda informa a indisponibilidade em vez de exibir JSON bruto.
+
+### Dados
+- Removida a compra nº 5, registro vazio criado por uma pergunta. Cópia prévia em `core/database/backups/`.
+
+## [V4] — Correções do Modo Qwen e documentação (2026-11-03)
+
+### Corrigido
+- `desativar qwen` e `desativar modo qwen` passaram a retornar ao Gemma; antes, a frase era reconhecida como ativação.
+- A inatividade de 30 minutos passou a ser avaliada antes de renovar o horário de atividade, na solicitação seguinte.
+- `PROMPT_PROGRAMACAO` passou a ser string raw, eliminando `SyntaxWarning` e o caractere de controle no caminho do projeto.
+
+### Adicionado
+- `tests/test_gemma_service.py`: 7 testes do orquestrador, sem acesso ao Ollama. A suíte passa a ter 29 testes.
+- `Sobre a Versão/06 - Evolução da V3 para a V4.md` e `Sobre a Versão/08 - Estado Atual da V4.md`.
+
+### Alterado
+- Documentos 01 a 05 de `Sobre a Versão` revisados para a V4.
+
 ## [V4] — Skill ProjectAnalyzer (2026-11-02)
 
 ### Adicionado
@@ -34,4 +73,4 @@
 - Itens com `validacao_pendente` não são perguntados pelo chat.
 - `compras` + `consultar` (ex.: "quanto gastei no Moreschi?") é roteado ao `ShoppingAssistant`, que é de registro.
 - `AIService.processar_requisicao_complexa` usa prompt fixo de "texto de compras" para qualquer pedido enviado ao Gemini.
-- Sem suíte de testes automatizados no repositório.
+- Sem testes automatizados para estoque, serviços vetoriais reais e IPC.

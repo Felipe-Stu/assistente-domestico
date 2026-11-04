@@ -28,6 +28,11 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
     *   **Formato de comunicação:** JSON estruturado via `format="json"` do Ollama SDK.
     *   **Introduzido em:** V3. Mantido na V4.
 
+*   **Modelo Qwen 2.5-Coder 7B (`qwen2.5-coder:7b`)**
+    *   **Finalidade:** LLM local mais forte, usado no Modo Qwen e na interpretação feita pelo ProjectAnalyzer. A troca descarrega o Gemma da VRAM.
+    *   **Onde é utilizada:** `services/llm_provider.py` e `core/config.py` (`PROJECT_ANALYZER_MODEL`).
+    *   **Introduzido em:** **V4**.
+
 *   **SDK Python `ollama`**
     *   **Finalidade:** Biblioteca cliente Python que abstrai as chamadas HTTP ao servidor Ollama local.
     *   **Onde é utilizada:** `services/gemma_service.py` e `services/llm_provider.py`.
@@ -37,17 +42,17 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 
 ### Inteligência Artificial na Nuvem (Fallback)
 *   **Google Gemini API (Modelo `gemini-2.5-flash`)**
-    *   **Finalidade na V4:** Atua como **fallback de contingência** quando o LLM local falha persistentemente, ou quando a orquestração classifica a solicitação como `medio_dificil`.
+    *   **Finalidade na V4:** Atende somente perguntas gerais (`geral` e `outro`), quando o LLM local falha persistentemente ou a orquestração as classifica como `medio_dificil`.
     *   **Onde é utilizada:** `services/ai_service.py` e, indiretamente, via `CloudLLMProvider` em `services/llm_provider.py`.
     *   **Introduzido em:** V1. Papel alterado na V3 (de primário para fallback). Mantido na V4.
 
-*   **SDK `google-genai` (>= 0.8.0)**
+*   **SDK `google-genai` (>= 1.0.0)**
     *   **Finalidade:** Biblioteca cliente para comunicação com os endpoints Gemini.
     *   **Onde é utilizada:** `services/ai_service.py`.
     *   **Introduzido em:** V1. Mantido na V4.
 
 > [!NOTE]
-> A dívida técnica `self.gemini_client` em `ai_service.py` identificada na V3 permanece na V4. O fallback de nuvem para o fluxo `processar_requisicao_complexa` pode estar inoperante.
+> O cliente é criado no primeiro uso, portanto a chave é opcional. `processar_requisicao_complexa` usa um prompt geral e o tratamento de erros de `chamar_llm`.
 
 ---
 
@@ -104,7 +109,9 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 *   **`queue`:** Event loop principal baseado em fila de comandos. **(NOVO na V4)**
 *   **`io`:** Configuração de codificação UTF-8 dos fluxos stdin/stdout. **(NOVO na V4)**
 *   **`uuid`:** Geração de identificadores únicos para documentos vetoriais. **(NOVO na V4)**
-*   **`requests` (>= 2.31.0):** Comunicação HTTP para serviços e APIs. (V3)
+*   **`requests` (>= 2.31.0):** Declarado em `requirements.txt`, sem import direto no código da V4. (V3)
+*   **`unittest`:** Suíte de testes em `tests/`. **(NOVO na V4)**
+*   **`ast`, `hashlib`:** Extração de fatos e índice incremental do ProjectAnalyzer. **(NOVO na V4)**
 
 ---
 
@@ -193,4 +200,4 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 *   **OCR / Visão Computacional:** **Não identificado nesta versão.**
 *   **WebSocket / API REST Local:** **Não identificado nesta versão.** A comunicação entre Electron e Python utiliza stdin/stdout.
 *   **Whisper Local (STT):** **Não identificado nesta versão.** A transcrição de voz ainda depende da API Google Speech Recognition (serviço web externo).
-*   **Segunda LLM (Qwen2.5-Coder):** **Planejada no `OBJETIVO DA VERSÃO.txt` mas não implementada no código-fonte atual.**
+*   **Segunda LLM (Qwen2.5-Coder):** **Implementada parcialmente na V4.** A troca por comando e o retorno por inatividade funcionam; o botão no Electron e a troca por intenção não estão concluídos (ver documento 08).

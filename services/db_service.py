@@ -41,7 +41,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 1
+        SCHEMA_VERSION = 2
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -73,6 +73,8 @@ class DatabaseService:
             valor_unitario REAL NOT NULL,
             valor_total REAL NOT NULL,
             categoria TEXT,
+            embalagem_quantidade REAL,
+            embalagem_unidade TEXT,
             FOREIGN KEY (compra_id) REFERENCES compras(id) ON DELETE CASCADE
         );
         """
@@ -135,6 +137,22 @@ class DatabaseService:
                     # Atualiza o ponteiro de versão do banco
                     cursor.execute("PRAGMA user_version = 1;")
                     atual_version = 1
+
+                if atual_version < 2:
+                    msg_migracao = "Aplicando migração v2: colunas de embalagem em itens_compra."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+
+                    cursor.execute("PRAGMA table_info(itens_compra);")
+                    colunas = [coluna[1] for coluna in cursor.fetchall()]
+
+                    if "embalagem_quantidade" not in colunas:
+                        cursor.execute("ALTER TABLE itens_compra ADD COLUMN embalagem_quantidade REAL;")
+                    if "embalagem_unidade" not in colunas:
+                        cursor.execute("ALTER TABLE itens_compra ADD COLUMN embalagem_unidade TEXT;")
+
+                    cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
+                    atual_version = SCHEMA_VERSION
 
                 conn.commit()
             
@@ -199,81 +217,126 @@ class DatabaseService:
     # PERSISTÊNCIA DE COMPRAS
     # =========================================================================
 
-    def salvar_compra_da_ia(self, dados_ia: Dict[str, Any]) -> int:
+    def _inserir_compra(self, cursor: sqlite3.Cursor, dados_ia: Dict[str, Any]) -> int:
+        """Insere uma compra e seus itens na transação do cursor recebido."""
+        # Extração de cabeçalho da compra com fallbacks de chave
+        data_compra = dados_ia.get("data_compra") or dados_ia.get("data")
+        nome_comercio = dados_ia.get("estabelecimento") or dados_ia.get("nome_comercio") or "Não Identificado"
+        total_gasto = float(dados_ia.get("valor_total_compra") or dados_ia.get("total_gasto") or 0.0)
+
+        cursor.execute(
+            """
+            INSERT INTO compras (data_compra, nome_comercio, total_gasto)
+            VALUES (?, ?, ?)
+            """,
+            (data_compra, nome_comercio, total_gasto)
+        )
+        compra_id = cursor.lastrowid
+
+        for item in dados_ia.get("itens", []):
+            # Normalização e resolução de assincronia entre JSON da IA e a DDL da tabela
+            produto_nome = item.get("produto") or item.get("nome") or "Produto Indefinido"
+            marca = item.get("marca") or ""
+            quantidade = float(item.get("quantidade") or item.get("qtd") or 1.0)
+            unidade = item.get("unidade") or item.get("unidade_medida") or "UN"
+            valor_unitario = float(item.get("valor_unitario") or item.get("preco_unitario") or 0.0)
+            valor_total = float(item.get("valor_total") or item.get("preco_total") or (quantidade * valor_unitario))
+            categoria = item.get("categoria") or "Geral"
+
+            cursor.execute(
+                """
+                INSERT INTO itens_compra (
+                    compra_id, 
+                    produto, 
+                    marca, 
+                    quantidade, 
+                    unidade, 
+                    valor_unitario, 
+                    valor_total, 
+                    categoria,
+                    embalagem_quantidade,
+                    embalagem_unidade
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    compra_id,
+                    produto_nome,
+                    marca,
+                    quantidade,
+                    unidade,
+                    valor_unitario,
+                    valor_total,
+                    categoria,
+                    item.get("embalagem_quantidade"),
+                    item.get("embalagem_unidade")
+                )
+            )
+
+        return compra_id
+
+    def salvar_compras_da_ia(self, compras: List[Dict[str, Any]]) -> List[int]:
         """
-        Recebe o JSON extraído pelo Gemini e faz a inserção relacional das compras e itens.
-        Garante tratamento de fallback para chaves sinônimas e tipos numéricos.
-        
-        :param dados_ia: Dicionário retornado pelo serviço de IA
-        :return: ID da compra gerada
+        Grava todas as compras em uma única transação: ou todas são salvas, ou nenhuma.
+
+        :param compras: Lista de compras validadas
+        :return: IDs das compras geradas, na mesma ordem
         """
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
-
-            # Extração de cabeçalho da compra com fallbacks de chave
-            data_compra = dados_ia.get("data_compra") or dados_ia.get("data")
-            nome_comercio = dados_ia.get("estabelecimento") or dados_ia.get("nome_comercio") or "Não Identificado"
-            total_gasto = float(dados_ia.get("valor_total_compra") or dados_ia.get("total_gasto") or 0.0)
-
-            cursor.execute(
-                """
-                INSERT INTO compras (data_compra, nome_comercio, total_gasto)
-                VALUES (?, ?, ?)
-                """,
-                (data_compra, nome_comercio, total_gasto)
-            )
-            compra_id = cursor.lastrowid
-
-            itens = dados_ia.get("itens", [])
-
-            for item in itens:
-                # Normalização e resolução de assincronia entre JSON da IA e a DDL da tabela
-                produto_nome = item.get("produto") or item.get("nome") or "Produto Indefinido"
-                marca = item.get("marca") or ""
-                quantidade = float(item.get("quantidade") or item.get("qtd") or 1.0)
-                unidade = item.get("unidade") or item.get("unidade_medida") or "UN"
-                valor_unitario = float(item.get("valor_unitario") or item.get("preco_unitario") or 0.0)
-                valor_total = float(item.get("valor_total") or item.get("preco_total") or (quantidade * valor_unitario))
-                categoria = item.get("categoria") or "Geral"
-
-                cursor.execute(
-                    """
-                    INSERT INTO itens_compra (
-                        compra_id, 
-                        produto, 
-                        marca, 
-                        quantidade, 
-                        unidade, 
-                        valor_unitario, 
-                        valor_total, 
-                        categoria
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        compra_id,
-                        produto_nome,
-                        marca,
-                        quantidade,
-                        unidade,
-                        valor_unitario,
-                        valor_total,
-                        categoria
-                    )
-                )
-
+            ids = [self._inserir_compra(cursor, compra) for compra in compras]
             conn.commit()
-            msg_gravar = f"Procedimentos feitos: Compra (ID: {compra_id}) e {len(itens)} itens gravados no banco de dados SQLite."
-            logging_logger.info("Compra (ID: %d) e %d itens gravados com sucesso via IA.", compra_id, len(itens))
-            custom_logger.log_assistente(NOME_ASSISTENTE, msg_gravar)
-            return compra_id
 
-        except sqlite3.Error as e:
+            total_itens = sum(len(compra.get("itens", [])) for compra in compras)
+            msg_gravar = f"Procedimentos feitos: Compras {ids} e {total_itens} itens gravados no banco de dados SQLite."
+            logging_logger.info(msg_gravar)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_gravar)
+            return ids
+
+        except (sqlite3.Error, ValueError, TypeError) as e:
             conn.rollback()
             msg_rollback = f"Erro durante inserção da compra. Transação desfeita (Rollback): {e}"
             logging_logger.error(msg_rollback)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_rollback)
+            raise
+        finally:
+            conn.close()
+
+    def salvar_compra_da_ia(self, dados_ia: Dict[str, Any]) -> int:
+        """
+        Recebe o JSON extraído pela IA e faz a inserção relacional da compra e dos itens.
+
+        :param dados_ia: Dicionário retornado pelo serviço de IA
+        :return: ID da compra gerada
+        """
+        return self.salvar_compras_da_ia([dados_ia])[0]
+
+    def remover_compras(self, compra_ids: List[int]) -> List[int]:
+        """
+        Remove as compras informadas e seus itens em uma única transação.
+
+        :return: IDs dos itens removidos
+        """
+        if not compra_ids:
+            return []
+
+        marcadores = ", ".join("?" for _ in compra_ids)
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT id FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
+            itens_ids = [linha[0] for linha in cursor.fetchall()]
+            cursor.execute(f"DELETE FROM compras WHERE id IN ({marcadores})", tuple(compra_ids))
+            conn.commit()
+            custom_logger.log_assistente(NOME_ASSISTENTE, f"Compras {compra_ids} removidas ({len(itens_ids)} itens).")
+            return itens_ids
+
+        except sqlite3.Error as e:
+            conn.rollback()
+            msg_erro = f"Erro ao remover compras. Transação desfeita (Rollback): {e}"
+            logging_logger.error(msg_erro)
+            custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro)
             raise
         finally:
             conn.close()

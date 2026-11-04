@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from services.vector.vector_store_service import VectorStoreService
 from services.vector.memory_service import MemoryService
 from services.db_service import DatabaseService
@@ -25,14 +25,19 @@ class SemanticSearchService:
     def busca_semantica_pura(
         self,
         query: str,
-        assistant: Optional[str] = None,
+        assistant: Optional[Union[str, List[str]]] = None,
         top_k: int = 5,
         min_score: float = 0.65
     ) -> List[Dict[str, Any]]:
         """
         Executa busca vetorial pura no ChromaDB com score mínimo e filtro de metadados.
+        assistant aceita um contexto ou uma lista de contextos permitidos.
         """
-        where_filter = {"assistant": assistant} if assistant else None
+        where_filter = None
+        if isinstance(assistant, (list, tuple, set)):
+            where_filter = {"assistant": {"$in": list(assistant)}}
+        elif assistant:
+            where_filter = {"assistant": assistant}
         return self.vector_store.search_similarity(
             query_text=query,
             top_k=top_k,

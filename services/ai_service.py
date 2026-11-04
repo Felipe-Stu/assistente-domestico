@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Dict, Any
+import os
+from typing import Dict, Any, List, Optional
 from google import genai
 from google.genai import types
 from services.logger_service import logger as custom_logger
@@ -29,10 +30,21 @@ class AIService:
     """
 
     def __init__(self, model_name: str = "gemini-2.5-flash"):
-        # O Client() lê a GEMINI_API_KEY automaticamente do ambiente (.env)
-        self.client = genai.Client()
+        self._client = None
         self.model_name = model_name
         custom_logger.log_assistente(NOME_ASSISTENTE, "Serviço AIService (Gemini) inicializado com sucesso.")
+
+    @property
+    def client(self):
+        """Cria o cliente apenas no primeiro uso; o sistema inicia sem a chave do Gemini."""
+        if self._client is None:
+            # O Client() lê a GEMINI_API_KEY automaticamente do ambiente (.env)
+            self._client = genai.Client()
+        return self._client
+
+    def disponivel(self) -> bool:
+        """Retorna True se há chave configurada para acessar o Gemini."""
+        return bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
 
     def chamar_llm(self, prompt: str, json_output: bool = True) -> Any:
         """Envia o prompt para o Gemini na nuvem e retorna a resposta pura ou em JSON."""
@@ -112,22 +124,26 @@ class AIService:
         """Alias para chamar_llm com saída JSON."""
         return self.chamar_llm(prompt, json_output=True)
     
-    def processar_requisicao_complexa(self, mensagem_usuario: str, contexto: str = None) -> str:
+    @staticmethod
+    def _formatar_historico(historico: Optional[List[Dict[str, str]]]) -> str:
+        """Converte o histórico da sessão em texto legível para o prompt."""
+        if not historico:
+            return "Nenhum"
+        rotulos = {"user": "Usuário", "assistant": "Assistente"}
+        return "\n".join(f"{rotulos.get(m.get('role'), 'Mensagem')}: {m.get('content', '')}" for m in historico)
+
+    def processar_requisicao_complexa(self, mensagem_usuario: str, contexto: Optional[List[Dict[str, str]]] = None) -> str:
         """
-        Método de Fallback acionado quando o LLM local falha.
-        Envia a requisição para a API do Gemini na nuvem.
+        Responde perguntas gerais pela API do Gemini na nuvem.
+        Compras, estoque, agenda, programação e documentação são tratados localmente.
         """
         prompt = f"""
-        Você é um assistente doméstico. Processe e estruture o seguinte texto de compras:
-        "{mensagem_usuario}"
-        
-        Contexto prévio: {contexto if contexto else "Nenhum"}
-        
-        Retorne os itens e valores identificados.
+        Você é um assistente pessoal. Responda em português do Brasil, de forma clara e objetiva.
+
+        Histórico recente da conversa:
+        {self._formatar_historico(contexto)}
+
+        Solicitação do usuário:
+        {mensagem_usuario}
         """
-        # CORRIGIDO: Chamada usando o cliente padronizado e a sintaxe oficial google-genai
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=prompt
-        )
-        return response.text
+        return self.chamar_llm(prompt, json_output=False)

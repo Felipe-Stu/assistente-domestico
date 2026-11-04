@@ -19,6 +19,7 @@ sys.path.append(str(ROOT_DIR))
 from services.ai_service import AIService, ServiceUnavailableException, TokenExhaustedException
 from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
+from services.intent_router import normalizar_texto
 from services.inventory_assistant import InventoryAssistant
 from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
 import services.llm_provider as llm_provider_estado
@@ -47,6 +48,13 @@ logger = logging.getLogger(__name__)
 
 TEMPO_RETRY = 3.0
 MAX_TENTATIVAS = 3
+
+MSG_IA_LOCAL_INDISPONIVEL = (
+    "A IA local não respondeu. Nada foi gravado nem enviado à nuvem. "
+    "Verifique se o Ollama está em execução e tente novamente."
+)
+RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar", "gravar", "salvar", "grava", "salva"}
+RESPOSTAS_CANCELAR = {"nao", "n", "cancela", "cancelar", "descarta", "descartar", "nao grava", "nao gravar", "nao salve"}
 
 
 # =============================================================================
@@ -100,6 +108,7 @@ class AssistenteRuntime:
         self.deve_encerrar = False
         self.fila = queue.Queue()
         self.sessao = GerenciadorDeSessao()
+        self.compra_pendente = None
 
         # Serviços essenciais (inicializados na Fase 1)
         self.db_service = None
@@ -294,15 +303,21 @@ class AssistenteRuntime:
 
     # Contextos que geram JSON estruturado não recebem contexto RAG no prompt
     CONTEXTOS_SEM_RAG = {"compras", "agenda"}
-    # Compras já são vetorizadas pelo ShoppingAssistant; consultas de estoque não são fatos
-    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario"}
+    # Compras já são vetorizadas pelo ShoppingAssistant; consultas de estoque e agenda não são fatos
+    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario", "agenda"}
+    # Somente perguntas gerais podem ir ao Gemini; os demais contextos permanecem locais
+    CONTEXTOS_NUVEM = {"geral", "outro"}
 
-    def _enriquecer_com_memoria(self, texto: str, contexto: str) -> str:
-        """Anexa memórias semânticas relevantes à instrução enviada à LLM."""
+    def _enriquecer_com_memoria(self, texto: str, contexto: str, para_nuvem: bool = False) -> str:
+        """
+        Anexa memórias semânticas relevantes à instrução enviada à LLM.
+        Para a nuvem, usa apenas memórias de contextos que podem sair da máquina.
+        """
         if contexto in self.CONTEXTOS_SEM_RAG:
             return texto
         try:
-            bloco = self.context_retrieval.montar_contexto_recuperado(texto)
+            assistentes = sorted(self.CONTEXTOS_NUVEM) if para_nuvem else None
+            bloco = self.context_retrieval.montar_contexto_recuperado(texto, assistant=assistentes)
         except Exception as e:
             logger.warning(f"Falha ao recuperar contexto semântico (seguindo sem RAG): {e}")
             return texto
@@ -354,8 +369,79 @@ class AssistenteRuntime:
             return f"A análise do projeto falhou: {e}"
 
     # -------------------------------------------------------------------------
+    # Compras
+    # -------------------------------------------------------------------------
+
+    def _processar_compras(self, texto: str, acao: str, parametros: dict) -> tuple:
+        """Roteia pedidos de compras. Retorna (texto do chat, texto para voz ou None)."""
+        if parametros.get("operacao") == "desfazer":
+            return self.shopping_assistant.desfazer_ultimo_registro(), None
+
+        if acao == "corrigir":
+            return "Ainda não consigo editar compras. Use \"desfazer última compra\" e registre novamente.", None
+
+        if acao != "criar":
+            return "As consultas de gastos e preços ainda não estão disponíveis. Nada foi registrado.", None
+
+        preparada = execute_with_retry(
+            func=self.shopping_assistant.preparar_compra,
+            args=(texto,),
+            max_tentativas=MAX_TENTATIVAS,
+            tempo_espera=TEMPO_RETRY,
+            voice_service=self.voice_service if self.voice_mode_active else None,
+            mensagem_espera_voz="Estou tentando entender sua compra novamente.",
+            nome_servico="ShoppingAssistant"
+        )
+
+        if not preparada["compras"]:
+            return "Não identifiquei itens de compra nessa mensagem. Nada foi registrado.", None
+
+        if preparada["duvidas"]:
+            self.compra_pendente = preparada["compras"]
+            duvidas = "\n".join(f"- {d}" for d in preparada["duvidas"])
+            resumo = self.shopping_assistant.formatar_resumo(preparada["compras"])
+            return (
+                f"Antes de gravar, confira esta compra:\n{resumo}\n\nPontos de dúvida:\n{duvidas}\n\n"
+                "Responda \"sim\" para gravar ou \"não\" para descartar.",
+                "Tenho uma dúvida sobre esta compra. Confira no chat e responda sim ou não."
+            )
+
+        return self.shopping_assistant.registrar_compras(preparada["compras"])["mensagem"], None
+
+    def _responder_confirmacao_compra(self, texto: str):
+        """Trata a resposta do usuário a uma compra aguardando confirmação."""
+        resposta = normalizar_texto(texto).strip(" .,!")
+
+        if resposta in RESPOSTAS_CONFIRMAR:
+            compras, self.compra_pendente = self.compra_pendente, None
+            resposta_texto = self.shopping_assistant.registrar_compras(compras)["mensagem"]
+        elif resposta in RESPOSTAS_CANCELAR:
+            self.compra_pendente = None
+            resposta_texto = "Compra descartada. Nada foi gravado."
+        else:
+            resposta_texto = "Ainda há uma compra aguardando confirmação. Responda \"sim\" para gravar ou \"não\" para descartar."
+
+        return self._entregar_resposta(resposta_texto)
+
+    # -------------------------------------------------------------------------
     # Processamento de Solicitação (Orquestração)
     # -------------------------------------------------------------------------
+
+    def _pode_usar_nuvem(self, contexto: str) -> bool:
+        """O Gemini só atende perguntas gerais, fora do Modo Qwen e com chave configurada."""
+        return (
+            contexto in self.CONTEXTOS_NUVEM
+            and not llm_provider_estado.MODO_QWEN_ATIVO
+            and self.ai_service.disponivel()
+        )
+
+    def _entregar_resposta(self, resposta_texto: str, fala_texto: str = None):
+        """Fala e exibe a resposta e devolve o sistema à espera de entrada."""
+        logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
+        self._falar_se_permitido(fala_texto or resposta_texto)
+        emitir_electron("assistant_message", {"text": resposta_texto})
+        self._set_estado("WAITING_INPUT")
+        return resposta_texto
 
     def _processar_solicitacao(self, transcricao: str):
         """Pipeline completo de processamento: Orquestração → Execução → Resposta."""
@@ -365,6 +451,9 @@ class AssistenteRuntime:
         custom_logger.log_geral(f"Entrada recebida: '{solicitacao_original}'")
 
         self._set_estado("PROCESSING")
+
+        if self.compra_pendente is not None:
+            return self._responder_confirmacao_compra(solicitacao_original)
 
         # =====================================================================
         # PASSO 1: Orquestração Gemma 4
@@ -382,14 +471,10 @@ class AssistenteRuntime:
                 nome_servico="Gemma4-Orquestrador"
             )
         except MaxRetriesExceededException:
-            logger.warning("⚠️ Gemma 4 excedeu retries. Aplicando fallback seguro para nuvem.")
-            custom_logger.log_geral("Fallback ativado: Encaminhando solicitação para Gemini.")
-            decisao = {
-                "dificuldade": "medio_dificil",
-                "mudanca_de_contexto": True,
-                "contexto": "outro",
-                "acao": "delegar"
-            }
+            # Sem classificação, o texto pode ser privado (ex.: uma compra): nada vai à nuvem
+            logger.warning("⚠️ Gemma 4 excedeu retries. Solicitação não encaminhada à nuvem.")
+            custom_logger.log_geral("Orquestrador indisponível: solicitação não encaminhada à nuvem.")
+            return self._entregar_resposta(MSG_IA_LOCAL_INDISPONIVEL)
 
         logger.info(f"🧠 [Decisão do Orquestrador]: {decisao}")
 
@@ -397,6 +482,7 @@ class AssistenteRuntime:
         contexto = decisao.get("contexto", "outro")
         mudanca_contexto = decisao.get("mudanca_de_contexto", False)
         acao = decisao.get("acao", "")
+        parametros = decisao.get("parametros") or {}
 
         # =====================================================================
         # INTERCEPTAÇÃO: Resposta direta
@@ -416,7 +502,7 @@ class AssistenteRuntime:
         # INTERCEPTAÇÃO: Skill ProjectAnalyzer (local, sem fallback para nuvem)
         # =====================================================================
         if contexto == "projetos":
-            caminho = (decisao.get("parametros") or {}).get("caminho")
+            caminho = parametros.get("caminho")
             resposta_texto = self._executar_analise_projeto(caminho)
             self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
             # Por voz, apenas a primeira linha (sem caminhos de pasta)
@@ -426,25 +512,21 @@ class AssistenteRuntime:
             return resposta_texto
 
         resposta_texto = ""
+        fala_texto = None
+        usar_nuvem = dificuldade != "facil" and self._pode_usar_nuvem(contexto)
 
         # =====================================================================
         # PASSO 2: Roteamento de Execução
         # =====================================================================
-        if dificuldade == "facil":
+        if not usar_nuvem:
             logger.info("⚡ Processando LOCALMENTE...")
 
             try:
                 if contexto == "compras":
-                    res_compra = execute_with_retry(
-                        func=self.shopping_assistant.processar_texto_compra,
-                        args=(solicitacao_original,),
-                        max_tentativas=MAX_TENTATIVAS,
-                        tempo_espera=TEMPO_RETRY,
-                        voice_service=self.voice_service if self.voice_mode_active else None,
-                        mensagem_espera_voz="Estou tentando registrar suas compras novamente.",
-                        nome_servico="ShoppingAssistant"
-                    )
-                    resposta_texto = res_compra.get("mensagem", "Compra registrada com sucesso.")
+                    resposta_texto, fala_texto = self._processar_compras(solicitacao_original, acao, parametros)
+
+                elif contexto == "agenda":
+                    resposta_texto = "A agenda ainda não está disponível: não consigo salvar nem consultar compromissos."
 
                 elif contexto == "inventario":
                     if acao in ("criar", "corrigir"):
@@ -468,29 +550,35 @@ class AssistenteRuntime:
                     )
 
             except MaxRetriesExceededException:
-                logger.error("❌ Falha crítica local. Redirecionando para Nuvem...")
-                dificuldade = "medio_dificil"
+                if self._pode_usar_nuvem(contexto):
+                    logger.error("❌ Falha crítica local. Redirecionando para Nuvem...")
+                    usar_nuvem = True
+                else:
+                    logger.error("❌ Falha crítica local em contexto restrito. Nada enviado à nuvem.")
+                    return self._entregar_resposta(MSG_IA_LOCAL_INDISPONIVEL)
 
-        if dificuldade != "facil":
+        if usar_nuvem:
             logger.info("☁️ Processando na NUVEM via Gemini...")
+            # O histórico só acompanha o pedido se a conversa em curso também pode ir à nuvem
+            historico_nuvem = self.sessao.historico if self.sessao.contexto_ativo in self.CONTEXTOS_NUVEM else []
 
             try:
                 resposta_texto = execute_with_retry(
                     func=self.ai_service.processar_requisicao_complexa,
-                    args=(self._enriquecer_com_memoria(solicitacao_original, contexto), self.sessao.historico),
+                    args=(self._enriquecer_com_memoria(solicitacao_original, contexto, para_nuvem=True), historico_nuvem),
                     max_tentativas=MAX_TENTATIVAS,
                     tempo_espera=TEMPO_RETRY,
                     excecoes_recuperaveis=(ServiceUnavailableException, Exception),
+                    excecoes_fatais=(TokenExhaustedException,),
                     voice_service=self.voice_service if self.voice_mode_active else None,
                     mensagem_espera_voz="Tráfego congestionado na nuvem. Aguardando reenvio.",
                     nome_servico="Gemini-Nuvem"
                 )
+            except TokenExhaustedException as e:
+                logger.warning(f"AVISO DE TOKENS: {e}")
+                return self._entregar_resposta("O limite de uso do Gemini foi atingido. Tente novamente mais tarde.")
             except MaxRetriesExceededException:
-                resposta_texto = "Desculpe, o serviço de inteligência na nuvem está indisponível no momento. Tente novamente mais tarde."
-                self._falar_se_permitido(resposta_texto)
-                emitir_electron("assistant_message", {"text": resposta_texto})
-                self._set_estado("WAITING_INPUT")
-                return resposta_texto
+                return self._entregar_resposta("Desculpe, o serviço de inteligência na nuvem está indisponível no momento. Tente novamente mais tarde.")
 
         self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
         self._registrar_memoria(solicitacao_original, contexto)
@@ -499,9 +587,7 @@ class AssistenteRuntime:
         # PASSO 3: Resposta
         # =====================================================================
         if resposta_texto:
-            logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
-            self._falar_se_permitido(resposta_texto)
-            emitir_electron("assistant_message", {"text": resposta_texto})
+            return self._entregar_resposta(resposta_texto, fala_texto)
 
         self._set_estado("WAITING_INPUT")
         return resposta_texto

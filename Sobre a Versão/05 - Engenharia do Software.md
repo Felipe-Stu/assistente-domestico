@@ -1,9 +1,9 @@
 # 05 - Engenharia do Software
 
-Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente (V3)**.
+Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente (V4)**.
 
 > [!NOTE]
-> Todos os diagramas abaixo foram construídos a partir da análise direta do código-fonte da V3. Os componentes e fluxos representados refletem o estado real do sistema.
+> Os diagramas abaixo foram revisados a partir do código-fonte da V4 em 03/11/2026 (commit `c754a6a`). Linhas tracejadas indicam código existente que não é acionado pelo fluxo atual.
 
 ---
 
@@ -11,63 +11,72 @@ Este documento apresenta os diagramas técnicos de arquitetura, comunicação, f
 
 ```mermaid
 graph TB
-    subgraph "Entrada do Usuário"
-        MIC["🎤 Microfone\n(PyAudio)"]
-        SPK["🔊 Alto-falantes\n(pygame.mixer)"]
+    subgraph "Interface Desktop — Electron"
+        UI["renderer.js + index.html"]
+        BRIDGE["preload.js<br>window.api"]
+        EMAIN["main.js<br>spawn do Python"]
+        UI --> BRIDGE --> EMAIN
     end
 
-    subgraph "Transcrição"
-        STT["Google Speech\nRecognition API\n(Externo)"]
+    subgraph "Runtime — app/main.py"
+        RT["AssistenteRuntime<br>fila de eventos"]
+        SESSAO["GerenciadorDeSessao"]
+        RETRY["resilience_service<br>execute_with_retry()"]
+        RT --> SESSAO
+        RT --> RETRY
     end
 
-    subgraph "app/main.py — Orquestrador"
-        MAIN["GerenciadorDeSessao\n+ processar_solicitacao()"]
-        RETRY["resilience_service\nexecute_with_retry()"]
+    subgraph "Serviços de Domínio"
+        GEMMA_SVC["gemma_service<br>orquestrar_requisicao()"]
+        SHOPPING["shopping_assistant"]
+        INVENTORY["inventory_assistant"]
+        PA["project_analyzer"]
     end
 
-    subgraph "LLM Local — Ollama"
-        OLLAMA["Servidor Ollama\nhttp://127.0.0.1:11434"]
-        GEMMA["Gemma 3 4B\n(gemma4:e4b)"]
-        OLLAMA --> GEMMA
+    subgraph "LLM"
+        LOCAL_PROV["LocalLLMProvider"]
+        OLLAMA["Ollama<br>gemma4:e4b / qwen2.5-coder:7b"]
+        AI_SVC["ai_service<br>Gemini 2.5 Flash"]
+        LOCAL_PROV --> OLLAMA
     end
 
-    subgraph "Serviços Especializados"
-        GEMMA_SVC["gemma_service\norquestrar_requisicao()"]
-        SHOPPING["shopping_assistant\nprocessar_texto_compra()"]
-        INVENTORY["inventory_assistant\nverificar_itens_expirados()\nprocessar_estoque_nova_compra()"]
+    subgraph "Memória Semântica"
+        CTX["ContextRetrievalService"]
+        MEM["MemoryService"]
+        BUSCA["SemanticSearchService"]
+        VS["VectorStoreService"]
+        EMB["EmbeddingService<br>CPU"]
+        CHROMA[("ChromaDB")]
+        CTX --> BUSCA --> VS
+        MEM --> VS
+        VS --> EMB
+        VS --> CHROMA
     end
 
-    subgraph "Camada de Abstração LLM"
-        LOCAL_PROV["LocalLLMProvider\n(Ollama)"]
-        CLOUD_PROV["CloudLLMProvider\n(Gemini)"]
+    subgraph "Persistência Relacional"
+        DB["DatabaseService"]
+        SQLITE[("SQLite<br>compras, itens_compra<br>controle_consumo")]
+        DB --> SQLITE
     end
 
-    subgraph "IA na Nuvem — Fallback"
-        AI_SVC["ai_service\nGemini 2.5 Flash\n(Google Cloud)"]
+    subgraph "Voz (sob demanda)"
+        AUDIO["audio_service<br>PyAudio + Google Speech"]
+        TTS["voice_service<br>edge-tts + pygame"]
     end
 
-    subgraph "Persistência"
-        DB["DatabaseService\nSQLite"]
-        DBFILE["assistente_casa.db\ncompras / itens_compra\ncontrole_consumo"]
-    end
-
-    subgraph "Síntese de Voz"
-        TTS["voice_service\nedge-tts\n(Microsoft Edge)"]
-    end
-
-    MIC --> STT --> MAIN
-    MAIN --> RETRY
-    RETRY --> GEMMA_SVC --> OLLAMA
-    RETRY --> SHOPPING --> LOCAL_PROV --> OLLAMA
+    EMAIN <-->|"JSON stdin/stdout"| RT
+    RETRY --> GEMMA_SVC --> LOCAL_PROV
+    RETRY --> SHOPPING --> LOCAL_PROV
     RETRY --> AI_SVC
-    SHOPPING --> DB --> DBFILE
-    INVENTORY --> LOCAL_PROV
-    INVENTORY --> DB
-    MAIN --> INVENTORY
-    INVENTORY --> TTS --> SPK
-    MAIN --> TTS
-    LOCAL_PROV --> CLOUD_PROV
-    CLOUD_PROV --> AI_SVC
+    RT --> PA --> LOCAL_PROV
+    RT --> INVENTORY --> DB
+    SHOPPING --> DB
+    SHOPPING --> VS
+    RT --> CTX
+    RT --> MEM
+    RT --> AUDIO
+    RT --> TTS
+    SHOPPING -.->|"não implementado"| INVENTORY
 ```
 
 ---
@@ -76,34 +85,45 @@ graph TB
 
 ```mermaid
 flowchart TD
-    A([Início]) --> B[AudioService\nCaptura voz do microfone]
-    B --> C{Áudio\ndetectado?}
-    C -- Não --> Z([Fim: Nenhuma fala])
-    C -- Sim --> D[Google Speech Recognition\nTranscreve para texto]
-    D --> E[execute_with_retry\norquestrar_requisicao - Gemma Local]
-    E --> F{Orquestração\nbem-sucedida?}
-    F -- Falha após 3x --> G[Fallback para Gemini\ndificuldade=medio_dificil]
-    F -- Sucesso --> H{Dificuldade\ndo orquestrador}
+    A([Texto do chat ou voz transcrita]) --> B{Comando<br>determinístico?}
+    B -- Qwen --> C[Troca o modelo ativo]
+    C --> FIM
+    B -- Analisar projeto --> D[ProjectAnalyzer<br>local, sem nuvem]
+    D --> FIM
+    B -- Não --> E[execute_with_retry<br>orquestrar_requisicao]
+    B -- Regra conhecida --> J{Contexto}
+    E -- Falha após 3x --> X[Avisa: IA local indisponível<br>nada vai à nuvem]
+    E -- Classificado --> J
+    J -- geral/outro difícil --> N[Gemini<br>perguntas gerais]
+    J -- compras --> I{acao}
+    J -- inventario --> K{acao}
+    J -- agenda --> Y[Avisa: ainda indisponível]
+    J -- geral/outro/programacao --> L[executar_assistente_local]
 
-    H -- facil + compras --> I[execute_with_retry\nShoppingAssistant]
-    H -- facil + outro --> J[execute_with_retry\nexecutar_assistente_local]
-    H -- medio_dificil --> G
+    I -- consultar --> Z[Avisa: disponível na Fase 3]
+    I -- criar --> V[preparar_compra]
+    V -- Falha após 3x --> X
+    V -- Sem dúvida --> M[(SQLite + ChromaDB)]
+    V -- Com dúvida --> W{Usuário confirma?}
+    W -- Sim --> M
+    W -- Não --> R
+    K -- consultar/delegar --> O[consultar_estoque]
+    K -- criar/corrigir --> P[Informa a limitação]
+    L -- Falha em geral/outro --> N
+    L -- Falha em programacao --> X
 
-    I --> K{LocalLLM\nbem-sucedido?}
-    K -- Sim --> L[Valida e sanitiza JSON]
-    K -- Falha após 3x --> G
-    L --> M[DatabaseService\nsalvar_compra_da_ia]
-    M --> N[VoiceService\nResponde ao usuário]
-
-    J --> N
-    G --> O[execute_with_retry\nai_service Gemini]
-    O --> P{Gemini\nbem-sucedido?}
-    P -- Sim --> N
-    P -- Falha após 3x --> Q[Mensagem de erro\npor voz]
-
-    N --> R[GerenciadorDeSessao\nAtualiza contexto]
-    Q --> R
-    R --> Z2([Fim])
+    N -- Falha após 3x --> Q[Mensagem de indisponibilidade]
+    M --> R[Atualiza sessão]
+    O --> R
+    P --> R
+    Y --> R
+    Z --> R
+    L --> R
+    N -- Sucesso --> R
+    R --> S[Registra memória semântica<br>exceto compras e inventário]
+    S --> FIM([assistant_message + TTS opcional])
+    Q --> FIM
+    X --> FIM
 ```
 
 ---
@@ -112,38 +132,31 @@ flowchart TD
 
 ```mermaid
 graph LR
-    USER["👤 Usuário"] -->|Voz| AUDIO["audio_service"]
-    AUDIO -->|Buffer PCM| GOOGLE_STT["Google Speech\nRecognition\n(Externo)"]
-    GOOGLE_STT -->|Texto transcrito| MAIN["main.py"]
+    USER["Usuário"] -->|Texto| UI["Electron"]
+    USER -->|Voz, se ativada| AUDIO["audio_service"]
+    AUDIO -->|Buffer PCM| GOOGLE_STT["Google Speech<br>(Externo)"]
+    GOOGLE_STT -->|Texto transcrito| RT["AssistenteRuntime"]
+    UI -->|send_text| RT
+    RT -->|assistant_message| UI
 
-    MAIN -->|texto_transcrito| GEMMA_SVC["gemma_service"]
-    GEMMA_SVC -->|POST /api/chat| OLLAMA["Ollama Local\nGemma 3 4B"]
+    RT -->|texto| GEMMA_SVC["gemma_service"]
+    GEMMA_SVC -->|POST /api/chat| OLLAMA["Ollama Local"]
     OLLAMA -->|JSON classificado| GEMMA_SVC
-    GEMMA_SVC -->|decisao dict| MAIN
 
-    MAIN -->|processar_texto_compra| SHOPPING["shopping_assistant"]
-    SHOPPING -->|gerar_json prompt| LOCAL_LLM["LocalLLMProvider\nOllama"]
-    LOCAL_LLM -->|POST /api/chat| OLLAMA
-    OLLAMA -->|JSON compras| LOCAL_LLM
-    LOCAL_LLM -->|dados dict| SHOPPING
-    SHOPPING -->|dados validados| DB["DatabaseService\nSQLite"]
+    RT -->|preparar e registrar compra| SHOPPING["shopping_assistant"]
+    SHOPPING -->|gerar_json| OLLAMA
+    SHOPPING -->|dados validados| DB["SQLite"]
+    SHOPPING -->|itens vetorizados| CHROMA["ChromaDB"]
 
-    MAIN -->|verificar_itens_expirados| INVENTORY["inventory_assistant"]
-    INVENTORY -->|falar pergunta| VOICE["voice_service"]
-    VOICE -->|texto| EDGE_TTS["Microsoft\nEdge TTS\n(Externo)"]
-    EDGE_TTS -->|MP3| VOICE
+    RT -->|consultar_estoque| INVENTORY["inventory_assistant"]
+    INVENTORY -->|SELECT| DB
+
+    RT -->|recupera e salva memória| CHROMA
+    RT -->|perguntas gerais| AI["ai_service"]
+    AI -->|HTTPS| GEMINI["Gemini<br>(Externo)"]
+    RT -->|resposta, se voz ativa| VOICE["voice_service"]
+    VOICE -->|texto| EDGE_TTS["Edge TTS<br>(Externo)"]
     VOICE -->|áudio| USER
-
-    INVENTORY -->|capturar resposta| AUDIO
-    INVENTORY -->|_heuristica_rapida| REGEX["Regex / Heurística\n(interno)"]
-    REGEX -->|Miss| LOCAL_LLM
-    INVENTORY -->|UPDATE| DB
-
-    MAIN -->|fallback| AI["ai_service\nGemini Nuvem"]
-    AI -->|HTTPS| GEMINI["Google Gemini API\n(Externo)"]
-    GEMINI -->|resposta| AI
-    AI -->|texto| MAIN
-    MAIN -->|resposta_texto| VOICE
 ```
 
 ---
@@ -153,49 +166,48 @@ graph LR
 ```mermaid
 sequenceDiagram
     actor User as 👤 Usuário
-    participant Audio as AudioService
-    participant STT as Google STT
-    participant Main as main.py
+    participant UI as Electron
+    participant Main as AssistenteRuntime
     participant Retry as execute_with_retry
     participant Gemma as gemma_service
     participant Ollama as Ollama Local
     participant Shopping as ShoppingAssistant
     participant LocalLLM as LocalLLMProvider
     participant DB as DatabaseService
+    participant Chroma as VectorStoreService
     participant Voice as VoiceService
 
-    User->>Audio: Fala: "fui ao Moreschi, comprei frango..."
-    Audio->>Audio: Captura buffer PCM (RMS monitoring)
-    Audio->>STT: AudioData (pt-BR)
-    STT-->>Audio: "fui ao Moreschi, comprei frango..."
-    Audio-->>Main: texto_transcrito
+    User->>UI: Digita: "fui ao Moreschi, comprei frango..."
+    UI->>Main: send_text (JSON por stdin)
 
     Main->>Retry: execute_with_retry(orquestrar_requisicao)
     Retry->>Gemma: orquestrar_requisicao(texto)
-    Gemma->>Ollama: POST /api/chat [format=json, temp=0.1]
-    Note over Ollama: Inferência ~40s
-    Ollama-->>Gemma: {"dificuldade":"facil","contexto":"compras",...}
-    Gemma->>Gemma: _validar_schema_orquestrador()
+    Gemma->>Gemma: rotear_por_regras(texto)
     Gemma-->>Retry: decisao dict
     Retry-->>Main: {dificuldade:"facil", contexto:"compras"}
 
-    Main->>Retry: execute_with_retry(processar_texto_compra)
-    Retry->>Shopping: processar_texto_compra(texto)
+    Main->>Retry: execute_with_retry(preparar_compra)
+    Retry->>Shopping: preparar_compra(texto)
     Shopping->>LocalLLM: gerar_json(prompt_sistema, texto)
     LocalLLM->>Ollama: POST /api/chat [format=json]
     Note over Ollama: Inferência JSON compras
     Ollama-->>LocalLLM: {"compras":[{"estabelecimento":"Moreschi","itens":[...]}]}
     LocalLLM-->>Shopping: dados dict
     Shopping->>Shopping: _validar_e_sanitizar_compra()
-    Shopping->>DB: salvar_compra_da_ia(dados_validados)
-    DB-->>Shopping: compra_id
-    Shopping-->>Retry: {"status":"sucesso", "compras_processadas":1}
-    Retry-->>Main: resultado
+    Shopping-->>Retry: {"compras":[...], "duvidas":[]}
+    Retry-->>Main: compra preparada
+    Main->>Shopping: registrar_compras(compras)
+    Shopping->>DB: salvar_compras_da_ia(compras)
+    DB-->>Shopping: ids
+    Shopping->>Chroma: upsert_documents(itens vetorizados)
+    Shopping-->>Main: {"status":"sucesso", "compras_processadas":1}
 
-    Main->>Voice: falar("Informações inseridas com sucesso!")
-    Voice->>Voice: edge_tts.Communicate(texto).save(mp3)
-    Voice->>Voice: pygame.mixer.music.play()
-    Voice-->>User: 🔊 Resposta por voz
+    Main-->>UI: assistant_message (JSON por stdout)
+    UI-->>User: Exibe a resposta no chat
+    opt Modo voz ativo e sem mudo
+        Main->>Voice: falar("Informações inseridas com sucesso!")
+        Voice-->>User: Resposta por voz
+    end
 ```
 
 ---
@@ -207,17 +219,20 @@ flowchart TD
     START([Texto Transcrito]) --> ORCH{Orquestrador\nGemma Local}
 
     ORCH -->|dificuldade='facil'\ncontexto='compras'| COMP[ShoppingAssistant\nLocalLLMProvider → Gemma]
-    ORCH -->|dificuldade='facil'\ncontexto='agenda'| AGENDA[executar_assistente_local\nGemma Local]
-    ORCH -->|dificuldade='facil'\ncontexto='inventario'| INVENT["InventoryAssistant\n(não implementado no roteador\nda V3 para criação)"]
+    ORCH -->|dificuldade='facil'\ncontexto='agenda'| AGENDA[Avisa: agenda\nainda indisponível]
+    ORCH -->|dificuldade='facil'\ncontexto='inventario'| INVENT["InventoryAssistant\nconsultar_estoque\n(criar/corrigir: informa limitação)"]
+    ORCH -->|Regex\ncontexto='projetos'| PROJ[ProjectAnalyzer\nsem nuvem]
     ORCH -->|dificuldade='facil'\ncontexto='geral' ou 'outro'| OUTRO[executar_assistente_local\nGemma Local]
-    ORCH -->|dificuldade='medio_dificil'| NUVEM[ai_service\nGemini API]
-    ORCH -->|Falha após 3x retry| NUVEM
+    ORCH -->|'geral' ou 'outro' difícil| NUVEM[ai_service\nGemini API]
+    ORCH -->|Falha após 3x retry| AVISO[Avisa: IA local indisponível\nnada vai à nuvem]
+    OUTRO -->|Falha após 3x retry| NUVEM
 
-    COMP -->|Sucesso| DB[(SQLite)]
-    COMP -->|Falha após 3x retry| NUVEM
+    COMP -->|Sem dúvida ou confirmada| DB[(SQLite)]
+    COMP -->|Falha após 3x retry\nnada é gravado| AVISO
 
-    INVENTORY_INIT([Inicialização]) --> VARR{Para cada item\ncom autonomia esgotada}
-    VARR --> RESP{Resposta do\nusuário}
+    INVENTORY_INIT([Inicialização]) --> VARR{Para cada item ativo\ncom autonomia esgotada}
+    VARR --> PEND[Modo texto: marca\nvalidacao_pendente]
+    VARR -.->|Voz ativa: não ocorre\nna inicialização| RESP{Resposta do\nusuário}
     RESP -->|Heurística Regex\nresolve| CLASS1[Classifica\nlocalmente - 0ms]
     RESP -->|Heurística\nnão resolve| CLASS2[Gemma 4 Local\nLocalLLMProvider]
     CLASS1 --> INT{Intenção}
@@ -235,10 +250,16 @@ flowchart TD
 | Padrão | Onde é aplicado | Finalidade |
 |--------|-----------------|------------|
 | **Strategy Pattern** | `llm_provider.py` (`BaseLLMProvider`) | Permite trocar o provedor LLM (local/nuvem) sem alterar os assistentes |
-| **Dependency Injection** | `main.py` → `ShoppingAssistant`, `InventoryAssistant` | Provedores LLM são injetados externamente, facilitando testes e troca |
+| **Dependency Injection** | `app/main.py` → `ShoppingAssistant`, `InventoryAssistant` | Provedores LLM são injetados externamente, facilitando testes e troca |
 | **Retry Pattern** | `resilience_service.execute_with_retry` | Resiliência uniforme a falhas em qualquer chamada de LLM |
-| **Fallback Chain** | `main.py`: Local → Gemini Nuvem | Garantia de processamento mesmo com falha do modelo local |
-| **Chain of Responsibility** | `InventoryAssistant`: Regex → Gemma | Processamento progressivo, do mais rápido para o mais custoso |
-| **Session Management** | `GerenciadorDeSessao` em `main.py` | Manutenção de contexto e histórico entre interações |
+| **Fallback Chain** | `app/main.py`: Local → Gemini, só em `geral` e `outro` | Contingência sem enviar dados restritos à nuvem |
+| **Chain of Responsibility** | `orquestrar_requisicao` e `InventoryAssistant`: regras → LLM | Processamento progressivo, do mais rápido para o mais custoso |
+| **Session Management** | `GerenciadorDeSessao` em `app/main.py` | Manutenção de contexto e histórico entre interações |
 | **Schema Validation** | `gemma_service._validar_schema_orquestrador` | Contrato rígido de saída do LLM orquestrador |
 | **Sanitization Pipeline** | `_sanitizar_resposta_json` (em múltiplos módulos) | Remove marcações Markdown residuais do LLM antes do parse |
+| **Event Loop com Fila** | `AssistenteRuntime.rodar` | Processa comandos do chat, voz e controles em uma única sequência |
+| **Bridge Seguro** | `preload.js` (`contextBridge`) | Expõe ao renderer apenas a API necessária |
+| **Inicialização Lazy** | `VoiceService`, `AudioService` | Só acessa o hardware quando o modo voz é ativado |
+| **Singleton** | `EmbeddingService`, `VectorStoreService` | Evita recarregar o modelo e reabrir o cliente ChromaDB |
+| **Fachada** | `ProjectAnalyzer` | Coordena varredura, extração, LLM local e documentação |
+| **Índice Incremental** | `index_cache.py` | Reanalisa apenas arquivos com hash alterado |

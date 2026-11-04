@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional, Union
 from services.vector.semantic_search_service import SemanticSearchService
 from services.vector.memory_service import MemoryService
 from services.logger_service import logger as custom_logger
@@ -24,7 +24,7 @@ class ContextRetrievalService:
     def montar_contexto_recuperado(
         self,
         query_usuario: str,
-        assistant: Optional[str] = None,
+        assistant: Optional[Union[str, List[str]]] = None,
         top_k: int = 4,
         min_score: float = 0.65
     ) -> str:

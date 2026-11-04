@@ -1,6 +1,9 @@
 # 01 - Resumo do Sistema
 
-Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 4 - V4)**. O sistema representa uma evolução arquitetural significativa em relação à V3, introduzindo uma **Interface Gráfica Desktop via Electron**, um **Banco Vetorial (ChromaDB)** com **embeddings locais na CPU**, **Memória Semântica de Longo Prazo**, **Busca Híbrida (Vetorial + Relacional)** e um modelo de inicialização **Text-First** com ativação dinâmica de voz.
+Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 4 - V4)**. O sistema representa uma evolução arquitetural significativa em relação à V3, introduzindo uma **Interface Gráfica Desktop via Electron**, um **Banco Vetorial (ChromaDB)** com **embeddings locais na CPU**, **Memória Semântica de Longo Prazo**, um **Modo Qwen** para programação, a **Skill ProjectAnalyzer** e um modelo de inicialização **Text-First** com ativação dinâmica de voz.
+
+> [!IMPORTANT]
+> A gestão preditiva de estoque ainda não funciona de ponta a ponta, porque as compras gravadas não alimentam `controle_consumo`. A situação real de cada funcionalidade está em `08 - Estado Atual da V4.md`.
 
 ---
 
@@ -13,13 +16,15 @@ O objetivo central do sistema na **Versão 4** permanece: **gerenciar de forma a
 ## 2. Resumo das Principais Funcionalidades
 
 *   **Interface Gráfica Desktop (NOVO na V4):** Aplicação Electron com janela nativa Windows, chat bidirecional (texto), painel lateral de controles, terminal de debug interno e comunicação IPC bidirecional (Renderer ↔ Main ↔ Python).
-*   **Modelo de Inicialização Text-First (NOVO na V4):** O sistema inicia com o chat textual disponível imediatamente. Hardware de voz (microfone + TTS) é ativado sob demanda via toggle na interface, sem bloquear o modo texto.
+*   **Modelo de Inicialização Text-First (NOVO na V4):** O chat textual não depende de hardware de áudio e fica disponível ao fim da Fase 1, após a carga do modelo de embeddings (15 a 50 segundos nos logs). Hardware de voz (microfone + TTS) é ativado sob demanda via toggle na interface, sem bloquear o modo texto.
+*   **Modo Qwen (NOVO na V4 — parcial):** Comandos como `ativar qwen` trocam o modelo ativo para `qwen2.5-coder:7b`; `voltar gemma` retorna ao padrão. A troca ocorre por frases exatas, sem botão na interface.
+*   **Skill ProjectAnalyzer (NOVO na V4):** Analisa projetos e gera documentação técnica localmente (ver documento 07).
 *   **Banco Vetorial ChromaDB (NOVO na V4):** Persistência vetorial local em `core/database/chroma_db` com coleção `assistente_domestico_memory`, utilizando espaço de similaridade por cosseno e operações idempotentes (upsert/delete/count).
 *   **Embeddings Locais na CPU (NOVO na V4):** Geração de vetores via `sentence-transformers` (modelo `paraphrase-multilingual-MiniLM-L12-v2`) operando exclusivamente na CPU, preservando a VRAM/GPU para os modelos generativos Ollama.
 *   **Memória Semântica de Longo Prazo (NOVO na V4):** Serviço de memória (`MemoryService`) que avalia e filtra automaticamente interações irrelevantes (saudações, interjeições), persistindo apenas fatos, preferências e observações relevantes no banco vetorial.
-*   **Busca Semântica Híbrida (NOVO na V4):** Mecanismo que localiza itens semanticamente equivalentes no ChromaDB e hidrata valores transacionais exatos (preços, quantidades, estabelecimentos) diretamente do SQLite.
+*   **Busca Semântica Híbrida (NOVO na V4 — não ligada ao fluxo):** Mecanismo que localiza itens semanticamente equivalentes no ChromaDB e hidrata valores exatos do SQLite. Hoje é usado apenas por `scripts/validate_vector_database.py`.
 *   **Recuperação de Contexto RAG (NOVO na V4):** Montador de contexto (`ContextRetrievalService`) que formata blocos de memória semântica, injetado nas instruções do assistente local genérico e do Gemini.
-*   **Consulta de Estoque por Texto (NOVO na V4):** Perguntas como "ainda tenho leite?" são respondidas com a estimativa do estoque restante a partir de `controle_consumo`. Alterações de estoque por texto ainda não estão disponíveis.
+*   **Consulta de Estoque por Texto (NOVO na V4 — parcial):** Perguntas como "ainda tenho leite?" são respondidas com a estimativa do estoque restante a partir de `controle_consumo`. Como essa tabela ainda não é preenchida pelas compras, a resposta atual é de estoque vazio. Alterações de estoque por texto ainda não estão disponíveis.
 *   **Vetorização Automática de Compras (NOVO na V4):** Cada item de compra registrado no SQLite via `ShoppingAssistant` é automaticamente vetorizado no ChromaDB, criando representação semântica em linguagem natural.
 *   **Captação de Áudio com Controle Avançado de Silêncio:** Captura comandos de voz gerenciando o tempo global de execução (máximo de 120 segundos), com corte automático após 5 segundos de silêncio real e cancelamento após 15 segundos de inatividade inicial.
 *   **Transcrição de Voz (Speech-to-Text):** Conversão de fala analógica em texto por meio da API do Google Speech Recognition.
@@ -27,11 +32,13 @@ O objetivo central do sistema na **Versão 4** permanece: **gerenciar de forma a
 *   **Processamento Local de Compras (Mantido da V3):** O `ShoppingAssistant` utiliza o `LocalLLMProvider` (Gemma 4 e:4b via Ollama) para estruturar a fala do usuário em JSON de compras.
 *   **Classificação Local de Intenções de Estoque (Mantido da V3):** O `InventoryAssistant` utiliza heurística rápida via Regex e, caso não resolva, delega ao Gemma 4 e:4b local.
 *   **Resiliência com Retry Automático (Mantido da V3):** Camada de resiliência (`resilience_service.py`) com até 3 tentativas automáticas e fallback para a nuvem (Gemini).
-*   **Fallback para Gemini na Nuvem (Mantido da V3):** Caso o LLM local falhe, o sistema tenta encaminhar para a API do Gemini como contingência.
+*   **Gemini para Perguntas Gerais (Alterado na V4):** Somente perguntas gerais podem ir à nuvem, quando são difíceis ou o LLM local falha. Compras, estoque, agenda, programação e documentação ficam locais. A chave do Gemini é opcional.
+*   **Roteamento por Regras (NOVO na V4):** Frases conhecidas são encaminhadas sem IA; o orquestrador classifica apenas os casos ambíguos.
+*   **Confirmação e Desfazer Compras (NOVO na V4):** Compras com dúvida (mercado, preço, total, data ou embalagem) aguardam "sim" ou "não". O comando "desfazer última compra" remove o último registro da sessão.
 *   **Síntese de Voz Neural (Text-to-Speech):** Resposta por voz artificial com voz `pt-BR-AntonioNeural` via Microsoft Edge TTS.
-*   **Motor de Gestão Preditiva de Estoque:** Varredura automática em background na inicialização para identificar itens com autonomia estimada esgotada.
-*   **Árvore de Decisão Conversacional de Estoque (4 cenários):** Confirmação, Negativa Zerado, Negativa Sem Consumo, Divergência de Quantidade.
-*   **Baixa Direta e Voluntária de Itens:** Zeramento manual de estoque com resolução de ambiguidade.
+*   **Motor de Gestão Preditiva de Estoque (sem dados):** Varredura automática em background na inicialização para identificar itens com autonomia estimada esgotada. Sem registros em `controle_consumo`, não há itens a avaliar.
+*   **Árvore de Decisão Conversacional de Estoque (4 cenários — não ligada ao fluxo):** Confirmação, Negativa Zerado, Negativa Sem Consumo, Divergência de Quantidade. O código existe, mas `processar_estoque_nova_compra` não tem chamadas.
+*   **Baixa Direta e Voluntária de Itens (não ligada ao fluxo):** Zeramento manual de estoque com resolução de ambiguidade. O código existe, mas `registrar_fim_estoque_direto` não tem chamadas.
 *   **Sistema de Log Estruturado:** Logs persistentes em disco, segmentados por módulo, com cabeçalhos diários e tags semânticas (`[EMBEDDING]`, `[VECTOR_STORE]`, `[SEMANTIC_SEARCH]`, `[MEMORY]`, `[RAG]`).
 
 ---
@@ -70,14 +77,17 @@ graph TD
     READY --> ORCH{Orquestrador<br>Gemma 4 Local}
     ORCH --> |"facil + compras"| SHOP["ShoppingAssistant<br>→ LocalLLMProvider<br>→ SQLite + ChromaDB"]
     ORCH --> |"facil + outro"| LOCAL["executar_assistente_local<br>→ Gemma 4"]
-    ORCH --> |"medio_dificil"| NUVEM["Gemini API<br>(Fallback Nuvem)"]
-    ORCH --> |"Falha 3x"| NUVEM
+    ORCH --> |"geral ou outro difícil"| NUVEM["Gemini API<br>(Perguntas gerais)"]
+    LOCAL --> |"Falha 3x em geral ou outro"| NUVEM
+    ORCH --> |"facil + inventario"| INV["InventoryAssistant<br>consultar_estoque"]
+    ORCH --> |"analisar projeto"| PA["ProjectAnalyzer<br>100% local"]
     
-    SHOP --> SQLITE["SQLite<br>(compras, itens, estoque)"]
+    SHOP --> SQLITE["SQLite<br>(compras, itens_compra)"]
     SHOP --> CHROMA["ChromaDB<br>(vetorização automática)"]
     
-    PYTHON --> INV["InventoryAssistant<br>Varredura Preditiva (Background)"]
-    INV --> |"Regex → Gemma 4"| SQLITE
+    PYTHON --> VARR["Varredura de estoque<br>(Background)"]
+    VARR --> ESTOQUE["SQLite<br>controle_consumo (sem dados)"]
+    INV --> ESTOQUE
 ```
 
 ---

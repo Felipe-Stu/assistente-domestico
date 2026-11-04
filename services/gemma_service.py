@@ -6,10 +6,12 @@ from services.llm_provider import (
     ativar_modo_qwen,
     desativar_modo_qwen,
     obter_modelo_ativo,
+    verificar_e_gestionar_timeout_inatividade,
     _atualizar_timestamp_atividade
 )
 
 from services.resilience_service import InvalidOrchestratorOutputException
+from services.intent_router import rotear_por_regras
 from services.project_analyzer.command_parser import detectar_comando_projeto
 from services.logger_service import logger as custom_logger
 
@@ -23,7 +25,7 @@ VALORES_PERMITIDOS = {
 
 
 # Prompt Assistente Especialista de Programação
-PROMPT_PROGRAMACAO = """
+PROMPT_PROGRAMACAO = r"""
     # PAPEL
 
     Você é o **Copilot de Programação e Engenheiro de Software Sênior** do projeto **Assistente Doméstico**.
@@ -232,10 +234,23 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
     O Orquestrador analisa a solicitação usando o modelo ativo (Gemma ou Qwen)
     e classifica a dificuldade, o contexto e a ação necessária.
     """
+    # A inatividade deve ser avaliada antes de registrar a atividade desta solicitação
+    verificar_e_gestionar_timeout_inatividade()
     _atualizar_timestamp_atividade()
-    
+
     # 1. Tratamento de Comandos Diretos de Chaveamento de Modo
     texto_lower = texto_transcrito.lower()
+    # Desativação vem primeiro: "desativar qwen" contém "ativar qwen"
+    if any(cmd in texto_lower for cmd in ["desativar qwen", "desativar modo qwen", "voltar gemma", "modo normal", "sair do qwen"]):
+        desativar_modo_qwen()
+        return {
+            "dificuldade": "facil",
+            "mudanca_de_contexto": True,
+            "contexto": "geral",
+            "acao": "chavear_modo",
+            "resposta_direta": "Modo Qwen desativado. Retornando ao Gemma 4 como orquestrador padrão."
+        }
+
     if any(cmd in texto_lower for cmd in ["ativar qwen", "modo qwen", "modo programador", "chamar qwen", "usar qwen"]):
         ativar_modo_qwen()
         return {
@@ -244,16 +259,6 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
             "contexto": "programacao",
             "acao": "chavear_modo",
             "resposta_direta": "Modo Qwen ativado com sucesso! Assumi o controle. Como posso te ajudar?"
-        }
-
-    if any(cmd in texto_lower for cmd in ["desativar qwen", "voltar gemma", "modo normal", "sair do qwen"]):
-        desativar_modo_qwen()
-        return {
-            "dificuldade": "facil",
-            "mudanca_de_contexto": True,
-            "contexto": "geral",
-            "acao": "chavear_modo",
-            "resposta_direta": "Modo Qwen desativado. Retornando ao Gemma 4 como orquestrador padrão."
         }
 
     # 1.1 Comando da Skill ProjectAnalyzer (determinístico, sem LLM)
@@ -269,6 +274,11 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
         if not comando_projeto.get("caminho"):
             decisao["resposta_direta"] = "Informe o caminho da pasta do projeto. Exemplo: analisar projeto E:\\MOBA"
         return decisao
+
+    # 1.2 Frases conhecidas dispensam a classificação pelo LLM
+    decisao_regras = rotear_por_regras(texto_transcrito, contexto_atual)
+    if decisao_regras is not None:
+        return decisao_regras
 
     # 2. Obter o modelo ativo para orquestrar
     modelo_ativo = obter_modelo_ativo()

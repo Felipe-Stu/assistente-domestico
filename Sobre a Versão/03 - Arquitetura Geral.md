@@ -41,12 +41,14 @@ assistente-domestico/
 │   ├── migrate_vector_database.py       # Migração idempotente SQLite → ChromaDB
 │   ├── rebuild_embeddings.py            # Reconstrução completa dos embeddings
 │   └── validate_vector_database.py      # Testes automatizados de busca semântica
+├── tests/                               # [NOVO V4] Testes automatizados (ProjectAnalyzer e orquestrador)
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py                    # Interface com a API Gemini (nuvem) — fallback
 │   ├── audio_service.py                 # Captura de microfone com RMS e bips
 │   ├── db_service.py                    # Persistência SQLite com migrações de schema
 │   ├── gemma_service.py                 # Orquestrador local via Ollama/Gemma 4 e:4b
+│   ├── intent_router.py                 # [NOVO V4] Roteamento por regras, sem LLM
 │   ├── inventory_assistant.py           # Controle preditivo de estoque (Regex + Gemma)
 │   ├── llm_provider.py                  # Abstração de provedores LLM (Local/Nuvem)
 │   ├── logger_service.py                # CustomLogger transversal
@@ -107,25 +109,25 @@ assistente-domestico/
 **Responsabilidade:** Encapsula chamadas ao Gemma 4 e:4b via Ollama. Fornece `orquestrar_requisicao()` com validação de schema (`_validar_schema_orquestrador`) e sanitização JSON (`_sanitizar_resposta_json`). Fornece `executar_assistente_local()` para fluxos genéricos.
 
 #### B.3. Abstração LLM (`services/llm_provider.py`)
-**Responsabilidade:** `BaseLLMProvider` (abstrata) → `LocalLLMProvider` (Ollama, `timeout=120.0`) e `CloudLLMProvider` (Gemini via AIService).
+**Responsabilidade:** `BaseLLMProvider` (abstrata) → `LocalLLMProvider` (Ollama, `timeout=120.0`) e `CloudLLMProvider` (Gemini via AIService). **Atualizado na V4:** mantém o modelo ativo em memória (`MODO_QWEN_ATIVO`), alterna Gemma e Qwen e libera a VRAM com `keep_alive=0`. O `CloudLLMProvider` é criado no runtime, mas não é usado por nenhum assistente.
 
 #### B.4. Resiliência (`services/resilience_service.py`)
 **Responsabilidade:** `execute_with_retry()` centralizado com suporte a callbacks de validação, alertas de voz e exceções recuperáveis.
 
 #### B.5. Assistente de Compras (`services/shopping_assistant.py`) — Atualizado na V4
-**Responsabilidade:** Processa transcrições de compras via LLM local. **Na V4, recebe `VectorStoreService` como dependência injetada** e, após cada compra gravada no SQLite, **vetoriza automaticamente cada item no ChromaDB** com representação em linguagem natural contendo produto, marca, estabelecimento, preço e data.
+**Responsabilidade:** Processa transcrições de compras via LLM local em duas etapas: `preparar_compra()` extrai, valida e aponta dúvidas sem gravar; `registrar_compras()` grava em transação única. Também resolve datas no Python e oferece `desfazer_ultimo_registro()`. **Na V4, recebe `VectorStoreService` como dependência injetada** e, após cada compra gravada no SQLite, **vetoriza automaticamente cada item no ChromaDB** com representação em linguagem natural contendo produto, marca, estabelecimento, preço e data. Não atualiza `controle_consumo` (P1 no documento 08).
 
 #### B.6. Assistente de Inventário (`services/inventory_assistant.py`)
 **Responsabilidade:** Controle preditivo de estoque. Classificação em dois níveis: Regex → Gemma 4 local. **Atualizado na V4:**
 - Recebe `VoiceService`/`AudioService` compartilhados do runtime e a função `modo_voz_ativo`. Sem modo voz ativo, não fala nem escuta.
-- Na varredura inicial em modo texto, itens com autonomia esgotada são marcados com `validacao_pendente = 1` (perguntados quando o modo voz estiver ativo numa próxima varredura).
+- Na varredura inicial em modo texto, itens com autonomia esgotada são marcados com `validacao_pendente = 1`. A varredura só roda na inicialização, antes de o usuário ativar a voz, portanto a pergunta por voz não é alcançada (P8 no documento 08).
 - Novo método `consultar_estoque(texto)`: somente leitura de `controle_consumo` (itens ativos), filtro por termos do produto e estimativa do restante (`quantidade_comprada + residual − dias/ritmo`, mínimo 0). Sem LLM.
 
 #### B.7. Banco de Dados (`services/db_service.py`)
-**Responsabilidade:** Persistência relacional SQLite com `PRAGMA user_version`. Tabelas: `compras`, `itens_compra`, `controle_consumo`, `historico_conversas`. Sem alterações de responsabilidade na V4.
+**Responsabilidade:** Persistência relacional SQLite com `PRAGMA user_version`. Tabelas: `compras`, `itens_compra`, `controle_consumo`, `historico_conversas`. Schema v2: colunas de embalagem em `itens_compra`. `salvar_compras_da_ia()` grava várias compras em transação única. Nenhum fluxo insere registros em `controle_consumo` ou usa `historico_conversas`.
 
 #### B.8. IA na Nuvem (`services/ai_service.py`)
-**Responsabilidade:** Interface Gemini API. Fallback. Dívida técnica de `self.gemini_client` permanece.
+**Responsabilidade:** Interface Gemini API para perguntas gerais. `processar_requisicao_complexa` usa prompt geral e histórico legível. O cliente é criado no primeiro uso, e `disponivel()` informa se há chave configurada.
 
 #### B.9. Serviços de Voz e Áudio
 - **`voice_service.py`:** Síntese neural via edge-tts + pygame. Inicialização lazy na V4.
@@ -175,7 +177,7 @@ assistente-domestico/
  DatabaseService → SQLite conectado
  VectorStoreService → ChromaDB inicializado (CPU)
  MemoryService + ContextRetrievalService → Prontos
- AIService → Fallback Gemini configurado
+ AIService → Gemini configurado (cliente criado no primeiro uso)
  LocalLLMProvider(gemma4:e4b) + CloudLLMProvider
  InventoryAssistant + ShoppingAssistant (com vector_store)
  VoiceService + AudioService (construtor leve, sem init de hardware)
@@ -208,10 +210,10 @@ assistente-domestico/
          │     │   → ProjectAnalyzer (Qwen local) → Documentacao_Gerada
          │     │
          │     ├── [PASSO 2: Roteamento]
-         │     │   ├── [facil + compras] → ShoppingAssistant → SQLite + ChromaDB
+         │     │   ├── [compras] → preparar_compra → confirmação se houver dúvida → SQLite + ChromaDB
          │     │   ├── [facil + inventario] → consultar_estoque (criar/corrigir: informa limitação)
          │     │   ├── [facil + outro] → executar_assistente_local → Gemma 4 (com contexto RAG)
-         │     │   └── [medio_dificil / falha 3x] → Gemini API (nuvem, com contexto RAG)
+         │     │   └── [geral/outro difícil ou falha 3x] → Gemini API (nuvem, com RAG restrito)
          │     │
          │     └── [PASSO 3: Resposta]
          │         → emitir_electron("assistant_message")
@@ -266,7 +268,7 @@ assistente-domestico/
 6. **`InventoryAssistant`** acopla-se a:
    - `BaseLLMProvider` (injetado como `LocalLLMProvider`)
    - `DatabaseService`
-   - `VoiceService` e `AudioService` (instanciados internamente)
+   - `VoiceService` e `AudioService` (instâncias compartilhadas injetadas pelo runtime)
    - `logger_service`
 
 7. **`VectorStoreService`** acopla-se a:
@@ -296,7 +298,8 @@ assistente-domestico/
     - `AIService`
 
 14. **`gemma_service`** acopla-se a:
-    - SDK `ollama` (diretamente)
+    - `llm_provider` (o SDK `ollama` é acessado por meio dele)
+    - `project_analyzer.command_parser`
     - `resilience_service.InvalidOrchestratorOutputException`
     - `logger_service`
 

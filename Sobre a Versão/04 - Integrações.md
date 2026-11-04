@@ -1,14 +1,14 @@
 # 04 - Integrações
 
-Este documento identifica e mapeia todos os fluxos de integração e conexões — externas, internas e com hardware — que o **Assistente Doméstico Inteligente (V3)** realiza para viabilizar suas funções.
+Este documento identifica e mapeia todos os fluxos de integração e conexões — externas, internas e com hardware — que o **Assistente Doméstico Inteligente (V4)** realiza para viabilizar suas funções.
 
 ---
 
-## 1. Comunicação com IA Local (NOVO na V3)
+## 1. Comunicação com IA Local
 
 ### A. Ollama — Servidor Local de Inferência
 *   **Tipo:** Comunicação com serviço local (processo separado na mesma máquina).
-*   **Origem:** `services/gemma_service.py` (orquestração) e `services/llm_provider.py` - `LocalLLMProvider` (extração de dados e classificação de inventário).
+*   **Origem:** `services/llm_provider.py` - `LocalLLMProvider`, usado pelo orquestrador (`services/gemma_service.py`), pelos assistentes e pelo ProjectAnalyzer.
 *   **Destino:** Servidor Ollama em execução local, acessível via `http://127.0.0.1:11434`.
 *   **Finalidade:**
     1. **Orquestração de Intenções:** Recebe a transcrição de voz do usuário e retorna um JSON classificando a dificuldade, contexto, ação e mudança de contexto da solicitação.
@@ -17,7 +17,7 @@ Este documento identifica e mapeia todos os fluxos de integração e conexões �
 *   **Tecnologia:** SDK Python `ollama`, com cliente configurado para `timeout=120.0` segundos.
 *   **Formato de envio:** Lista de mensagens `[{role, content}]` com parâmetro `format="json"` e `options={"temperature": 0.1}`.
 *   **Formato de retorno:** Dicionário JSON Python parseado via `json.loads()`.
-*   **Modelo utilizado:** `gemma4:e4b` (Gemma 4 e:4b, quantizado).
+*   **Modelos utilizados:** `gemma4:e4b` (padrão) e `qwen2.5-coder:7b` (Modo Qwen e ProjectAnalyzer). A troca libera a VRAM com `keep_alive=0`.
 
 ---
 
@@ -27,13 +27,11 @@ Este documento identifica e mapeia todos os fluxos de integração e conexões �
 *   **Tipo:** Comunicação externa via HTTPS.
 *   **Origem:** `services/ai_service.py` e indiretamente via `CloudLLMProvider` em `services/llm_provider.py`.
 *   **Destino:** Servidores de LLM da Google Cloud (modelo `gemini-2.5-flash`).
-*   **Finalidade na V3:** Atua exclusivamente como **camada de contingência**. É acionada apenas quando o LLM local (Gemma/Ollama) falha após esgotar todas as tentativas de retry, ou quando a orquestração classifica a solicitação como `medio_dificil`.
-*   **Tecnologia:** Biblioteca `google-genai`, requisições HTTPS. A API Key é lida do arquivo `.env` via `python-dotenv`.
+*   **Finalidade na V4:** Atende somente perguntas gerais (`geral` e `outro`), fora do Modo Qwen, quando o LLM local falha ou a orquestração as classifica como `medio_dificil`. Compras, estoque, agenda, programação e documentação nunca usam a nuvem. Se o orquestrador falhar, a frase também não é enviada.
+*   **Tecnologia:** Biblioteca `google-genai`, requisições HTTPS. A API Key vem da variável de ambiente `GEMINI_API_KEY`, definida no sistema ou no arquivo `.env`, e é opcional: sem ela, todo o processamento fica local.
+*   **Contexto enviado:** Além do texto do usuário, podem ser enviados o histórico e as memórias semânticas apenas de `geral` e `outro`.
 *   **Formato de envio:** Prompt textual com instrução de sistema e mensagem do usuário.
 *   **Formato de retorno:** Texto puro ou JSON parseado via `response_mime_type="application/json"`.
-
-> [!WARNING]
-> O método `processar_requisicao_complexa` em `ai_service.py` (L.115-128) contém uma referência a `self.gemini_client` que não foi implementada corretamente. Isso causa falha no fallback de nuvem e está documentado como dívida técnica no código da V3.
 
 ### B. Google Speech Recognition API — Transcrição de Fala
 *   **Tipo:** Comunicação externa via HTTP.
@@ -65,39 +63,57 @@ Este documento identifica e mapeia todos os fluxos de integração e conexões �
 *   **Destino:** `core/database/assistente_casa.db`.
 *   **Finalidade:** Persistência de compras (`compras`, `itens_compra`) e controle de inventário (`controle_consumo`).
 *   **Tecnologia:** Módulo nativo `sqlite3`.
-*   **Controle de Versão de Schema:** `PRAGMA user_version` — atualmente na versão 1.
+*   **Controle de Versão de Schema:** `PRAGMA user_version` — atualmente na versão 2.
 *   **Tabelas:**
     *   `compras`: id, data_compra, nome_comercio, total_gasto.
-    *   `itens_compra`: id, compra_id (FK), produto, marca, quantidade, unidade, valor_unitario, valor_total, categoria.
-    *   `controle_consumo`: produto_nome (UNIQUE), categoria, tempo_medio_calculado, data_ultima_compra, quantidade_comprada, quantidade_residual_confirmada, status_estoque, validacao_pendente, ultima_qtd_comprada, quantidade_residual_esgotada.
+    *   `itens_compra`: id, compra_id (FK), produto, marca, quantidade, unidade, valor_unitario, valor_total, categoria, embalagem_quantidade, embalagem_unidade.
+    *   `controle_consumo`: produto_nome (UNIQUE), categoria, tempo_medio_calculado, data_ultima_compra, quantidade_comprada, quantidade_residual_confirmada, status_estoque, validacao_pendente, ultima_qtd_comprada, quantidade_residual_esgotada. Ainda não é preenchida pelo fluxo de compras.
+    *   `historico_conversas`: id, session_id, papel, conteudo, timestamp. Criada, mas sem uso.
+
+### B. ChromaDB — Base Vetorial (NOVO na V4)
+*   **Tipo:** Integração local (biblioteca embarcada com persistência em disco).
+*   **Origem:** `services/vector/vector_store_service.py`.
+*   **Destino:** `core/database/chroma_db/`, coleção `assistente_domestico_memory`.
+*   **Finalidade:** Armazenar itens de compra vetorizados e memórias de longo prazo.
+*   **Tecnologia:** `chromadb.PersistentClient`, similaridade por cosseno e telemetria desativada.
+*   **Embeddings:** `sentence-transformers` na CPU, com o modelo `paraphrase-multilingual-MiniLM-L12-v2`. O download ocorre no primeiro uso; depois, o modelo fica em cache local.
 
 ---
 
 ## 4. Comunicação Interna entre Componentes
 
 ```text
-[main.py]
+[Electron: renderer.js ↔ preload.js ↔ main.js]
+   └── JSON por stdin/stdout
+[app/main.py: AssistenteRuntime]
    ├── → gemma_service.orquestrar_requisicao()
-   │       → Ollama Local (Gemma 4)
-   ├── → execute_with_retry(shopping_assistant.processar_texto_compra)
-   │       → LocalLLMProvider.gerar_json()
-   │           → Ollama Local (Gemma 4)
-   │       → DatabaseService.salvar_compra_da_ia()
-   │           → SQLite
-   ├── → execute_with_retry(ai_service.processar_requisicao_complexa) [fallback]
+   │       ├── Regras: Qwen, ProjectAnalyzer e intent_router
+   │       └── LocalLLMProvider.gerar_json() → Ollama Local
+   ├── → execute_with_retry(shopping_assistant.preparar_compra)
+   │       → LocalLLMProvider.gerar_json() → Ollama Local
+   ├── → shopping_assistant.registrar_compras() [uma vez, após confirmar se houver dúvida]
+   │       → DatabaseService.salvar_compras_da_ia() → SQLite
+   │       → VectorStoreService.upsert_documents() → ChromaDB
+   ├── → inventory_assistant.consultar_estoque() → SQLite
+   ├── → executar_assistente_local()
+   │       → ContextRetrievalService → ChromaDB
+   │       → LocalLLMProvider.gerar_texto() → Ollama Local
+   ├── → execute_with_retry(ai_service.processar_requisicao_complexa) [só geral/outro]
    │       → Google Gemini API (nuvem)
-   └── → inventory_assistant.verificar_itens_expirados_inicializacao()
-           → VoiceService.falar()
-               → Microsoft Edge TTS (externo)
-               → pygame.mixer (hardware)
-           → AudioService.capturar_audio_e_transcrever()
-               → Google Speech Recognition (externo)
-           → _heuristica_rapida() [Regex interno]
-           → LocalLLMProvider.gerar_json() [se heurística falhar]
-               → Ollama Local (Gemma 4)
-           → DatabaseService.executar_comando()
-               → SQLite
+   ├── → ProjectAnalyzer.analisar() → Ollama Local + pasta de saída
+   ├── → MemoryService.salvar_memoria_longo_prazo() → ChromaDB
+   └── → inventory_assistant.verificar_itens_expirados_inicializacao() [thread]
+           → SQLite
 ```
+
+### Protocolo Electron ↔ Python (NOVO na V4)
+
+| Direção | Tipos de mensagem |
+| :--- | :--- |
+| Electron → Python | `send_text`, `toggle_voice_mode`, `toggle_mute`, `shutdown` |
+| Python → Electron | `state_changed`, `user_message`, `assistant_message`, `voice_mode_status`, `debug_log`, `error`, `system_ready` |
+
+O `main.js` converte os nomes de `snake_case` para `kebab-case` ao repassá-los ao renderer. Linhas do stdout que não sejam JSON são tratadas como log.
 
 ---
 
@@ -128,18 +144,30 @@ Este documento identifica e mapeia todos os fluxos de integração e conexões �
 
 ### B. Arquivo de Configuração (`.env`)
 *   **Origem:** `core/config.py` via `python-dotenv`.
-*   **Variáveis:** `GEMINI_API_KEY`, `AUDIO_SAMPLE_RATE`, `AUDIO_CHANNELS`, `AUDIO_CHUNK_SIZE`, `AUDIO_RECORD_SECONDS`.
+*   **Variáveis:** `GEMINI_API_KEY`, `EMBEDDING_MODEL_NAME`, `PROJECT_ANALYZER_OUTPUT_DIR`, `PROJECT_ANALYZER_MODEL`, `AUDIO_SAMPLE_RATE`, `AUDIO_CHANNELS`, `AUDIO_CHUNK_SIZE`, `AUDIO_RECORD_SECONDS`.
+*   **Observação:** O arquivo é opcional quando as variáveis já estão definidas no sistema.
 
 ### C. Arquivos Temporários de Voz
 *   **Origem:** `services/voice_service.py`.
 *   **Destino:** `assets/temp_voice.mp3` — criado e excluído automaticamente a cada síntese de voz.
 
+### D. Documentação Gerada pelo ProjectAnalyzer (NOVO na V4)
+*   **Origem:** `services/project_analyzer/doc_writer.py`.
+*   **Destino:** `PROJECT_ANALYZER_OUTPUT_DIR`, por padrão `E:\Agente IA\Documentacao_Gerada`.
+
 ---
 
-## 7. Categorias Não Identificadas na V3
+## 7. Subprocessos e IPC (NOVO na V4)
 
-*   **APIs REST Locais / Servidores HTTP:** Não identificado. O sistema roda via linha de comando.
+*   **Origem:** `main.js`, com `spawn('python', ['-u', 'app/main.py'])`.
+*   **Requisito:** O comando `python` deve estar no `PATH`.
+*   **Encerramento:** O Electron envia `shutdown` e encerra o processo Python após 2 segundos, se necessário.
+
+---
+
+## 8. Categorias Não Identificadas na V4
+
+*   **APIs REST Locais / Servidores HTTP:** Não identificado.
 *   **WebSocket:** Não identificado.
-*   **Subprocessos / IPC:** Não identificado. Todas as integrações operam sob o mesmo processo Python.
 *   **OCR / Visão Computacional:** Não identificado.
 *   **STT Local (Whisper):** Não identificado. A transcrição de voz utiliza API externa Google.
