@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [V4] — Revisão de credenciais (2026-11-16)
+
+### Segurança
+- Varredura do código e do histórico Git de todas as branches: nenhuma chave, senha ou token real encontrado. O único token nos testes é falso e montado em partes.
+- `.gitignore` passa a cobrir `.env.*`, `*secret*.json`, `*credentials*.json`, `*.pem`, `*.key`, `*.p12` e `*.pfx`.
+- `.env.example` documenta as variáveis sem valores reais; o README orienta copiá-lo para `.env`.
+
 ## [V4] — Fase 1: base confiável (2026-11-03)
 
 ### Adicionado

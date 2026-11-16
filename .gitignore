@@ -9,7 +9,15 @@ __pycache__/
 
 # Segredos e variáveis de ambiente
 .env
+.env.*
+!.env.example
 secret_key.json
+*secret*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Bancos de dados locais (gerados em runtime)
 *.db

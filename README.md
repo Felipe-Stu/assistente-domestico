@@ -94,9 +94,11 @@ assistente-domestico/
    pip install -r requirements.txt
 
 3. Configurar as Variáveis de Ambiente:
-   Crie um arquivo .env na raiz do projeto contendo:
+   Copie o arquivo `.env.example` para `.env` e preencha o que for usar.
+   A chave do Gemini é opcional: sem ela, todo o processamento fica local.
+   O `.env` é ignorado pelo Git; nunca versione chaves reais.
 
-   GEMINI_API_KEY=sua_chave_gemini_aqui
+   GEMINI_API_KEY=
    OLLAMA_HOST=http://localhost:11434
 
 4. Executar o Assistente:
