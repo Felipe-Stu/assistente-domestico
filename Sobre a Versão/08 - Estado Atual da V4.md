@@ -136,7 +136,7 @@ Executar os testes:
 python -m unittest discover -s tests -v
 ```
 
-**Git:** a branch `V4` existe só nesta máquina, sem cópia no GitHub. O `V3` remoto contém o commit `a8ad2ca`, que ainda não foi baixado para este repositório.
+**Git:** a branch `V4` está publicada no GitHub e é a branch padrão do repositório desde 16/11/2026. O `V3` remoto contém o commit `a8ad2ca`, que não faz parte da V4.
 
 ---
 
