@@ -4,6 +4,8 @@ Assistente desktop que registra compras e responde perguntas por linguagem natur
 
 Projeto pessoal, desenvolvido em versões incrementais (V1 → V4) com apoio de ferramentas de IA (AntiGravity IDE e Claude).
 
+▶️ **[Demonstração em vídeo (1 min)](https://youtu.be/6S1aW61MDzU)**: registro de compra, pergunta ao LLM local, análise do próprio projeto pelo ProjectAnalyzer e "desfazer" resolvido por regra, tudo rodando localmente.
+
 **Python · Electron · Ollama (Gemma 4, Qwen2.5-Coder) · ChromaDB · SQLite · sentence-transformers**
 
 ---
