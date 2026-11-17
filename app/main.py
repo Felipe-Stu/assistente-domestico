@@ -10,6 +10,8 @@ from pathlib import Path
 # Configura codificação de fluxo para UTF-8 no Windows antes de qualquer saída
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# O Electron envia os comandos em UTF-8; sem isso, acentos chegam corrompidos ("café" -> "cafÃ©")
+sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
 # 1. Ajusta o sys.path PRIMEIRO
 ROOT_DIR = Path(__file__).resolve().parent.parent

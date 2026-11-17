@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [V4] — Correção de acentuação na entrada (2026-11-16)
+
+### Corrigido
+- `app/main.py`: a entrada (stdin) do back-end passa a ser lida em UTF-8, como a saída. Antes, no Windows, textos com acento enviados pelo Electron chegavam corrompidos ("café" virava "cafÃ©" no chat e no banco).
+
 ## [V4] — Revisão de credenciais (2026-11-16)
 
 ### Segurança
