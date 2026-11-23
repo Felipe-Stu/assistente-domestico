@@ -8,7 +8,9 @@ Este documento registra o histórico comparativo entre a **Versão 4 (V4)** e a 
 
 A V4 entregou o chat, a memória semântica e a Skill ProjectAnalyzer, mas a base tinha custos que atrapalhavam o uso diário: o chat levava ≈ 18 s para aceitar texto, cada decisão do orquestrador levava ≈ 8 s, o Ollama fechado deixava o usuário esperando sem explicação, não havia cópia de segurança e os logs não permitiam medir nada.
 
-A **V4.1 não acrescenta funcionalidades para o usuário**. Ela arruma a base para que as próximas etapas (voz local, leitura de PDF, relatórios, agenda, Spotify) sejam construídas sobre algo rápido, medido e recuperável. As melhorias seguem os códigos `M` do planejamento (documento de melhorias da pasta de planejamento, fora do repositório).
+A V4.1 começou **sem funcionalidades novas para o usuário**: a primeira parte arruma a base para que as próximas etapas (voz local, leitura de PDF, relatórios, agenda, Spotify) sejam construídas sobre algo rápido, medido e recuperável. As melhorias seguem os códigos `M` do planejamento (documento de melhorias da pasta de planejamento, fora do repositório).
+
+A segunda parte, a **fase das skills** (SK0 a SK8 e SKP, concluída em 23/11/2026), reorganizou o sistema em skills escolhidas por catálogo. Sobre essa base entraram a agenda, as ideias de projetos com análise do Claude e o bot do Telegram (seção 8).
 
 ---
 
@@ -29,7 +31,7 @@ A **V4.1 não acrescenta funcionalidades para o usuário**. Ela arruma a base pa
 | **Conexões SQLite (P22)** | Ficavam abertas após o `with` | Fechadas ao sair do bloco | Corrigido |
 | **Skills (SK1)** | Prompts dentro do Python e regex no `intent_router.py` | Uma pasta por capacidade em `skills/` (instruções, prompts e gatilhos), lida por `core/skills/` | Novo |
 | **Conjunto de avaliação (SK0)** | 8 frases do orquestrador e 6 compras dentro de um script | `evals/` (48 frases por skill, 15 de capacidades futuras, e 8 compras) e `scripts/avaliar.py` | Novo |
-| **Testes** | 70 | 160 | Expandido |
+| **Testes** | 70 | 231 | Expandido |
 | **Medições** | Só pelos logs | Scripts que medem o app real (`medir_v41.py`, `medir_m17.py`) e resumem o tempo por etapa (`ver_logs.py`) | Novo |
 
 ---
@@ -95,10 +97,42 @@ Cópia de segurança, em 22/11/2026, com os dados reais copiados para uma pasta 
 
 ## 7. O que a V4.1 Ainda Não Conclui
 
-*   **M01:** as credenciais anotadas em texto puro fora do repositório ainda precisam ser revogadas e trocadas.
-*   **M02:** o fluxo de integração contínua só roda depois do primeiro envio ao GitHub.
+*   **M01** (credenciais em texto puro) foi concluído em 23/11/2026: chaves trocadas e anotações substituídas por `[REVOGADA]`.
+*   **M02:** a integração contínua roda a cada envio ao GitHub. Os commits da fase das skills ainda não foram enviados.
+*   **SK4** (fluxos abertos com ferramentas) ficou de fora por decisão: o SK3 bastou.
 *   **M27:** modelos e caminhos ainda estão espalhados pelo código, e o Electron inicia o Python com `spawn('python')`.
 *   **Extração de compras com raciocínio desligado:** ainda não medida; continua no padrão do Ollama.
 *   Os problemas funcionais da V4 continuam abertos, entre eles o P1 (compras não alimentam o estoque).
 
 A lista completa, com locais e evidências, está em `08 - Estado Atual da V4.md` (seções 11 e 12).
+
+---
+
+## 8. Fase das Skills (concluída em 23/11/2026)
+
+| Etapa | Entrega | Evidência |
+| :--- | :--- | :--- |
+| SK0 | Medição: Gemma 4 E4B escolhe a skill pelo catálogo com 45/48 em 0,55 s; o prompt por contextos fazia 43/48 em 1,39 s | `MEDIDO` no PC |
+| SK1 | Uma pasta por capacidade em `skills/` (instruções, prompts, gatilhos) | 0 diferenças em 168 decisões de referência |
+| SK2 | Orquestrador escolhe pelo catálogo, com prompt fixo e saída restrita | `MEDIDO` no PC: 44/48 em 0,87 s |
+| SK3 | Compras, estoque e agenda com roteiro próprio; confirmação genérica | `TESTADO` |
+| SK5 | Orquestrador antigo removido; `main.py` dividido (974 → 788 linhas); nenhum `if contexto ==` no `app/` | `TESTADO` e teste de fumaça |
+| SK6 | Fábrica de skills (`nova_skill.py`, `validar_skills.py` na integração contínua) | `TESTADO` |
+| SK7 | Agenda funcional feita só com a pasta da skill, sem mexer no núcleo | `TESTADO` |
+| SKP | Programação com o Claude (pela assinatura, `claude -p`, ou pela API) e reserva no Qwen com biblioteca de contexto | `TESTADO` no PC |
+| SK8 | Ideias de projetos: salvas pelo chat ou pelo Telegram, analisadas pelo Claude e guardadas na biblioteca local | `TESTADO` no PC (análise em cerca de 20 s) |
+| SK4 | Fluxos abertos com ferramentas | Não feito (opcional) |
+
+Problemas resolvidos na fase: P9 (agenda), P10 (programação fora do orquestrador) e P23 (pedido de sugestões confundido com ideia salva).
+
+**Decisões da fase**
+- Gemma 4 E4B é o modelo residente, e a escolha da skill é feita pelo catálogo.
+- O Claude recebe dados só das skills autorizadas (`programacao`, `ideias`). Compras, estoque e agenda nunca saem da máquina.
+- O Claude pela assinatura é o padrão, sem cobrança à parte; ele roda sem ferramentas, numa pasta temporária.
+- O bot do Telegram atende só os chats configurados e, por enquanto, só guarda ideias.
+
+**Ficou para depois**
+- O bot do Telegram ainda não conversa com o assistente inteiro.
+- Aviso na hora dos compromissos e Google Agenda (V7).
+- A distinção entre pergunta e ideia no Telegram é uma regra simples: uma ideia escrita como pedido pode precisar de "ideia:" na frente.
+
