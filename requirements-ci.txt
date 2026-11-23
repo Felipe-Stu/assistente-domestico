@@ -1,0 +1,5 @@
+# Dependências mínimas para rodar a suíte de testes (LLM, ChromaDB e embeddings são simulados).
+# Para executar o assistente, use requirements.txt.
+ollama>=0.4.0
+python-dotenv>=1.0.1
+google-genai>=1.0.0

@@ -1,0 +1,46 @@
+name: Testes
+
+on:
+  push:
+    branches: [V4]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Instalar dependências dos testes
+        run: pip install -r requirements-ci.txt
+
+      - name: Verificar sintaxe (Python)
+        run: python -W error::SyntaxWarning -m compileall -q app core services scripts tests
+
+      - name: Verificar sintaxe (JavaScript)
+        run: node --check main.js && node --check preload.js && node --check renderer.js
+
+      - name: Testes automatizados
+        run: python -m unittest discover -s tests -v
+
+      # Informativo: mostra os achados do linter sem reprovar a execução.
+      # Quando a lista estiver limpa, remova o continue-on-error.
+      - name: Linter (ruff, informativo)
+        continue-on-error: true
+        run: |
+          pip install ruff
+          ruff check --select E9,F63,F7,F82,F401,F841 .
