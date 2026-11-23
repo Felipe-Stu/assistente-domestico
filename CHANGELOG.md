@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [V4.3, parte 1] — Catálogo, centavos e estoque: M07, M08, M06 (2026-11-23)
+
+### Adicionado
+- **M07 — catálogo de produtos e categorias fechadas** (migração v4):
+  - 15 categorias fechadas, no esquema de saída e no prompt da extração.
+  - Tabela `produtos`: "Leite 1L", "leite" e "leites" são o mesmo produto.
+  - Produto novo é cadastrado sozinho, e cada item aponta para ele (`itens_compra.produto_id`).
+  - Itens antigos entram no catálogo na migração, com a categoria deduzida do nome do produto. O texto original fica preservado.
+- **M08 — dinheiro em centavos inteiros** (migração v5):
+  - Colunas `*_centavos` em `compras` e `itens_compra`, preenchidas na entrada e na migração (meio centavo para cima).
+  - Total da compra somado em centavos; exibição em `R$ 1.234,56`.
+  - As colunas REAL antigas continuam preenchidas.
+- **M06 — compras alimentam o estoque** (migração v6):
+  - Cada item gravado soma ao estoque do produto na mesma transação, em unidade base (kg, litro, un); embalagens são convertidas ("2 pacotes de 5 kg" → 10 kg).
+  - O ritmo de consumo é aprendido na recompra; desfazer a compra tira do estoque.
+  - "Ainda tenho leite?" responde com quantidade e unidade, sem depender de acentos.
+
+### Corrigido
+- **P1:** compras não alimentavam o estoque.
+
+### Testes
+- `tests/test_m07.py`, `test_m08.py`, `test_m06.py`. Suíte: 271 testes.
+- Migrações v3 a v6 conferidas numa cópia do banco real: 4 compras e 11 itens preservados, totais em centavos iguais à soma dos itens.
+
+### Limitações
+- O estoque começa vazio: compras antigas não entram, porque sem ritmo conhecido apareceriam como estoque cheio.
+- Sem perguntas de confirmação de sobras (P8); o código antigo de estoque por voz continua sem uso.
+
 ## [V4.2] — Medir antes de mudar: M09, M13, M15, M16 (2026-11-23)
 
 ### Adicionado

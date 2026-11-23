@@ -20,10 +20,10 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 15.600 linhas em 23/11/2026, com os testes (≈ 8.070 em 03/11) |
-| Testes automatizados | 250 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
+| Testes automatizados | 271 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`**; 3 ideias analisadas (23/11) |
-| Problemas abertos | 8 (1 alto, 4 médios, 3 baixos); 15 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P9, P10, P16 e P23 em 23/11) |
+| Problemas abertos | 7 (0 alto, 4 médios, 3 baixos); 16 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P1, P9, P10, P16 e P23 em 23/11) |
 
 ---
 
@@ -51,8 +51,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 
 | Funcionalidade | O que falta | Problemas |
 |---|---|---|
-| Consulta de estoque por texto | A lógica existe, mas a tabela consultada nunca é preenchida | P1 |
-| Consultas de gastos e preços | São reconhecidas, mas respondem que a função ainda não existe (Fase 3) | — |
+| Consulta de estoque por texto | A lógica existe, mas a tabela consultada nunca é preenchida | Consultas de gastos e preços | São reconhecidas, mas respondem que a função ainda não existe (Fase 3) | — |
 | Modo Qwen manual (`ativar qwen`) | Não libera a VRAM por completo e não executa ferramentas. A programação pela skill `programacao` (Claude ou Qwen) resolveu o P10 | P7 |
 | Modo voz | Código presente; depende de microfone, Google Speech e Edge TTS | `NÃO TESTADO` |
 | Bot do Telegram | Só guarda ideias; ainda não conversa com o assistente inteiro. Separa pergunta de ideia por regra simples | — |
@@ -197,6 +196,7 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 
 | ID | Problema | Correção | Validação |
 |---|---|---|---|
+| P1 | Compras não alimentavam o estoque | Cada item gravado soma ao estoque do produto do catálogo, na mesma transação (M06, com M07) | `tests/test_m06.py` (`TESTADO`); cópia do banco real conferida |
 | P16 | Python ausente derrubava o Electron sem aviso | `main.js` trata o evento `error` do processo e mostra a orientação; Python configurável por `ASSISTENTE_PYTHON` ou `.venv` (M27) | `tests/test_m27.py` (`TESTADO`); janela real `NÃO TESTADO` |
 | P10 | `programacao` (e `projetos`) não estavam entre as opções do orquestrador | O orquestrador escolhe entre todas as skills do catálogo (SK2) | `tests/test_sk2.py` (`TESTADO`) |
 | P23 | Pedido de sugestões com a palavra "ideias" ia para a skill `ideias`; no Telegram, perguntas viravam ideias | A skill só consulta quando o pedido se refere a uma ideia salva e encaminha o resto à conversa geral (`Resposta.encaminhar`). No Telegram, perguntas e pedidos não são salvos; "ideia: ..." ou "/ideia ..." salvam sempre | `tests/test_ideias.py` (`TestP23`, `TestP23NoApp`) (`TESTADO`) |
@@ -402,4 +402,14 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | M14 Classificador por similaridade | Descartado: o catálogo já atinge a meta (p95 de 0,83 s na medição mais recente) | `MEDIDO` (histórico) |
 
 **Observado no histórico:** a extração de compras chega a p95 de 23,8 s (Gemma, sem raciocínio, 8 casos). Vale investigar na V4.3.
+
+## 16. V4.3, parte 1 — catálogo, centavos e estoque (23/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| M07 Catálogo e categorias | 15 categorias fechadas (esquema e prompt); tabela `produtos` com nome normalizado; produto novo cadastrado sozinho; itens antigos migrados com categoria pelo nome | `TESTADO` (7 testes); cópia do banco real: 11 itens em 10 produtos, categorias conferidas |
+| M08 Centavos | Colunas `*_centavos` preenchidas na entrada e na migração; totais somados em centavos | `TESTADO` (4 testes); cópia do banco real: totais iguais à soma dos itens |
+| M06 Estoque pelas compras | Item gravado soma ao estoque em unidade base; ritmo aprendido na recompra; desfazer tira do estoque; consulta com unidade | `TESTADO` (10 testes, inclusive o critério "comprei 2 litros de leite" → "ainda tenho leite?"); migração no banco real na próxima abertura |
+
+**Migrações v3 a v6 no banco real:** acontecem na próxima abertura do assistente, depois da cópia de segurança do dia. Só acrescentam tabelas e colunas e preenchem as novas; nada é apagado.
 
