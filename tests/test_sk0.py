@@ -134,6 +134,27 @@ class TestAvaliacaoERelatorio(BaseSemLogs):
         self.assertIn("Erros de escolha", md)
         self.assertEqual(json.loads(base.with_suffix(".json").read_text(encoding="utf-8"))["modelos"], ["modelo-x"])
 
+    def test_m13_historico_campos_e_versoes(self):
+        pasta = Path(self._tmp.name) / "medicoes"
+        extracao = [{"modelo": "m", "raciocinio": "nao", "acerto": False, "segundos": 1.0, "metricas": {},
+                     "checagens": {"itens": True, "total": False, "mercado": True, "embalagem": True}},
+                    {"modelo": "m", "raciocinio": "nao", "acerto": True, "segundos": 2.0, "metricas": {},
+                     "checagens": {"itens": True, "total": True, "mercado": True, "embalagem": True}}]
+        [linha] = avaliar.resumir_extracao(extracao)
+        self.assertEqual((linha["itens"], linha["total"], linha["acerto"]), ("2/2", "1/2", "1/2"))
+        versoes = avaliar.versoes_dos_prompts()
+        self.assertEqual({len(v) for v in versoes.values()}, {8})
+        for hora in ("10:00", "11:00"):
+            dados = {"data": f"23/11/2026 {hora}", "modelos": ["m"], "usar_regras": True, "repeticoes": 1,
+                     "roteamento": None, "extracao": extracao, "troca": None, "prompts": versoes}
+            base = avaliar.gravar_relatorio(dados, pasta)
+        historico = avaliar.ler_historico(pasta)
+        self.assertEqual([h["data"] for h in historico], ["23/11/2026 10:00", "23/11/2026 11:00"])
+        md = base.with_suffix(".md").read_text(encoding="utf-8")
+        self.assertIn("## Histórico (últimas medições)", md)
+        self.assertIn(versoes["extracao"], md)
+        self.assertIn("| m | nao | 1/2 | 2/2 | 1/2 |", md)
+
     def test_modo_atual_troca_o_modelo_e_desliga_regras(self):
         modelos_usados = []
 

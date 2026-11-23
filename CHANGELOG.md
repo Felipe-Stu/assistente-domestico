@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [V4.2] — Medir antes de mudar: M09, M13, M15, M16 (2026-11-23)
+
+### Adicionado
+- **M09 — origem de cada registro:** tabela `entradas` (migração v3) com, para cada pedido de compra:
+  - texto original e canal (`chat` ou `voz`);
+  - o que o modelo devolveu, o modelo, a versão do prompt (hash de 8 caracteres) e a duração.
+  - É gravada na mesma transação da compra (`compras.entrada_id`); descartadas e desfeitas também ficam registradas.
+- **M13 — conjunto de avaliação:**
+  - `scripts/avaliar.py` guarda o histórico de cada medição em `Planejamento/medicoes/historico-avaliacao.jsonl` e mostra as últimas no relatório.
+  - Mede o acerto da extração por campo (itens, total, mercado, embalagem) e registra a versão dos prompts do orquestrador e da extração.
+  - As medições de 23/11 (SK0 e SK2) entraram no histórico.
+
+### Alterado
+- **M16 — nuvem por escolha:** a conversa geral responde localmente por padrão. O Gemini entra quando a pessoa pede ("pergunta pro Gemini", "pesquisa na internet", "procura no Google") ou quando o modelo local falha. O campo `dificuldade` saiu do prompt e do esquema do orquestrador.
+- **M15 — prompt enxuto:** registrado como feito pelo SK2 (prompt fixo pelo catálogo: 1.624 → 325 tokens lidos); com o M16, o prompt ficou ainda menor.
+
+### Testes
+- `tests/test_m09.py` (8), M16 em `test_sk2.py` e `test_fase1.py`, M13 em `test_sk0.py`. Suíte: 250 testes.
+
+### Pendente
+- Medir no PC a escolha da skill com o prompt sem `dificuldade` (SK9, `rodar-medicao-sk0.bat`).
+- M14: a meta (p95 < 1 s) já foi atingida pelo catálogo (p95 de 0,64 a 1,01 s). Decidir se é descartado.
+
 ## [V4.1] — M27: configuração e portabilidade; M02: integração contínua na v4.1 (2026-11-23)
 
 ### Adicionado

@@ -22,6 +22,7 @@ Modelos que não estiverem instalados são pulados com aviso (instale com `ollam
 Relatório em JSON e Markdown na pasta de medições do planejamento (ou --saida).
 """
 import argparse
+import hashlib
 import json
 import statistics
 import sys
@@ -41,6 +42,8 @@ except Exception:
 ARQUIVO_CASOS = ROOT / "evals" / "casos.jsonl"
 ARQUIVO_COMPRAS = ROOT / "evals" / "compras.jsonl"
 PASTA_SAIDA_PADRAO = ROOT.parent / "Planejamento" / "medicoes"
+ARQUIVO_HISTORICO = "historico-avaliacao.jsonl"   # M13: uma linha por medição, dentro da pasta de saída
+CAMPOS_EXTRACAO = ("itens", "total", "mercado", "embalagem")
 MODELOS_PADRAO = ["gemma4:e4b", "qwen2.5:7b", "qwen2.5-coder:7b"]
 MODOS = ["atual", "catalogo", "nativo"]
 RACIOCINIO = {"padrao": None, "nao": False, "sim": True}
@@ -345,10 +348,67 @@ def resumir_extracao(resultados):
     grupos = {}
     for r in resultados:
         grupos.setdefault((r["modelo"], r["raciocinio"]), []).append(r)
-    return [{"modelo": m, "raciocinio": rac, "acerto": f"{sum(r['acerto'] for r in rs)}/{len(rs)}",
-             "p50_s": percentil([r["segundos"] for r in rs], 50), "p95_s": percentil([r["segundos"] for r in rs], 95),
-             "tokens_p50": percentil([r["metricas"].get("tokens_gerados") for r in rs], 50)}
-            for (m, rac), rs in grupos.items()]
+    linhas = []
+    for (m, rac), rs in grupos.items():
+        linha = {"modelo": m, "raciocinio": rac, "acerto": f"{sum(r['acerto'] for r in rs)}/{len(rs)}",
+                 "p50_s": percentil([r["segundos"] for r in rs], 50), "p95_s": percentil([r["segundos"] for r in rs], 95),
+                 "tokens_p50": percentil([r["metricas"].get("tokens_gerados") for r in rs], 50)}
+        # M13: acerto por campo, para saber o que o modelo erra (itens, total, mercado, embalagem)
+        for campo in CAMPOS_EXTRACAO:
+            linha[campo] = f"{sum(bool(r['checagens'].get(campo)) for r in rs)}/{len(rs)}"
+        linhas.append(linha)
+    return linhas
+
+
+def versoes_dos_prompts() -> dict:
+    """Hash curto dos prompts usados (orquestrador e extração de compras), igual ao gravado nas entradas (M09)."""
+    from core.skills import obter_catalogo
+    from core.skills import seletor
+    catalogo = obter_catalogo()
+    texto_orquestrador = seletor.prompt_decisao(catalogo) + json.dumps(seletor.esquema_decisao(catalogo), sort_keys=True)
+    texto_extracao = catalogo.skill("compras").prompt("extracao", data_atual="AAAA-MM-DD")
+    return {"orquestrador": hashlib.sha1(texto_orquestrador.encode("utf-8")).hexdigest()[:8],
+            "extracao": hashlib.sha1(texto_extracao.encode("utf-8")).hexdigest()[:8]}
+
+
+def linha_historico(dados) -> dict:
+    """Resumo de uma medição para o histórico (M13)."""
+    linha = {"data": dados["data"], "modelos": dados["modelos"], "prompts": dados.get("prompts", {}),
+             "usar_regras": dados["usar_regras"], "skill": dados.get("skill")}
+    if dados.get("roteamento") is not None:
+        linha["roteamento"] = [{k: r[k] for k in ("modo", "modelo", "acerto", "acerto_atuais", "p50_s", "p95_s")}
+                               for r in resumir_roteamento(dados["roteamento"])]
+    if dados.get("extracao") is not None:
+        linha["extracao"] = [{k: r[k] for k in ("modelo", "raciocinio", "acerto", "p50_s", "p95_s") + CAMPOS_EXTRACAO}
+                             for r in resumir_extracao(dados["extracao"])]
+    return linha
+
+
+def ler_historico(pasta: Path) -> list:
+    arquivo = Path(pasta) / ARQUIVO_HISTORICO
+    if not arquivo.is_file():
+        return []
+    linhas = []
+    for texto in arquivo.read_text(encoding="utf-8").splitlines():
+        try:
+            linhas.append(json.loads(texto))
+        except ValueError:
+            continue
+    return linhas
+
+
+def tabela_historico(historico, limite=10) -> str:
+    linhas = []
+    for h in historico[-limite:]:
+        for r in h.get("roteamento", []):
+            linhas.append({"data": h["data"], "tipo": "escolha", "modo/raciocínio": r["modo"], "modelo": r["modelo"],
+                           "acerto": r["acerto"], "p50_s": r["p50_s"], "p95_s": r["p95_s"],
+                           "prompt": h.get("prompts", {}).get("orquestrador")})
+        for r in h.get("extracao", []):
+            linhas.append({"data": h["data"], "tipo": "extração", "modo/raciocínio": r["raciocinio"], "modelo": r["modelo"],
+                           "acerto": r["acerto"], "p50_s": r["p50_s"], "p95_s": r["p95_s"],
+                           "prompt": h.get("prompts", {}).get("extracao")})
+    return tabela_md(linhas, ["data", "tipo", "modo/raciocínio", "modelo", "acerto", "p50_s", "p95_s", "prompt"])
 
 
 def tabela_md(linhas, colunas):
@@ -378,14 +438,24 @@ def relatorio_md(dados) -> str:
                              ["modo", "modelo", "id", "frase", "esperado", "skill", "acao", "caminho"])]
     if dados.get("extracao") is not None:
         md += ["## Extração de compras", "", tabela_md(resumir_extracao(dados["extracao"]),
-                                                       ["modelo", "raciocinio", "acerto", "p50_s", "p95_s", "tokens_p50"])]
+                                                       ["modelo", "raciocinio", "acerto", *CAMPOS_EXTRACAO,
+                                                        "p50_s", "p95_s", "tokens_p50"])]
     if dados.get("troca") is not None:
         md += ["## Troca de modelo", "", tabela_md(dados["troca"], ["modelo", "segundos", "s_carga", "na_vram", "erro"])]
+    if dados.get("prompts"):
+        md += ["", f"Versões dos prompts: orquestrador `{dados['prompts'].get('orquestrador')}`, "
+                   f"extração `{dados['prompts'].get('extracao')}`."]
+    if dados.get("historico"):
+        md += ["", "## Histórico (últimas medições)", "", tabela_historico(dados["historico"])]
     return "\n".join(md) + "\n"
 
 
 def gravar_relatorio(dados, pasta: Path) -> Path:
     pasta.mkdir(parents=True, exist_ok=True)
+    # M13: acrescenta esta medição ao histórico e leva as últimas para o relatório
+    with (pasta / ARQUIVO_HISTORICO).open("a", encoding="utf-8") as arquivo:
+        arquivo.write(json.dumps(linha_historico(dados), ensure_ascii=False) + "\n")
+    dados["historico"] = ler_historico(pasta)
     base = pasta / f"sk0-{datetime.now().strftime('%Y%m%d-%H%M')}"
     base.with_suffix(".json").write_text(json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
     base.with_suffix(".md").write_text(relatorio_md(dados), encoding="utf-8")
@@ -433,7 +503,7 @@ def main(argv=None):
     so = [args.so_roteamento, args.so_extracao, args.so_troca]
     fazer = (lambda i: so[i] or not any(so))
     dados = {"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "modelos": modelos, "usar_regras": not args.sem_regras,
-             "orquestrador": "catalogo",
+             "orquestrador": "catalogo", "prompts": versoes_dos_prompts(), "skill": args.skill,
              "repeticoes": args.repeticoes, "roteamento": None, "extracao": None, "troca": None}
     if fazer(2):
         dados["troca"] = medir_troca(modelos)

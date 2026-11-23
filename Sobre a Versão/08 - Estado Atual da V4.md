@@ -20,7 +20,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 15.600 linhas em 23/11/2026, com os testes (≈ 8.070 em 03/11) |
-| Testes automatizados | 238 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
+| Testes automatizados | 250 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`**; 3 ideias analisadas (23/11) |
 | Problemas abertos | 8 (1 alto, 4 médios, 3 baixos); 15 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P9, P10, P16 e P23 em 23/11) |
@@ -390,4 +390,16 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 **Dados que saem da máquina, em resumo:** perguntas gerais (Gemini, se configurado), texto das ideias e pedidos de programação (Claude), mensagens ao bot (Telegram) e, no modo voz, áudio (Google Speech) e texto (Edge TTS). Compras, estoque e agenda não saem.
 
 **Pendente:** testar com o modelo real a escolha das 4 frases novas de `evals/casos.jsonl` (r50, r52 e r53 dependem do modelo); enviar os commits ao GitHub.
+
+## 15. V4.2 — medir antes de mudar (23/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| M09 Origem dos registros | Tabela `entradas` (migração v3): texto, canal, resposta do modelo, modelo, versão do prompt e duração de cada pedido de compra, ligada à compra; descartadas e desfeitas ficam registradas | `TESTADO` (8 testes); migração no banco real na próxima abertura (só acrescenta) |
+| M13 Conjunto de avaliação | Histórico das medições (`historico-avaliacao.jsonl`), acerto da extração por campo e versão dos prompts em cada relatório | `TESTADO`; histórico com as medições de 23/11 |
+| M15 Prompt enxuto | Feito pelo SK2 e reduzido de novo pelo M16 | `MEDIDO` (SK0: 1.624 → 325 tokens) |
+| M16 Nuvem por escolha | Gemini só quando pedido ou na falha local; sem `dificuldade` no orquestrador | `TESTADO`; nova medição da escolha no PC `NÃO TESTADO` |
+| M14 Classificador por similaridade | Não feito: o catálogo já tem p95 de 0,64 a 1,01 s, a meta do item | `MEDIDO` (histórico) |
+
+**Observado no histórico:** a extração de compras chega a p95 de 23,8 s (Gemma, sem raciocínio, 8 casos). Vale investigar na V4.3.
 
