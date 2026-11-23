@@ -6,7 +6,8 @@ SpeechRecognition>=3.10.0
 # No Windows, pode ser necessário instalar via pip ou binário compilado.
 PyAudio>=0.2.14
 # SDK oficial do Ollama para orquestração da LLM local (Gemma 4 e4b)
-ollama>=0.1.8
+# A partir da 0.4 o parâmetro `format` aceita JSON Schema (saída estruturada)
+ollama>=0.4.0
 # Biblioteca HTTP para comunicação com serviços e APIs
 requests>=2.31.0
 # Banco Vetorial e Embeddings Locais (CPU)

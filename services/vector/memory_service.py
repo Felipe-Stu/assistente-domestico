@@ -64,7 +64,7 @@ class MemoryService:
         if not self._deve_salvar_em_longo_prazo(conteudo, assistant):
             custom_logger.log_assistente(
                 "memory",
-                f"[MEMORY] Texto descartado da memória de longo prazo: '{conteudo[:30]}...'"
+                f"[MEMORY] Texto descartado da memória de longo prazo: '{custom_logger.conteudo(conteudo[:30])}...'"
             )
             return None
 

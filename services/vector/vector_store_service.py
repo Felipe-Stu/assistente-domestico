@@ -91,6 +91,12 @@ class VectorStoreService:
                     documents[idx_orig].embedding = emb
 
             embeddings = [doc.embedding for doc in documents]
+            if any(not emb for emb in embeddings):
+                # Sem vetor próprio, o ChromaDB usaria outro modelo de embeddings; melhor não gravar
+                msg = f"[VECTOR_STORE] Upsert cancelado: embeddings indisponíveis para {len(documents)} doc(s)."
+                logging_logger.warning(msg)
+                custom_logger.log_assistente("vector_store", msg)
+                return False
 
             colecao.upsert(
                 ids=ids,
@@ -124,6 +130,14 @@ class VectorStoreService:
         Retorna lista de dicionários contendo: id, content, metadata, score e distance.
         """
         if not query_text or not query_text.strip():
+            return []
+
+        if self.embedding_service.carregando() and not self.embedding_service.pronto():
+            # Início do sistema: a resposta ao usuário não espera a carga do modelo (segue sem RAG)
+            custom_logger.log_assistente(
+                "vector_store",
+                "[SEMANTIC_SEARCH] Modelo de embeddings ainda carregando; busca ignorada."
+            )
             return []
 
         t0 = time.time()

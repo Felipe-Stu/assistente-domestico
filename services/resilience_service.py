@@ -20,6 +20,14 @@ class InvalidOrchestratorOutputException(ResilienceException):
     pass
 
 
+class OllamaIndisponivelException(ResilienceException, ConnectionError):
+    """
+    O servidor do Ollama não respondeu (fechado ou inacessível). Repetir a chamada não resolve:
+    quem usa execute_with_retry deve tratá-la como fatal e pedir ao usuário que abra o Ollama.
+    """
+    pass
+
+
 def parse_json_com_fallback(texto_llm: str) -> dict:
     """
     Tenta decodificar o JSON recebido da LLM local.

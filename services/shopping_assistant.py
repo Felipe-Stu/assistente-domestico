@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Dict, Any, List, Optional, Tuple
 
+from services.esquemas import ESQUEMA_COMPRAS
 from services.intent_router import normalizar_texto
 from services.llm_provider import BaseLLMProvider
 from services.logger_service import logger as custom_logger
@@ -286,7 +287,7 @@ class ShoppingAssistant:
         repetida com segurança pelo retry.
         Retorna {"compras": [...], "duvidas": [...]}.
         """
-        custom_logger.log_assistente(NOME_ASSISTENTE, f"Áudio recebido: '{texto_transcrito}'")
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Áudio recebido: '{custom_logger.conteudo(texto_transcrito)}'")
 
         if not self.llm_provider:
             logging_logger.error("Nenhum provedor de LLM configurado para processar a compra.")
@@ -413,7 +414,8 @@ class ShoppingAssistant:
         # Solicita a estrutura JSON através do provedor de LLM configurado (Local ou Nuvem)
         resposta_json = self.llm_provider.gerar_json(
             prompt_sistema=prompt_sistema,
-            mensagem_usuario=texto_transcrito
+            mensagem_usuario=texto_transcrito,
+            esquema=ESQUEMA_COMPRAS
         )
         custom_logger.log_assistente(NOME_ASSISTENTE, "Estrutura JSON retornada pelo LLMProvider com sucesso.")
 

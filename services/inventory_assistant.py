@@ -92,7 +92,7 @@ class InventoryAssistant:
         Lê controle_consumo (status_estoque = 1) e estima o restante pelo ritmo de consumo.
         Não altera o banco.
         """
-        custom_logger.log_assistente(NOME_ASSISTENTE, f"Consulta de estoque recebida: '{texto_usuario}'")
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Consulta de estoque recebida: '{custom_logger.conteudo(texto_usuario)}'")
 
         itens = self.db.executar_consulta(
             """SELECT produto_nome, quantidade_comprada, quantidade_residual_confirmada,
@@ -317,7 +317,7 @@ class InventoryAssistant:
                 self.voice.falar(pergunta)
 
                 resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
-                custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta por voz capturada: '{resposta_bruta}'")
+                custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta por voz capturada: '{custom_logger.conteudo(resposta_bruta)}'")
 
                 analise = self._classificar_resposta_usuario(resposta_bruta)
                 intencao = str(analise.get("intencao", "")).upper().strip()
@@ -408,7 +408,7 @@ class InventoryAssistant:
             self.voice.falar(pergunta)
 
             resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False)
-            custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta do usuário para o resíduo de '{nome_produto}': '{resposta_bruta}'")
+            custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta do usuário para o resíduo de '{nome_produto}': '{custom_logger.conteudo(resposta_bruta)}'")
 
             analise = self._classificar_resposta_usuario(resposta_bruta)
         else:
@@ -579,7 +579,7 @@ class InventoryAssistant:
         self.voice.falar(pergunta)
 
         resposta_bruta = self.audio.capturar_audio_e_transcrever(ativar_trava_inicial=False).lower()
-        custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta sobre a ambiguidade: '{resposta_bruta}'")
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Resposta sobre a ambiguidade: '{custom_logger.conteudo(resposta_bruta)}'")
 
         if any(w in resposta_bruta for w in ["todos", "todas", "tudo"]):
             for id_item, nome_real in itens_encontrados:

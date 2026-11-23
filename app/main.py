@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import io
 import json
@@ -10,8 +11,34 @@ from pathlib import Path
 # Configura codificação de fluxo para UTF-8 no Windows antes de qualquer saída
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-# O Electron envia os comandos em UTF-8; sem isso, acentos chegam corrompidos ("café" -> "cafÃ©")
-sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+
+
+def _isolar_entrada_ipc():
+    """
+    Devolve um leitor UTF-8 exclusivo para os comandos do Electron e troca a entrada
+    padrão do processo por uma vazia (os.devnull).
+
+    Motivo: no Windows, enquanto a thread de leitura espera a próxima linha no pipe,
+    qualquer consulta de outra thread a esse mesmo pipe (bibliotecas que checam o stdin
+    ao serem importadas, como na carga do modelo de embeddings) fica bloqueada até chegar
+    uma nova mensagem. Com o pipe em um descritor privado, ninguém além do leitor o toca.
+    O Electron envia os comandos em UTF-8; sem isso, acentos chegam corrompidos ("café" -> "cafÃ©").
+    """
+    try:
+        fd_privado = os.dup(sys.stdin.fileno())
+        fd_nulo = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(fd_nulo, 0)  # no Windows também atualiza o handle padrão de entrada
+        os.close(fd_nulo)
+        entrada = open(fd_privado, "r", encoding="utf-8", closefd=True)
+        sys.stdin = open(os.devnull, "r", encoding="utf-8")
+        return entrada
+    except Exception:
+        # Sem descritor real (ex.: execução embutida): mantém o comportamento anterior
+        sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+        return sys.stdin
+
+
+ENTRADA_IPC = _isolar_entrada_ipc()
 
 # 1. Ajusta o sys.path PRIMEIRO
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -25,12 +52,23 @@ from services.intent_router import normalizar_texto
 from services.inventory_assistant import InventoryAssistant
 from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
 import services.llm_provider as llm_provider_estado
-from core.config import PROJECT_ANALYZER_MODEL, PROJECT_ANALYZER_OUTPUT_DIR
+from core.config import (
+    BACKUP_ATIVO,
+    BACKUP_DIARIOS,
+    BACKUP_DIR,
+    BACKUP_SEMANAIS,
+    CHROMA_DIR,
+    DB_PATH,
+    PROJECT_ANALYZER_MODEL,
+    PROJECT_ANALYZER_OUTPUT_DIR,
+)
+from services.backup_service import BackupService
 from services.project_analyzer import ProjectAnalyzer, ProjetoInvalidoError
 from services.logger_service import logger as custom_logger
 from services.resilience_service import (
     InvalidOrchestratorOutputException,
     MaxRetriesExceededException,
+    OllamaIndisponivelException,
     execute_with_retry,
 )
 from services.shopping_assistant import ShoppingAssistant
@@ -54,6 +92,10 @@ MAX_TENTATIVAS = 3
 MSG_IA_LOCAL_INDISPONIVEL = (
     "A IA local não respondeu. Nada foi gravado nem enviado à nuvem. "
     "Verifique se o Ollama está em execução e tente novamente."
+)
+MSG_OLLAMA_FORA = (
+    "O Ollama não está em execução, então a IA local não pode responder. "
+    "Nada foi gravado nem enviado à nuvem. Abra o Ollama e use \"Tentar de novo\"."
 )
 RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar", "gravar", "salvar", "grava", "salva"}
 RESPOSTAS_CANCELAR = {"nao", "n", "cancela", "cancelar", "descarta", "descartar", "nao grava", "nao gravar", "nao salve"}
@@ -163,7 +205,9 @@ class AssistenteRuntime:
                 semantic_search_service=self.semantic_search,
                 memory_service=self.memory_service
             )
-            emitir_electron("debug_log", {"message": "✓ Banco vetorial (ChromaDB) e Memória Semântica prontos."})
+            emitir_electron("debug_log", {"message": "✓ Banco vetorial (ChromaDB) conectado. Carregando a memória semântica em segundo plano..."})
+            # O modelo de embeddings leva vários segundos: o chat não espera por ele
+            self.vector_store.embedding_service.carregar_em_segundo_plano(ao_concluir=self._avisar_memoria_carregada)
 
             self.ai_service = AIService()
             emitir_electron("debug_log", {"message": "✓ Serviço de IA inicializado."})
@@ -211,6 +255,14 @@ class AssistenteRuntime:
             emitir_electron("error", {"message": f"Erro fatal na inicialização: {e}"})
             self._set_estado("ERROR")
             sys.exit(1)
+
+    @staticmethod
+    def _avisar_memoria_carregada(sucesso: bool, erro: str = None):
+        """Informa no terminal interno o fim da carga do modelo de embeddings."""
+        if sucesso:
+            emitir_electron("debug_log", {"message": "✓ Memória semântica pronta."})
+        else:
+            emitir_electron("debug_log", {"message": f"⚠️ Memória semântica indisponível nesta sessão: {erro}"})
 
     # -------------------------------------------------------------------------
     # FASE 2: Ativação Dinâmica de Voz (Lazy, sob demanda)
@@ -295,7 +347,8 @@ class AssistenteRuntime:
             return
         if self.voice_service and self.voice_service.esta_disponivel():
             try:
-                self.voice_service.falar(texto)
+                with custom_logger.etapa("voz", caracteres=len(texto or "")):
+                    self.voice_service.falar(texto)
             except Exception as e:
                 logger.error(f"Erro ao reproduzir áudio: {e}")
 
@@ -332,12 +385,13 @@ class AssistenteRuntime:
         if contexto in self.CONTEXTOS_SEM_MEMORIA:
             return
         try:
-            self.memory_service.salvar_memoria_longo_prazo(
-                conteudo=texto,
-                assistant=contexto,
-                category="conversa",
-                source="user"
-            )
+            with custom_logger.etapa("memoria"):
+                self.memory_service.salvar_memoria_longo_prazo(
+                    conteudo=texto,
+                    assistant=contexto,
+                    category="conversa",
+                    source="user"
+                )
         except Exception as e:
             logger.warning(f"Falha ao salvar memória semântica: {e}")
 
@@ -361,7 +415,8 @@ class AssistenteRuntime:
             return "Informe o caminho da pasta do projeto. Exemplo: analisar projeto E:\\MOBA"
         emitir_electron("debug_log", {"message": f"ProjectAnalyzer: analisando '{caminho}'. Isso pode levar alguns minutos..."})
         try:
-            resultado = self.project_analyzer.analisar(caminho)
+            with custom_logger.etapa("analise_projeto"):
+                resultado = self.project_analyzer.analisar(caminho)
             return ProjectAnalyzer.formatar_resposta(resultado)
         except ProjetoInvalidoError as e:
             return f"Não foi possível analisar: {e}"
@@ -386,12 +441,13 @@ class AssistenteRuntime:
             return "As consultas de gastos e preços ainda não estão disponíveis. Nada foi registrado.", None
 
         preparada = execute_with_retry(
-            func=self.shopping_assistant.preparar_compra,
+            func=custom_logger.cronometrado("extracao_compras", self.shopping_assistant.preparar_compra),
             args=(texto,),
             max_tentativas=MAX_TENTATIVAS,
             tempo_espera=TEMPO_RETRY,
             voice_service=self.voice_service if self.voice_mode_active else None,
             mensagem_espera_voz="Estou tentando entender sua compra novamente.",
+            excecoes_fatais=(OllamaIndisponivelException,),
             nome_servico="ShoppingAssistant"
         )
 
@@ -437,6 +493,15 @@ class AssistenteRuntime:
             and self.ai_service.disponivel()
         )
 
+    def _avisar_ollama_fora(self, texto_original: str):
+        """Resposta imediata quando o Ollama está fechado; a interface oferece reenviar o mesmo texto."""
+        logger.warning("⚠️ Ollama indisponível. Solicitação não processada.")
+        custom_logger.log_geral("Ollama indisponível: solicitação não processada nem enviada à nuvem.")
+        self._falar_se_permitido("O Ollama não está em execução. Abra o Ollama e tente de novo.")
+        emitir_electron("assistant_message", {"text": MSG_OLLAMA_FORA, "tentar_novamente": texto_original})
+        self._set_estado("WAITING_INPUT")
+        return MSG_OLLAMA_FORA
+
     def _entregar_resposta(self, resposta_texto: str, fala_texto: str = None):
         """Fala e exibe a resposta e devolve o sistema à espera de entrada."""
         logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
@@ -446,11 +511,17 @@ class AssistenteRuntime:
         return resposta_texto
 
     def _processar_solicitacao(self, transcricao: str):
+        """Abre uma requisição no registro de eventos (M26) e executa o pipeline."""
+        canal = "voz" if self.voice_mode_active else "texto"
+        with custom_logger.requisicao(canal=canal, caracteres=len(transcricao or "")):
+            return self._executar_pipeline(transcricao)
+
+    def _executar_pipeline(self, transcricao: str):
         """Pipeline completo de processamento: Orquestração → Execução → Resposta."""
         solicitacao_original = transcricao
 
         logger.info(f"👤 [Usuário]: '{solicitacao_original}'")
-        custom_logger.log_geral(f"Entrada recebida: '{solicitacao_original}'")
+        custom_logger.log_geral(f"Entrada recebida: '{custom_logger.conteudo(solicitacao_original)}'")
 
         self._set_estado("PROCESSING")
 
@@ -462,16 +533,20 @@ class AssistenteRuntime:
         # =====================================================================
         try:
             decisao = execute_with_retry(
-                func=orquestrar_requisicao,
+                func=custom_logger.cronometrado("roteamento", orquestrar_requisicao),
                 args=(solicitacao_original,),
                 kwargs={"contexto_atual": self.sessao.contexto_ativo},
                 max_tentativas=MAX_TENTATIVAS,
                 tempo_espera=TEMPO_RETRY,
                 excecoes_recuperaveis=(InvalidOrchestratorOutputException, Exception),
+                excecoes_fatais=(OllamaIndisponivelException,),
                 voice_service=self.voice_service if self.voice_mode_active else None,
                 mensagem_espera_voz="Aguarde um instante, estou reprocessando sua solicitação.",
                 nome_servico="Gemma4-Orquestrador"
             )
+        except OllamaIndisponivelException:
+            # Repetir não adianta e, sem classificação, nada vai à nuvem
+            return self._avisar_ollama_fora(solicitacao_original)
         except MaxRetriesExceededException:
             # Sem classificação, o texto pode ser privado (ex.: uma compra): nada vai à nuvem
             logger.warning("⚠️ Gemma 4 excedeu retries. Solicitação não encaminhada à nuvem.")
@@ -479,6 +554,11 @@ class AssistenteRuntime:
             return self._entregar_resposta(MSG_IA_LOCAL_INDISPONIVEL)
 
         logger.info(f"🧠 [Decisão do Orquestrador]: {decisao}")
+        custom_logger.evento(
+            "main", "decisao",
+            contexto=decisao.get("contexto"), acao=decisao.get("acao"),
+            dificuldade=decisao.get("dificuldade"), resposta_direta="resposta_direta" in decisao,
+        )
 
         dificuldade = decisao.get("dificuldade", "medio_dificil")
         contexto = decisao.get("contexto", "outro")
@@ -538,23 +618,28 @@ class AssistenteRuntime:
                             "Alterações de estoque ainda não estão disponíveis neste modo."
                         )
                     else:
-                        resposta_texto = self.inventory_assistant.consultar_estoque(solicitacao_original)
+                        with custom_logger.etapa("consulta_estoque"):
+                            resposta_texto = self.inventory_assistant.consultar_estoque(solicitacao_original)
 
                 else:
                     resposta_texto = execute_with_retry(
-                        func=executar_assistente_local,
+                        func=custom_logger.cronometrado("assistente_local", executar_assistente_local),
                         args=(contexto, self.sessao.historico, self._enriquecer_com_memoria(solicitacao_original, contexto)),
                         max_tentativas=MAX_TENTATIVAS,
                         tempo_espera=TEMPO_RETRY,
                         voice_service=self.voice_service if self.voice_mode_active else None,
                         mensagem_espera_voz="Processando sua solicitação localmente.",
+                        excecoes_fatais=(OllamaIndisponivelException,),
                         nome_servico="AssistenteLocal"
                     )
 
-            except MaxRetriesExceededException:
+            except (MaxRetriesExceededException, OllamaIndisponivelException) as e:
+                ollama_fora = isinstance(e, OllamaIndisponivelException)
                 if self._pode_usar_nuvem(contexto):
                     logger.error("❌ Falha crítica local. Redirecionando para Nuvem...")
                     usar_nuvem = True
+                elif ollama_fora:
+                    return self._avisar_ollama_fora(solicitacao_original)
                 else:
                     logger.error("❌ Falha crítica local em contexto restrito. Nada enviado à nuvem.")
                     return self._entregar_resposta(MSG_IA_LOCAL_INDISPONIVEL)
@@ -566,7 +651,7 @@ class AssistenteRuntime:
 
             try:
                 resposta_texto = execute_with_retry(
-                    func=self.ai_service.processar_requisicao_complexa,
+                    func=custom_logger.cronometrado("nuvem", self.ai_service.processar_requisicao_complexa),
                     args=(self._enriquecer_com_memoria(solicitacao_original, contexto, para_nuvem=True), historico_nuvem),
                     max_tentativas=MAX_TENTATIVAS,
                     tempo_espera=TEMPO_RETRY,
@@ -583,15 +668,17 @@ class AssistenteRuntime:
                 return self._entregar_resposta("Desculpe, o serviço de inteligência na nuvem está indisponível no momento. Tente novamente mais tarde.")
 
         self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
-        self._registrar_memoria(solicitacao_original, contexto)
 
         # =====================================================================
         # PASSO 3: Resposta
         # =====================================================================
         if resposta_texto:
-            return self._entregar_resposta(resposta_texto, fala_texto)
+            self._entregar_resposta(resposta_texto, fala_texto)
+        else:
+            self._set_estado("WAITING_INPUT")
 
-        self._set_estado("WAITING_INPUT")
+        # Depois da resposta: gravar a memória pode aguardar a carga do modelo de embeddings
+        self._registrar_memoria(solicitacao_original, contexto)
         return resposta_texto
 
     # -------------------------------------------------------------------------
@@ -599,10 +686,10 @@ class AssistenteRuntime:
     # -------------------------------------------------------------------------
 
     def _leitor_stdin(self):
-        """Thread daemon para ler comandos do Electron via stdin."""
+        """Thread daemon para ler comandos do Electron (pipe isolado em ENTRADA_IPC)."""
         while not self.deve_encerrar:
             try:
-                linha = sys.stdin.readline()
+                linha = ENTRADA_IPC.readline()
                 if not linha:
                     logger.info("Stdin fechado (EOF). Encerrando processo Python.")
                     self.deve_encerrar = True
@@ -672,6 +759,23 @@ class AssistenteRuntime:
     # Loop Principal
     # -------------------------------------------------------------------------
 
+    def _iniciar_backup_diario(self):
+        if not BACKUP_ATIVO:
+            emitir_electron("debug_log", {"message": "Cópia de segurança automática desativada (BACKUP_ATIVO=0)."})
+            return
+        servico = BackupService(
+            db_path=DB_PATH,
+            chroma_dir=CHROMA_DIR,
+            pasta_backups=BACKUP_DIR,
+            diarios=BACKUP_DIARIOS,
+            semanais=BACKUP_SEMANAIS,
+        )
+        servico.iniciar_em_segundo_plano(
+            deve_parar=lambda: self.deve_encerrar,
+            ao_gravar=lambda pasta: emitir_electron("debug_log", {"message": f"✓ Cópia de segurança do dia gravada em '{pasta}'."}),
+            ao_falhar=lambda erro: emitir_electron("debug_log", {"message": f"⚠️ Cópia de segurança falhou: {erro}"}),
+        )
+
     def rodar(self):
         """Entrypoint principal do runtime."""
         logger.info("Iniciando Assistente Doméstico (Modelo Text-First)")
@@ -701,6 +805,19 @@ class AssistenteRuntime:
 
         t_varredura = threading.Thread(target=_varredura_background, daemon=True)
         t_varredura.start()
+
+        # Avisa logo no início se o Ollama estiver fechado (M17), sem atrasar o chat
+        def _verificar_ollama_inicio():
+            erro = llm_provider_estado.verificar_ollama()
+            if erro:
+                emitir_electron("debug_log", {"message": "⚠️ Ollama não respondeu. Abra o Ollama antes de conversar com a IA local."})
+            else:
+                emitir_electron("debug_log", {"message": "✓ Ollama em execução."})
+
+        threading.Thread(target=_verificar_ollama_inicio, daemon=True).start()
+
+        # Cópia de segurança do dia (M11), em segundo plano: o chat não espera por ela
+        self._iniciar_backup_diario()
 
         # =====================================================================
         # SISTEMA PRONTO PARA TEXTO — Chat desbloqueado!

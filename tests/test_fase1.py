@@ -5,10 +5,12 @@ Não acessam o Ollama nem o Gemini (LLM, Gemini e banco vetorial são simulados)
 Executar na raiz do assistente:
     python -m unittest discover -s tests -v
 """
+import json
 import os
 import sqlite3
 import sys
 import tempfile
+import time
 import unittest
 from datetime import date
 from pathlib import Path
@@ -354,6 +356,21 @@ class TestRuntime(BaseBanco):
         self.assertIn("Compra registrada", resposta)
         self.assertEqual(self.contar("compras"), 1)
 
+    def test_m26_requisicao_registra_etapas_com_o_mesmo_id(self):
+        self.responder("Comprei leite por 10 reais no Moreschi")
+        pasta = logger_service.logger.base_dir
+        eventos = []
+        for nome in sorted(os.listdir(pasta)):
+            if nome.startswith(logger_service.PREFIXO_ARQUIVO):
+                with open(os.path.join(pasta, nome), encoding="utf-8") as arquivo:
+                    eventos += [json.loads(linha) for linha in arquivo if linha.strip()]
+        inicio = next(e for e in eventos if e["evento"] == "requisicao_inicio")
+        da_requisicao = [e for e in eventos if e.get("req") == inicio["req"]]
+        etapas = {e["etapa"] for e in da_requisicao if e["evento"] == "etapa"}
+        self.assertTrue({"extracao_compras", "banco"} <= etapas, etapas)
+        self.assertEqual(da_requisicao[-1]["evento"], "requisicao_fim")
+        self.assertEqual(da_requisicao[-1]["status"], "ok")
+
     def test_consulta_de_compras_nao_grava(self):
         resposta = self.responder("O que eu tenho comprado ultimamente?")
         self.assertIn("Nada foi registrado", resposta)
@@ -398,6 +415,36 @@ class TestRuntime(BaseBanco):
             resposta = self.responder("Frase qualquer sem regra")
         self.assertEqual(resposta, app_main.MSG_IA_LOCAL_INDISPONIVEL)
         self.gemini.assert_not_called()
+
+    # M17 — Ollama fechado: resposta imediata, sem repetições e com "Tentar de novo"
+    def ollama_fora(self):
+        return llm_provider.OllamaIndisponivelException("O Ollama não respondeu em 2 s.")
+
+    def test_ollama_fora_no_orquestrador_responde_sem_repetir(self):
+        with mock.patch.object(app_main, "orquestrar_requisicao", side_effect=self.ollama_fora()) as orq, \
+                mock.patch.object(app_main, "TEMPO_RETRY", 5):
+            inicio = time.perf_counter()
+            resposta = self.responder("Frase qualquer sem regra")
+            duracao = time.perf_counter() - inicio
+        self.assertEqual(resposta, app_main.MSG_OLLAMA_FORA)
+        self.assertEqual(orq.call_count, 1)
+        self.assertLess(duracao, 1.0)  # antes: 3 tentativas com 2 esperas de TEMPO_RETRY
+        self.gemini.assert_not_called()
+        self.assertIn(("assistant_message", {"text": app_main.MSG_OLLAMA_FORA, "tentar_novamente": "Frase qualquer sem regra"}),
+                      self.emissoes)
+
+    def test_ollama_fora_em_compras_nao_grava_nem_vai_a_nuvem(self):
+        self.runtime.shopping_assistant = self.assistente(erro=self.ollama_fora())
+        with self.decidir("compras", acao="criar"):
+            resposta = self.responder("Comprei leite por 10 reais")
+        self.assertEqual(resposta, app_main.MSG_OLLAMA_FORA)
+        self.assertEqual(self.contar("compras"), 0)
+        self.gemini.assert_not_called()
+
+    def test_ollama_fora_em_pergunta_geral_usa_a_nuvem(self):
+        with self.decidir("geral"), mock.patch.object(app_main, "executar_assistente_local", side_effect=self.ollama_fora()) as local:
+            self.assertEqual(self.responder("Conte uma curiosidade"), "Resposta da nuvem")
+        self.assertEqual(local.call_count, 1)
 
     def test_falha_local_em_compras_nao_vai_a_nuvem(self):
         self.runtime.shopping_assistant = self.assistente(erro=ConnectionError("Ollama parado"))

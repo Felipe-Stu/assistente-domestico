@@ -17,6 +17,27 @@ CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configurações do Banco Vetorial e Embeddings Locais (CPU)
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "paraphrase-multilingual-MiniLM-L12-v2")
+# CPU por padrão: a VRAM fica livre para o modelo generativo do Ollama
+EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
+
+# Saída estruturada dos modelos locais: envia um JSON Schema no parâmetro `format` do Ollama.
+# Defina OLLAMA_SAIDA_ESTRUTURADA=0 para voltar ao modo JSON simples.
+OLLAMA_SAIDA_ESTRUTURADA = os.getenv("OLLAMA_SAIDA_ESTRUTURADA", "1").strip() != "0"
+# Raciocínio ("think") dos modelos que o suportam: vazio = padrão do Ollama, 0 = desliga, 1 = liga.
+_raciocinio = os.getenv("OLLAMA_RACIOCINIO", "").strip()
+OLLAMA_RACIOCINIO = None if _raciocinio == "" else _raciocinio != "0"
+
+# Registro de eventos (M26): uma linha JSON por evento em Logs/eventos-AAAA-MM-DD.jsonl
+LOGS_DIR = Path(os.getenv("LOGS_DIR", str(BASE_DIR / "Logs")))
+# 0 = não grava o texto das mensagens do usuário (fica só o tamanho)
+LOG_CONTEUDO = os.getenv("LOG_CONTEUDO", "1").strip() != "0"
+LOG_RETENCAO_DIAS = int(os.getenv("LOG_RETENCAO_DIAS", "30"))
+
+# Cópia de segurança automática (M11): SQLite + ChromaDB, uma vez por dia
+BACKUP_ATIVO = os.getenv("BACKUP_ATIVO", "1").strip() != "0"
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(DB_DIR / "backups")))
+BACKUP_DIARIOS = int(os.getenv("BACKUP_DIARIOS", "7"))
+BACKUP_SEMANAIS = int(os.getenv("BACKUP_SEMANAIS", "4"))
 
 # Credenciais e chaves
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

@@ -11,6 +11,7 @@ from services.llm_provider import (
 )
 
 from services.resilience_service import InvalidOrchestratorOutputException
+from services.esquemas import ESQUEMA_ORQUESTRADOR
 from services.intent_router import rotear_por_regras
 from services.project_analyzer.command_parser import detectar_comando_projeto
 from services.logger_service import logger as custom_logger
@@ -458,7 +459,9 @@ def orquestrar_requisicao(texto_transcrito: str, contexto_atual: Optional[str] =
 
     try:
         provedor = obter_provedor_local(temperatura=0.1)
-        dados = provedor.gerar_json(system_prompt, texto_transcrito)
+        # Classificar não exige raciocínio: com ele ligado, o Gemma 4 levava ~8 s por decisão; sem ele, ~1 s,
+        # com o mesmo acerto (medição de 17/11/2026 em Planejamento/medicoes)
+        dados = provedor.gerar_json(system_prompt, texto_transcrito, esquema=ESQUEMA_ORQUESTRADOR, raciocinio=False)
         
         _validar_schema_orquestrador(dados)
         return dados
@@ -497,4 +500,4 @@ def executar_assistente_local(
         dados_json = provedor.gerar_json(prompt_sistema, instrucao_usuario, historico_mensagens)
         return json.dumps(dados_json, ensure_ascii=False)
     else:
-        return provedor.gerar_texto(prompt_sistema, instrucao_usuario, historico_mensagens)
+        return provedor.gerar_texto(prompt_sistema, instrucao_usuario, historico_mensagens)

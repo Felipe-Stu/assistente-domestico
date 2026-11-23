@@ -99,7 +99,7 @@ class AIService:
 
     def classificar_intencao_usuario(self, texto_usuario: str) -> Dict[str, Any]:
         """Roteador secundário de intenções do sistema (em nuvem)."""
-        custom_logger.log_assistente(NOME_ASSISTENTE, f"Classificando intenção do texto: '{texto_usuario}'")
+        custom_logger.log_assistente(NOME_ASSISTENTE, f"Classificando intenção do texto: '{custom_logger.conteudo(texto_usuario)}'")
         
         prompt = f"""
         Você é o roteador principal de intenções de um sistema de gestão doméstica.

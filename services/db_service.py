@@ -9,6 +9,19 @@ logging_logger = logging.getLogger(__name__)
 
 NOME_ASSISTENTE = "db_service"
 
+
+class _ConexaoQueFecha(sqlite3.Connection):
+    """
+    Conexão que, além de confirmar (ou desfazer) a transação ao sair do `with`,
+    também é fechada. O sqlite3 padrão só confirma e deixa a conexão aberta (P22).
+    """
+
+    def __exit__(self, tipo, valor, rastro):
+        try:
+            return super().__exit__(tipo, valor, rastro)
+        finally:
+            self.close()
+
 class DatabaseService:
     """
     Serviço responsável por gerenciar a conexão com o banco de dados SQLite,
@@ -26,7 +39,7 @@ class DatabaseService:
         a chaves estrangeiras (Foreign Keys).
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, factory=_ConexaoQueFecha)
             conn.execute("PRAGMA foreign_keys = ON;")
             return conn
         except sqlite3.Error as e:
@@ -284,9 +297,10 @@ class DatabaseService:
         """
         conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            ids = [self._inserir_compra(cursor, compra) for compra in compras]
-            conn.commit()
+            with custom_logger.etapa("banco", componente=NOME_ASSISTENTE, operacao="gravar_compras", compras=len(compras)):
+                cursor = conn.cursor()
+                ids = [self._inserir_compra(cursor, compra) for compra in compras]
+                conn.commit()
 
             total_itens = sum(len(compra.get("itens", [])) for compra in compras)
             msg_gravar = f"Procedimentos feitos: Compras {ids} e {total_itens} itens gravados no banco de dados SQLite."
@@ -324,11 +338,12 @@ class DatabaseService:
         marcadores = ", ".join("?" for _ in compra_ids)
         conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT id FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
-            itens_ids = [linha[0] for linha in cursor.fetchall()]
-            cursor.execute(f"DELETE FROM compras WHERE id IN ({marcadores})", tuple(compra_ids))
-            conn.commit()
+            with custom_logger.etapa("banco", componente=NOME_ASSISTENTE, operacao="remover_compras", compras=len(compra_ids)):
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT id FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
+                itens_ids = [linha[0] for linha in cursor.fetchall()]
+                cursor.execute(f"DELETE FROM compras WHERE id IN ({marcadores})", tuple(compra_ids))
+                conn.commit()
             custom_logger.log_assistente(NOME_ASSISTENTE, f"Compras {compra_ids} removidas ({len(itens_ids)} itens).")
             return itens_ids
 

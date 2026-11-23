@@ -41,7 +41,7 @@ function escapeHTML(str) {
 // =============================================================================
 // Chat UI
 // =============================================================================
-function appendMessage(sender, text) {
+function appendMessage(sender, text, retryText = null) {
     const msgElement = document.createElement('div');
     msgElement.classList.add('message');
     msgElement.classList.add(sender === 'user' ? 'user-msg' : 'assistant-msg');
@@ -56,6 +56,20 @@ function appendMessage(sender, text) {
             <span class="msg-time">${timeStr}</span>
         </div>
     `;
+
+    // Botão "Tentar de novo" quando a IA local estava indisponível (reenvia o mesmo texto)
+    if (retryText) {
+        const retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'retry-btn';
+        retryBtn.textContent = '↻ Tentar de novo';
+        retryBtn.addEventListener('click', () => {
+            retryBtn.disabled = true;
+            retryBtn.textContent = 'Reenviado';
+            window.api.sendText(retryText);
+        });
+        msgElement.querySelector('.msg-content').insertBefore(retryBtn, msgElement.querySelector('.msg-time'));
+    }
 
     chatMessages.appendChild(msgElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -209,8 +223,9 @@ window.api.onUserMessage((data) => {
 });
 
 window.api.onAssistantMessage((data) => {
-    const text = typeof data === 'object' && data !== null ? data.text : data;
-    if (text) appendMessage('assistant', text);
+    const isObj = typeof data === 'object' && data !== null;
+    const text = isObj ? data.text : data;
+    if (text) appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null);
 });
 
 // =============================================================================

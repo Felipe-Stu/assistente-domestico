@@ -566,3 +566,18 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+
+/* Botão "Tentar de novo" (IA local indisponível) */
+.retry-btn {
+    margin: 6px 0 2px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.retry-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.retry-btn:disabled { opacity: 0.55; cursor: default; }
