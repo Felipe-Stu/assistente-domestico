@@ -19,9 +19,14 @@
 ### Testes
 - `tests/test_m09.py` (8), M16 em `test_sk2.py` e `test_fase1.py`, M13 em `test_sk0.py`. Suíte: 250 testes.
 
-### Pendente
-- Medir no PC a escolha da skill com o prompt sem `dificuldade` (SK9, `rodar-medicao-sk0.bat`).
-- M14: a meta (p95 < 1 s) já foi atingida pelo catálogo (p95 de 0,64 a 1,01 s). Decidir se é descartado.
+### Medido no PC (23/11, 19:48)
+- Escolha da skill com o prompt sem `dificuldade`: 50/53 (antes 44/48), p50 0,75 s e p95 0,83 s (antes 0,87 e 1,01 s), 16 tokens gerados (antes 27).
+- Os 3 erros restantes:
+  - r53 ("me dê ideias de melhorias...") vai para `ideias`, mas no app o encaminhamento do P23 manda à conversa geral;
+  - r43 e r47 são capacidades futuras.
+
+### Decisões
+- M14 (classificador por similaridade) descartado: o catálogo já atinge a meta de p95 abaixo de 1 s.
 
 ## [V4.1] — M27: configuração e portabilidade; M02: integração contínua na v4.1 (2026-11-23)
 

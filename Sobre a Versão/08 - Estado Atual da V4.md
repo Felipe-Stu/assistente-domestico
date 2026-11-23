@@ -398,8 +398,8 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | M09 Origem dos registros | Tabela `entradas` (migração v3): texto, canal, resposta do modelo, modelo, versão do prompt e duração de cada pedido de compra, ligada à compra; descartadas e desfeitas ficam registradas | `TESTADO` (8 testes); migração no banco real na próxima abertura (só acrescenta) |
 | M13 Conjunto de avaliação | Histórico das medições (`historico-avaliacao.jsonl`), acerto da extração por campo e versão dos prompts em cada relatório | `TESTADO`; histórico com as medições de 23/11 |
 | M15 Prompt enxuto | Feito pelo SK2 e reduzido de novo pelo M16 | `MEDIDO` (SK0: 1.624 → 325 tokens) |
-| M16 Nuvem por escolha | Gemini só quando pedido ou na falha local; sem `dificuldade` no orquestrador | `TESTADO`; nova medição da escolha no PC `NÃO TESTADO` |
-| M14 Classificador por similaridade | Não feito: o catálogo já tem p95 de 0,64 a 1,01 s, a meta do item | `MEDIDO` (histórico) |
+| M16 Nuvem por escolha | Gemini só quando pedido ou na falha local; sem `dificuldade` no orquestrador | `TESTADO` e `MEDIDO` no PC (23/11 19:48): escolha 50/53 (antes 44/48), p50 0,75 s e p95 0,83 s (antes 0,87 e 1,01), 16 tokens gerados (antes 27) |
+| M14 Classificador por similaridade | Descartado: o catálogo já atinge a meta (p95 de 0,83 s na medição mais recente) | `MEDIDO` (histórico) |
 
 **Observado no histórico:** a extração de compras chega a p95 de 23,8 s (Gemma, sem raciocínio, 8 casos). Vale investigar na V4.3.
 
