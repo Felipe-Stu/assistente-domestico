@@ -1,5 +1,67 @@
 # CHANGELOG
 
+## [V4.1] — SK2: o orquestrador escolhe a skill pelo catálogo (2026-11-23)
+
+### Medição que motivou (SK0, 23/11/2026, PC do usuário)
+
+| Configuração | Acerto (48 frases) | Tempo da escolha (mediana) | Tokens lidos / gerados |
+|---|---|---|---|
+| Gemma 4, prompt por contextos (antes) | 43/48 | 1,39 s | 1.624 / 36 |
+| **Gemma 4, catálogo (adotado)** | **45/48** | **0,55 s** | 325 / 8 |
+| Qwen 2.5 Coder, catálogo | 45/48 | 0,55 s | 375 / 11 |
+| Qwen 2.5 Coder, chamada nativa de ferramentas | 31/48 (não chamou nenhuma em 34 de 34) | — | — |
+
+Extração de compras: 6/8 nos dois modelos (as mesmas duas falhas), sem diferença entre raciocínio ligado e desligado. Troca de modelo na VRAM: 13 a 15 s; os dois modelos não cabem juntos.
+
+### Alterado
+- `gemma_service.orquestrar_requisicao`: depois dos comandos e dos gatilhos, o modelo escolhe a **skill** pelo catálogo (`core/skills/seletor.py`), com prompt fixo (nome e descrição de cada skill, sem a frase do usuário dentro) e esquema `{skill, acao, dificuldade}`. A resposta é convertida para o formato de decisão que o resto do app já usa.
+- Opção `ORQUESTRADOR_MODO` no `.env`: `catalogo` (padrão) ou `contextos` (prompt anterior, mantido como reserva).
+- Skill `compras`: gatilho para pesquisa e comparação de preços entre mercados. Na medição, "Pesquise na internet o preço do frango e compare três mercados" ia para a conversa geral, a única skill que pode ir à nuvem.
+- O evento `decisao` do registro de eventos traz a skill escolhida.
+- `scripts/avaliar.py`: o modo "atual" mede o orquestrador do app no modo configurado e o relatório informa qual.
+
+### Corrigido
+- **P10:** `programacao` e `projetos` não estavam entre as opções do orquestrador e só eram alcançadas por regra. Agora todas as skills do catálogo podem ser escolhidas pelo modelo.
+
+### Decisões (23/11/2026)
+- **Gemma 4 E4B é o modelo residente**: escolha da skill, compras, estoque, agenda e conversa. Mesmo acerto do Qwen, mais leve, e a troca de modelo custa 13 a 15 s.
+- Programação vira modo sob demanda: Claude (API, só a skill de programação) como principal e Qwen com biblioteca de contexto como reserva (etapa SKP, ainda não feita; depende da troca das chaves, M01).
+- A opção "não sei" (perguntar ao usuário quando a escolha for incerta) ficou de fora: muda o comportamento medido e precisa de medição própria.
+
+### Testes
+- `tests/test_sk2.py` (10 testes). Suíte: 170 de 170 aprovados (Python 3.10, dependências externas simuladas).
+- `tests/dados/roteador_referencia.json`: 3 decisões atualizadas de propósito (a frase de pesquisa de preço), com o motivo registrado em cada uma.
+- **Confirmado no PC** (23/11/2026, `scripts/avaliar.py --modos atual`, Gemma 4): 44/48 acertos (32/33 nas capacidades atuais) em 0,87 s de mediana, contra 43/48 (28/33) em 1,39 s do prompt anterior, contando também a ação. Os 4 erros ficaram em skills locais (nenhum foi para a conversa geral).
+
+## [V4.1] — Skills: formato, catálogo e ferramenta de medição (SK0 e SK1) (2026-11-23)
+
+Primeiras etapas do roadmap das skills (planejamento, fora do repositório): base para que cada capacidade nova seja uma pasta, sem mexer no núcleo.
+
+### Adicionado
+- **SK1 — skills:** pasta `skills/` com seis skills (`compras`, `estoque`, `agenda`, `documentar-projeto`, `programacao`, `conversa-geral`). Cada uma tem `SKILL.md` (cabeçalho YAML com nome, descrição, contextos, estado, privacidade, entradas, saídas e gatilhos, mais as instruções) e, quando usa modelo, `prompts/*.md`. Formato em `skills/README.md`.
+- `core/skills/`: carregador e catálogo. Valida cada cabeçalho (campos, nome igual à pasta, regex, prioridades e contextos únicos) e aponta o arquivo e o campo com erro. Os campos `entradas` e `saidas` já aceitam `pdf`, `imagem`, `audio`, `relatorio` e `acao`.
+- **SK0 — medição:** `evals/casos.jsonl` (48 frases com a skill esperada, 15 delas de capacidades futuras: PDF, relatórios, Spotify, câmeras, casa) e `evals/compras.jsonl` (8 compras).
+- `scripts/avaliar.py`: no PC com o Ollama, mede a escolha da skill em três modos (orquestrador atual, enum do catálogo e chamada nativa de ferramentas) para cada modelo, a extração de compras com o raciocínio desligado e ligado, e o tempo de troca de modelo na VRAM. Relatório em JSON e Markdown.
+- `core/skills/seletor.py`: protótipo dos modos "catálogo" e "nativo", usado só pelo `avaliar.py`; não está ligado ao app.
+- `tests/test_skills.py` (13 testes) e `tests/test_sk0.py` (10). A suíte passa a ter 160 testes.
+- `tests/dados/roteador_referencia.json`: 168 decisões do roteador por regras gravadas antes da mudança; o teste aponta qualquer decisão que mudar.
+- `PyYAML>=6.0` em `requirements.txt` e `requirements-ci.txt` (já vinha instalado junto com o ChromaDB; agora é declarado).
+
+### Alterado
+- `services/intent_router.py`: as expressões regulares saíram do código e foram para os gatilhos das skills; o módulo aplica o primeiro gatilho que casar, em ordem de prioridade (101 → 46 linhas).
+- `services/gemma_service.py`: `PROMPT_PROGRAMACAO` é lido de `skills/programacao/prompts/sistema.md`; o assistente local usa o prompt da skill do contexto (503 → 352 linhas).
+- `services/shopping_assistant.py`: o prompt de extração é lido de `skills/compras/prompts/extracao.md` (531 → 422 linhas).
+- Os prompts perderam a indentação de 8 espaços que vinha das strings Python; o texto é o mesmo.
+
+### Decisões
+- Nomes `compras` e `estoque` em vez de `registrar-compras` e `gerenciar-estoque` (do plano): as duas skills também respondem a consultas.
+- A política de nuvem continua no núcleo (`CONTEXTOS_NUVEM`); o campo `privacidade` declara a intenção e um teste garante que os dois concordam.
+- Comandos de modo (Qwen) e de análise de projeto com caminho continuam em `gemma_service.py`, antes dos gatilhos; saem no SK2.
+
+### Testes
+- 160 de 160 aprovados (Python 3.10, com `ollama`, `python-dotenv` e `google-genai` simulados). Equivalência conferida antes de apagar o código antigo: 0 diferenças nas 168 decisões do roteador e prompts com o mesmo texto.
+- `avaliar.py` exercitado de ponta a ponta com um Ollama falso; a medição real (SK0) depende do PC com o Ollama.
+
 ## [V4.1] — Cópia de segurança automática e registro de eventos estruturado (2026-11-22)
 
 ### Adicionado

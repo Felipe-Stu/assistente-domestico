@@ -2,7 +2,7 @@
 
 Retrato técnico da **Versão 4 (V4)** do **Assistente Doméstico Inteligente** em **03/11/2026**, na branch `V4`, a partir do commit `c754a6a`, incluindo as correções da seção 6 e a Fase 1. Este documento registra o que funciona de fato, o que existe apenas no código e o que ainda não foi construído.
 
-**Atualizações da V4.1:** seção 11 (17/11/2026) e seção 12 (22/11/2026). O histórico da versão está em `06 - Evolução da V4 para a V4.1.md`.
+**Atualizações da V4.1:** seção 11 (17/11/2026), seção 12 (22/11/2026) e seção 13 (23/11/2026, skills). O histórico da versão está em `06 - Evolução da V4 para a V4.1.md`.
 
 > [!IMPORTANT]
 > Quando houver conflito entre este documento e descrições mais antigas, vale o que está aqui: ele foi escrito a partir do código e de testes executados. Havendo novas alterações de código, confira novamente.
@@ -20,10 +20,10 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 137 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11 e 13 do M26); ver seções 11 e 12 |
+| Testes automatizados | 170 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0 e 10 do SK2); ver seções 11 a 13 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
-| Problemas abertos | 11 (1 alto, 6 médios, 4 baixos); 11 resolvidos (P21 em 17/11, P13 e P22 em 22/11) |
+| Problemas abertos | 10 (1 alto, 5 médios, 4 baixos); 12 resolvidos (P21 em 17/11, P13 e P22 em 22/11, P10 em 23/11) |
 
 ---
 
@@ -179,7 +179,6 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P7 | Assistentes usam Gemma fixo mesmo no modo Qwen. | `app/main.py:170` | Os dois modelos podem ocupar a VRAM ao mesmo tempo | `CÓDIGO` |
 | P8 | A varredura roda só no início, com o modo voz ainda desligado, e `validacao_pendente` nunca vira pergunta. | `app/main.py:691`, `services/inventory_assistant.py:307` | Validação por voz inalcançável | `CÓDIGO` |
 | P9 | Agenda não persiste dados. | `app/main.py` (rota `agenda`) | Nenhum compromisso salvo; o usuário recebe esse aviso | `CÓDIGO` |
-| P10 | `programacao` não está entre os contextos oferecidos ao orquestrador. | `services/gemma_service.py:388` | `PROMPT_PROGRAMACAO` só é usado se o modelo devolver esse valor por conta própria | `CÓDIGO` |
 | P12 | Vetores de compras em tempo real não têm `entity_id`, e a busca híbrida não está ligada ao fluxo. | `services/shopping_assistant.py:500` | Sem hidratação de valores exatos do SQLite | `CÓDIGO` |
 | P14 | Migração e fluxo em tempo real usam IDs diferentes para o mesmo item. | `scripts/migrate_vector_database.py:58`, `services/shopping_assistant.py:491` | Itens duplicados no ChromaDB | `CÓDIGO` |
 
@@ -192,6 +191,12 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P19 | Toda frase com 4 ou mais palavras vira memória de longo prazo. | `services/vector/memory_service.py:48` | `CÓDIGO` |
 | P20 | Heurística confunde respostas: "sim, mas sobraram dois" e "assim que abri acabou" viram `CONFIRMACAO`. Efeito futuro, pois o fluxo está inativo. | `services/inventory_assistant.py:175` | `TESTADO` |
 | P21 | Chat só ficava disponível depois da carga do modelo de embeddings (15 a 50 s nos logs). **Resolvido em 17/11/2026:** chat pronto em 3,5 s e memória em 13,0 s, em segundo plano (seção 11). | `services/vector/embedding_service.py`, `app/main.py` | `MEDIDO` |
+
+### Resolvidos em 23/11/2026
+
+| ID | Problema | Correção | Validação |
+|---|---|---|---|
+| P10 | `programacao` (e `projetos`) não estavam entre as opções do orquestrador | O orquestrador escolhe entre todas as skills do catálogo (SK2) | `tests/test_sk2.py` (`TESTADO`) |
 
 ### Resolvidos em 22/11/2026
 
@@ -324,3 +329,20 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 - Os arquivos `Logs/<módulo>/log.txt` deixaram de receber linhas; ficam como histórico até serem apagados manualmente.
 - Alguns testes antigos (`test_gemma_service.py` e parte de `test_fase1.py`) não redirecionam os logs e escrevem no `Logs/` real ao rodar a suíte. Já acontecia com os arquivos `.txt`.
 - O único `ResourceWarning` restante na suíte vem de `_isolar_entrada_ipc` (`app/main.py`), que deixa o `os.devnull` aberto de propósito durante toda a execução.
+
+## 13. Skills: SK0 e SK1 (23/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Formato de skill (SK1) | `skills/<nome>/SKILL.md` com cabeçalho YAML e `prompts/*.md`; catálogo em `core/skills/` | `TESTADO` (13 testes) |
+| Roteador por regras | Gatilhos lidos dos cabeçalhos das skills, em ordem de prioridade | `TESTADO`: 0 diferenças em 168 decisões de referência |
+| Prompts | Programação, extração de compras e assistente geral fora do Python | `TESTADO`: mesmo texto |
+| Medição (SK0) | `scripts/avaliar.py` com `evals/casos.jsonl` (48 frases) e `evals/compras.jsonl` (8 compras) | Ferramenta `TESTADO`; medição real `NÃO TESTADO` (requer o Ollama no PC) |
+
+| Medição (SK0, PC do usuário) | Gemma no catálogo: 45/48 em 0,55 s; prompt por contextos: 43/48 em 1,39 s; Qwen Coder falha na chamada nativa; troca de modelo 13 a 15 s | `MEDIDO` (`Planejamento/medicoes/sk0-20261123-0825.md`) |
+| Orquestrador (SK2) | Escolhe a skill pelo catálogo, com prompt fixo; `ORQUESTRADOR_MODO=contextos` volta ao anterior; resolve o P10 | `TESTADO` (10 testes) e `MEDIDO` no PC: 44/48 em 0,87 s (antes 43/48 em 1,39 s) |
+| Privacidade | Pesquisa de preço entre mercados passa por gatilho de `compras` (antes podia cair na conversa geral) | `TESTADO` |
+
+**O que ainda não muda:** uma skill nova ainda precisa de um ramo em `app/main.py` para ser executada (SK3).
+
+**Validação:** 170 de 170 testes aprovados, nas mesmas condições da seção 12.

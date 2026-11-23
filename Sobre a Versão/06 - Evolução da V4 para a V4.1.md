@@ -27,7 +27,9 @@ A **V4.1 não acrescenta funcionalidades para o usuário**. Ela arruma a base pa
 | **Registro de eventos (M26)** | Um `.txt` por módulo, sem rotação, sem nível e sem como medir | Uma linha JSON por evento em `Logs/eventos-AAAA-MM-DD.jsonl`, identificador por requisição, tempo por etapa, retenção de 30 dias e opção de omitir o texto do usuário | Reestruturado |
 | **Reconstrução dos embeddings (P13)** | Apagava as memórias `mem_*` | Faz cópia, exporta e regrava as memórias | Corrigido |
 | **Conexões SQLite (P22)** | Ficavam abertas após o `with` | Fechadas ao sair do bloco | Corrigido |
-| **Testes** | 70 | 137 | Expandido |
+| **Skills (SK1)** | Prompts dentro do Python e regex no `intent_router.py` | Uma pasta por capacidade em `skills/` (instruções, prompts e gatilhos), lida por `core/skills/` | Novo |
+| **Conjunto de avaliação (SK0)** | 8 frases do orquestrador e 6 compras dentro de um script | `evals/` (48 frases por skill, 15 de capacidades futuras, e 8 compras) e `scripts/avaliar.py` | Novo |
+| **Testes** | 70 | 160 | Expandido |
 | **Medições** | Só pelos logs | Scripts que medem o app real (`medir_v41.py`, `medir_m17.py`) e resumem o tempo por etapa (`ver_logs.py`) | Novo |
 
 ---
@@ -39,7 +41,8 @@ A **V4.1 não acrescenta funcionalidades para o usuário**. Ela arruma a base pa
 | Integração contínua | `.github/workflows/testes.yml`, `requirements-ci.txt` |
 | Serviços | `services/esquemas.py`, `services/backup_service.py` |
 | Scripts | `scripts/medir_v41.py`, `scripts/medir_m17.py`, `scripts/fazer_backup.py`, `scripts/ver_logs.py` |
-| Testes | `tests/test_v41.py`, `tests/test_m17.py`, `tests/test_m11.py`, `tests/test_m26.py` |
+| Testes | `tests/test_v41.py`, `tests/test_m17.py`, `tests/test_m11.py`, `tests/test_m26.py`, `tests/test_skills.py`, `tests/test_sk0.py`, `tests/dados/roteador_referencia.json` |
+| Skills | `skills/` (6 skills e `README.md`), `core/skills/` (`catalogo.py`, `seletor.py`), `evals/`, `scripts/avaliar.py` |
 
 Arquivos alterados: `app/main.py`, `core/config.py`, `services/llm_provider.py`, `services/gemma_service.py`, `services/shopping_assistant.py`, `services/resilience_service.py`, `services/logger_service.py` (reescrito), `services/db_service.py`, `services/vector/embedding_service.py`, `services/vector/vector_store_service.py`, `services/vector/memory_service.py`, `services/ai_service.py`, `services/inventory_assistant.py`, `scripts/rebuild_embeddings.py`, `renderer.js`, `index.css`, `requirements.txt`, `.env.example`, `tests/test_fase1.py`.
 
@@ -69,6 +72,8 @@ Arquivos alterados: `app/main.py`, `core/config.py`, `services/llm_provider.py`,
 | Logs em arquivo diário, sem renomear | No Windows, renomear um log aberto por outro processo falha |
 | Um arquivo de eventos por dia, com o componente em cada linha | Uma requisição atravessa vários módulos e precisa ser lida em ordem |
 | `logger_service` mantém `log_geral` e `log_assistente` | Os 15 módulos que já registram eventos não precisaram mudar |
+| Skills como organização primeiro, sem mudar comportamento | Cada capacidade nova vira uma pasta; a escolha pelo catálogo (SK2) só entra depois de medida |
+| Gatilhos com prioridade explícita | O roteador dependia da ordem das regex (desfazer antes de registrar, consulta antes de registro) |
 
 ---
 

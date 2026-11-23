@@ -22,7 +22,7 @@ Projeto pessoal, desenvolvido em versões incrementais (V1 → V4) com apoio de 
 | **Compras confiáveis** | Extração estruturada em JSON, validação de total × quantidade × preço, confirmação em caso de dúvida e "desfazer última compra" |
 | **Memória semântica (RAG)** | ChromaDB com embeddings multilíngues na CPU; só fatos relevantes são memorizados e reinjetados no contexto |
 | **ProjectAnalyzer** | Analisa repositórios (AST, grafo de dependências, inconsistências) e gera documentação técnica 100% local, ocultando segredos |
-| **Qualidade** | ~8.000 linhas, **137 testes automatizados** executados a cada push, cópia de segurança diária com verificação de integridade, registro de eventos em JSON com tempo por etapa e documentação de cada versão, incluindo o que ainda não funciona |
+| **Qualidade** | ~8.000 linhas, **170 testes automatizados** executados a cada push, cópia de segurança diária com verificação de integridade, registro de eventos em JSON com tempo por etapa e documentação de cada versão, incluindo o que ainda não funciona |
 
 ## Arquitetura
 
@@ -90,7 +90,9 @@ services/                          Assistentes, provedores de LLM, voz, áudio, 
 services/vector/                   Embeddings, ChromaDB, memória, busca semântica e RAG
 services/project_analyzer/         Skill de análise de projetos e documentação
 scripts/                           Banco vetorial, cópia de segurança, leitura dos logs e medições
-tests/                             137 testes automatizados (LLM, ChromaDB e embeddings simulados)
+skills/                            Uma pasta por capacidade: instruções, prompts e gatilhos (formato em skills/README.md)
+evals/                             Conjunto de avaliação usado por scripts/avaliar.py
+tests/                             170 testes automatizados (LLM, ChromaDB e embeddings simulados)
 Sobre a Versão/                    Documentação técnica e evolução V1 → V4
 ```
 

@@ -19,7 +19,12 @@ assistente-domestico/
 │   │   ├── assistente_casa.db           # Banco de dados SQLite (compras, itens, controle_consumo)
 │   │   └── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (persistência local)
 │   ├── __init__.py
-│   └── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
+│   ├── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
+│   └── skills/                          # [SK1] Carregador e catálogo das skills; seletor.py é protótipo do SK0
+├── skills/                              # [SK1] Uma pasta por capacidade: SKILL.md (cabeçalho + instruções) e prompts/
+│   ├── compras/  estoque/  agenda/
+│   └── documentar-projeto/  programacao/  conversa-geral/
+├── evals/                               # [SK0] Frases com a skill esperada e compras para medir a extração
 ├── Logs/                                # Gerados automaticamente (ignorados pelo Git)
 │   └── eventos-AAAA-MM-DD.jsonl         # [M26] Uma linha JSON por evento; 30 dias de retenção
 ├── node_modules/                        # [NOVO V4] Dependências do Electron (npm)
