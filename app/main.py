@@ -59,11 +59,15 @@ from core.config import (
     BACKUP_DIR,
     BACKUP_SEMANAIS,
     CHROMA_DIR,
+    CLAUDE_SKILLS,
     DB_PATH,
     PROJECT_ANALYZER_MODEL,
     PROJECT_ANALYZER_OUTPUT_DIR,
 )
 from services.backup_service import BackupService
+from services.biblioteca_service import BibliotecaService
+from services.claude_service import ClaudeService
+import core.config as config_app
 from services.project_analyzer import ProjectAnalyzer, ProjetoInvalidoError
 from services.logger_service import logger as custom_logger
 from services.resilience_service import (
@@ -161,6 +165,8 @@ class AssistenteRuntime:
         self.cloud_llm = None
         self.inventory_assistant = None
         self.shopping_assistant = None
+        self.claude_service = None
+        self.biblioteca = None
 
         # Serviços de voz (inicializados sob demanda na Fase 2)
         self.voice_service = None
@@ -210,6 +216,24 @@ class AssistenteRuntime:
             self.vector_store.embedding_service.carregar_em_segundo_plano(ao_concluir=self._avisar_memoria_carregada)
 
             self.ai_service = AIService()
+
+            # SKP: Claude para programação (sem chave, fica desligado) e biblioteca de contexto
+            self.claude_service = ClaudeService(
+                api_key=config_app.ANTHROPIC_API_KEY,
+                modelo=config_app.CLAUDE_MODELO,
+                versao_api=config_app.CLAUDE_API_VERSAO,
+                arquivo_estado=config_app.CLAUDE_ESTADO_ARQUIVO,
+                limite_mensal_usd=config_app.CLAUDE_LIMITE_MENSAL_USD,
+                preco_entrada=config_app.CLAUDE_PRECO_ENTRADA,
+                preco_saida=config_app.CLAUDE_PRECO_SAIDA,
+                hora_reteste=config_app.CLAUDE_HORA_RETESTE,
+                max_tokens=config_app.CLAUDE_MAX_TOKENS,
+            )
+            self.biblioteca = BibliotecaService(
+                vector_store=self.vector_store,
+                raiz=ROOT_DIR,
+                arquivo_indice=config_app.DB_DIR / "biblioteca_indice.json",
+            )
             emitir_electron("debug_log", {"message": "✓ Serviço de IA inicializado."})
 
             # 2. Provedores LLM
@@ -449,22 +473,30 @@ class AssistenteRuntime:
             nome_servico=nome_servico,
         )
 
-    def _contexto_skill(self) -> Contexto:
-        """O que as skills podem usar: serviços e a política de repetição. Nada de runtime, IPC ou nuvem."""
-        return Contexto(
-            servicos={
-                "shopping_assistant": self.shopping_assistant,
-                "inventory_assistant": self.inventory_assistant,
-                "db_service": self.db_service,
-            },
-            repetir=self._repetir,
-        )
+    def _contexto_skill(self, skill=None) -> Contexto:
+        """O que as skills podem usar: serviços e a política de repetição. Nada de runtime ou IPC."""
+        servicos = {
+            "shopping_assistant": self.shopping_assistant,
+            "inventory_assistant": self.inventory_assistant,
+            "db_service": self.db_service,
+        }
+        if skill is not None and skill.nome == "programacao":
+            servicos.update({
+                "historico": list(self.sessao.historico),
+                "biblioteca": getattr(self, "biblioteca", None),
+                "llm_programacao": LocalLLMProvider(modelo=llm_provider_estado.MODELO_AVANCADO, temperatura=0.2),
+            })
+        # Política do núcleo: o Claude só é entregue às skills autorizadas e que o declaram no cabeçalho
+        if skill is not None and skill.privacidade == "claude" and skill.nome in CLAUDE_SKILLS:
+            servicos["claude"] = getattr(self, "claude_service", None)
+        return Contexto(servicos=servicos, repetir=self._repetir)
 
     def _responder_pendencia(self, texto: str):
         """Encaminha a resposta do usuário à skill que pediu confirmação."""
         nome, dados = self.pendencia
         self.pendencia = None
-        resposta = motor_skills.responder_pendencia(obter_catalogo().skill(nome), self._contexto_skill(), texto, dados)
+        skill = obter_catalogo().skill(nome)
+        resposta = motor_skills.responder_pendencia(skill, self._contexto_skill(skill), texto, dados)
         if resposta.pendencia is not None:
             self.pendencia = (nome, resposta.pendencia)
         return self._entregar_resposta(resposta.texto, resposta.fala)
@@ -594,7 +626,7 @@ class AssistenteRuntime:
                 skill = obter_catalogo().por_contexto(contexto)
                 if skill is not None and skill.execucao == "roteiro":
                     # SK3: compras, estoque e agenda executam o roteiro da própria skill
-                    resposta = motor_skills.executar(skill, self._contexto_skill(), solicitacao_original, decisao)
+                    resposta = motor_skills.executar(skill, self._contexto_skill(skill), solicitacao_original, decisao)
                     resposta_texto, fala_texto = resposta.texto, resposta.fala
                     if resposta.pendencia is not None:
                         self.pendencia = (skill.nome, resposta.pendencia)

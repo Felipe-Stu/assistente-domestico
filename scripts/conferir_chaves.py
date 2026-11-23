@@ -49,6 +49,8 @@ def main():
     ok = True
     print("Conferência das chaves (M01) — nenhuma chave é exibida")
     print(f"- .env: {'chave preenchida' if do_env else 'SEM CHAVE'}")
+    claude = ler_env(ROOT / ".env").get("ANTHROPIC_API_KEY", "")
+    print(f"- Claude (ANTHROPIC_API_KEY no .env): {'preenchida' if claude else 'vazia (programação usa só o Qwen local)'}")
     for escopo in ("usuário", "sistema"):
         if os.name != "nt":
             print(f"- Variável do Windows ({escopo}): não verificada (fora do Windows)")

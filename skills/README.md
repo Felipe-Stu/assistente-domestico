@@ -27,7 +27,7 @@ name: compras                       # igual ao nome da pasta, minúsculas e híf
 description: Registra compras ...   # uma frase: o que faz e QUANDO usar (o seletor do SK2 lê só isto)
 contextos: [compras]                # rota atual do orquestrador; único por skill
 estado: ativa                       # ativa | planejada
-privacidade: local                  # local | nuvem-permitida
+privacidade: local                  # local | nuvem-permitida (Gemini) | claude (só em CLAUDE_SKILLS)
 entradas: [texto, voz]              # texto, voz, pdf, imagem, audio
 saidas: [texto]                     # texto, relatorio, acao
 versao: 1
@@ -61,5 +61,5 @@ Uma skill nova com `execucao: roteiro` é escolhida pelo orquestrador e executad
 | `estoque` | inventario | ativa | local | 2 | roteiro |
 | `agenda` | agenda | planejada | local | 2 | roteiro |
 | `documentar-projeto` | projetos | ativa | local | 1 | núcleo |
-| `programacao` | programacao | ativa | local | 0 | núcleo |
+| `programacao` | programacao | ativa | claude | 0 | roteiro (Claude → Qwen) |
 | `conversa-geral` | geral, outro | ativa | nuvem-permitida | 0 | núcleo |

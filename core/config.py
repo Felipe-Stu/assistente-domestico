@@ -44,6 +44,22 @@ ORQUESTRADOR_MODO = os.getenv("ORQUESTRADOR_MODO", "catalogo").strip().lower()
 if ORQUESTRADOR_MODO not in ("catalogo", "contextos"):
     ORQUESTRADOR_MODO = "catalogo"
 
+# Claude (SKP): agente principal de programação quando houver cota; sem cota, o Qwen local responde
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CLAUDE_MODELO = os.getenv("CLAUDE_MODELO", "claude-sonnet-5-5")
+CLAUDE_API_VERSAO = os.getenv("CLAUDE_API_VERSAO", "2026-10-21")
+CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "4096"))
+# Teto de gasto do assistente no mês (US$); defina também um limite no Console da Anthropic
+CLAUDE_LIMITE_MENSAL_USD = float(os.getenv("CLAUDE_LIMITE_MENSAL_USD", "5"))
+# Preço por milhão de tokens (entrada/saída) do modelo acima, para estimar o gasto
+CLAUDE_PRECO_ENTRADA = float(os.getenv("CLAUDE_PRECO_ENTRADA", "2"))
+CLAUDE_PRECO_SAIDA = float(os.getenv("CLAUDE_PRECO_SAIDA", "10"))
+# Sem cota, o Claude volta a ser testado na primeira solicitação depois desta hora
+CLAUDE_HORA_RETESTE = int(os.getenv("CLAUDE_HORA_RETESTE", "8"))
+# Única skill autorizada a enviar dados ao Claude (decisão de 23/11/2026)
+CLAUDE_SKILLS = {s.strip() for s in os.getenv("CLAUDE_SKILLS", "programacao").split(",") if s.strip()}
+CLAUDE_ESTADO_ARQUIVO = DB_DIR / "estado_claude.json"
+
 # Credenciais e chaves
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 

@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [V4.1] — SKP: programação com Claude (API) e Qwen local como reserva (2026-11-23)
+
+### Adicionado
+- `services/claude_service.py`: chamada à API do Claude com `requests` (sem pacote novo). Sem chave, fica desligado.
+  - Cota esgotada, teto de gasto, cobrança ou chave recusada (429 sem `retry-after`, 402, 401/403, 400 de limite de gasto) deixam o Claude indisponível até a **primeira solicitação depois das 8h** (`CLAUDE_HORA_RETESTE`). Com `retry-after`, até o horário indicado.
+  - Sobrecarga, timeout, erro interno e falha de rede afetam só a solicitação em curso.
+  - Gasto do mês estimado pelos tokens de cada resposta; ao passar de `CLAUDE_LIMITE_MENSAL_USD` (padrão US$ 5), o Claude volta no mês seguinte.
+  - Estado em `core/database/estado_claude.json`, ignorado pelo Git; nenhuma chave é registrada.
+- `services/biblioteca_service.py` e `scripts/indexar_biblioteca.py`: biblioteca de contexto no ChromaDB (coleção `biblioteca_projeto`), com reindexação só do que mudou. Fontes: README, CHANGELOG, `Sobre a Versão`, skills e a documentação gerada pelo ProjectAnalyzer. A pasta de planejamento fica de fora.
+- `skills/programacao/roteiro.py`: busca de 6 trechos na biblioteca → Claude → Qwen local (`qwen2.5-coder:7b`), informando o motivo quando o Qwen responde no lugar do Claude.
+- `scripts/testar_skp.py` e `testar-skp.bat`: chamada mínima ao Claude, indexação e a mesma pergunta pelos dois provedores, com relatório.
+- Opções no `.env`: `ANTHROPIC_API_KEY`, `CLAUDE_MODELO` (padrão `claude-sonnet-5-5`), `CLAUDE_LIMITE_MENSAL_USD`, `CLAUDE_PRECO_ENTRADA`, `CLAUDE_PRECO_SAIDA`, `CLAUDE_HORA_RETESTE`, `CLAUDE_SKILLS`.
+- Privacidade `claude` no cabeçalho das skills. A política fica no núcleo: o serviço do Claude só é entregue às skills de `CLAUDE_SKILLS` (padrão: `programacao`) que declaram `privacidade: claude`, e um teste garante que as duas listas concordam.
+- `tests/test_skp.py` (18 testes). Suíte: 195 testes.
+
+### Alterado
+- A skill `programacao` passou a ser executada pelo próprio roteiro, com privacidade `claude`. Antes usava o modelo ativo (Gemma ou Qwen) com o prompt de programação.
+- `scripts/conferir_chaves.py` informa se a chave do Claude está no `.env`, sem exibi-la.
+
+### Decisões (23/11/2026)
+- Só a skill de programação pode enviar dados ao Claude; compras, estoque e agenda nunca saem da máquina.
+- Acesso por API com chave própria. Endpoint, cabeçalhos e erros conforme a documentação oficial (https://platform.claude.com/docs/en/api/errors).
+- Reteste na primeira solicitação depois das 8h, e não em horário fixo: funciona mesmo com o PC desligado de manhã.
+
+### Não verificado
+- Chamada real ao Claude e a biblioteca no ChromaDB: dependem do PC (`testar-skp.bat`).
+
 ## [V4.1] — SK3: compras, estoque e agenda executam o roteiro da própria skill (2026-11-23)
 
 ### Adicionado

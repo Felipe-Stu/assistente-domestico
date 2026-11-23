@@ -24,7 +24,8 @@ PASTA_SKILLS = Path(__file__).resolve().parent.parent.parent / "skills"
 ESTADOS = {"ativa", "planejada"}
 # roteiro: passos em skills/<nome>/roteiro.py, em ordem fixa (SK3); nucleo: ainda executada por app/main.py
 EXECUCOES = {"roteiro", "nucleo"}
-PRIVACIDADES = {"local", "nuvem-permitida"}
+# local: nunca sai da máquina; nuvem-permitida: pode ir ao Gemini; claude: pode ir ao Claude (CLAUDE_SKILLS)
+PRIVACIDADES = {"local", "nuvem-permitida", "claude"}
 # Entradas e saídas previstas: o roadmap traz voz local, leitura de PDF, imagens e relatórios
 ENTRADAS = {"texto", "voz", "pdf", "imagem", "audio"}
 SAIDAS = {"texto", "relatorio", "acao"}
