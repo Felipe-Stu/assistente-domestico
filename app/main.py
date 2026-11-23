@@ -538,13 +538,25 @@ class AssistenteRuntime(ModoVoz):
 
             try:
                 skill = obter_catalogo().por_contexto(contexto)
+                resposta = None
                 if skill is not None and skill.execucao == "roteiro":
                     # SK3: compras, estoque e agenda executam o roteiro da própria skill
                     resposta = motor_skills.executar(skill, self._contexto_skill(skill), solicitacao_original, decisao)
-                    resposta_texto, fala_texto = resposta.texto, resposta.fala
-                    if resposta.pendencia is not None:
-                        self.pendencia = (skill.nome, resposta.pendencia)
+                    destino = obter_catalogo().skill(resposta.encaminhar) if resposta.encaminhar else None
+                    if destino is not None and destino.execucao == "nucleo":
+                        # A skill devolveu o pedido (ex.: "me dê ideias de..." não é uma ideia salva, P23)
+                        custom_logger.evento("main", "encaminhada", de=skill.nome, para=destino.nome)
+                        contexto = destino.contexto
+                        resposta = None
+                    else:
+                        resposta_texto, fala_texto = resposta.texto, resposta.fala
+                        if resposta.pendencia is not None:
+                            self.pendencia = (skill.nome, resposta.pendencia)
 
+                if resposta is not None:
+                    pass  # o roteiro da skill já respondeu
+                elif dificuldade != "facil" and self._pode_usar_nuvem(contexto):
+                    usar_nuvem = True  # encaminhada para uma skill que pode ir à nuvem
                 else:
                     resposta_texto = execute_with_retry(
                         func=custom_logger.cronometrado("assistente_local", executar_assistente_local),

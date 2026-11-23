@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [V4.1] — P23: pedido de sugestões não é ideia salva (2026-11-23)
+
+### Corrigido
+- P23, no chat: "Me dê ideias de melhorias para a documentação" ia para a skill `ideias` e respondia "Não encontrei essa ideia".
+  - A skill só consulta quando o pedido se refere a uma ideia salva ("minhas ideias", "ideia 3", "a ideia do...", "que salvei"); o resto vai para a conversa geral.
+  - Pedido ou pergunta também não é salvo como ideia.
+- P23, no Telegram: perguntas e pedidos ("analise a documentação...", "me diga como está o projeto") viravam ideias. Agora o bot explica que não salvou.
+
+### Adicionado
+- `Resposta.encaminhar` no motor das skills: um roteiro pode devolver o pedido a uma skill de execução `nucleo` (hoje, a conversa geral).
+- No Telegram, "ideia: ..." e "/ideia ..." salvam sempre, mesmo que o texto pareça pergunta.
+- `tests/test_ideias.py`: 4 testes do P23. Suíte: 231 testes.
+
+### Alterado
+- A descrição da skill `ideias` deixa claro que pedir ideias ou sugestões ao assistente não é com ela.
+
 ## [V4.1] — Ideias de projetos, Claude pela assinatura e bot do Telegram (2026-11-23)
 
 ### Adicionado

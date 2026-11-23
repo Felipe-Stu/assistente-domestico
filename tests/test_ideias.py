@@ -308,6 +308,81 @@ class TestSkillIdeias(BaseIdeias):
         self.assertIn("## Resumo", self.executar("mostra a ideia 1", "consultar").texto)
 
 
+class TestP23(BaseIdeias):
+    """Pedido de sugestões não é ideia salva, nem no chat nem no Telegram."""
+
+    PEDIDOS = (
+        "Me dê uma ideia de documentação para projetos de software",
+        "analise a documentação do projeto Assistente Doméstico, pasta E:\\Agente IA\\assistente-domestico. Leia a documentação",
+        'Dentro da pasta E:\\Agente IA tem uma pasta chamada "Sobre a versão". Procure a pasta e me diga como está o projeto hoje',
+        "Me dê ideias de melhorias para a documentação de sistemas",
+        "Qual a melhor forma de documentar um sistema",
+    )
+    IDEIAS = (
+        "Um app para a família dividir as tarefas da casa",
+        "sistema para controlar a manutenção da moto com lembretes de troca de óleo",
+        "bot que avisa promoções de passagem para Bauru",
+    )
+
+    def test_heuristica(self):
+        from services.ideias_service import limpar_prefixo, parece_pergunta, pede_para_salvar
+        for texto in self.PEDIDOS:
+            self.assertTrue(parece_pergunta(texto), texto)
+        for texto in self.IDEIAS:
+            self.assertFalse(parece_pergunta(texto), texto)
+        self.assertTrue(pede_para_salvar("ideia: me dê um resumo diário das compras"))
+        self.assertTrue(pede_para_salvar("/ideia app de receitas"))
+        self.assertEqual(limpar_prefixo("Tive uma ideia: um app de receitas"), "um app de receitas")
+        self.assertEqual(limpar_prefixo("ideia:um app de receitas"), "um app de receitas")
+        self.assertEqual(limpar_prefixo("Olá, anota essa ideia de um app"), "um app")
+
+    def test_telegram_nao_salva_pergunta(self):
+        ideias = self.servico(ClaudeFalso())
+        for texto in self.PEDIDOS:
+            self.assertIn("não salvei", ideias.responder_mensagem(texto, "telegram:1"))
+        self.assertEqual(ideias.listar(), [])
+        self.assertIn("Ideia #1 salva", ideias.responder_mensagem("ideia: me dê um resumo diário das compras", "telegram:1"))
+        self.assertEqual(ideias.obter(1)["texto"], "me dê um resumo diário das compras")
+        self.assertIn("Ideia #2 salva", ideias.responder_mensagem("/ideia app que sugere receitas pela geladeira", "telegram:1"))
+        self.assertIn("Qual é a ideia", ideias.responder_mensagem("/ideia", "telegram:1"))
+        self.assertIn("Ideia #3 salva", ideias.responder_mensagem(self.IDEIAS[0], "telegram:1"))
+
+    def test_skill_encaminha_para_a_conversa(self):
+        ideias = self.servico(ClaudeFalso([ANALISE]))
+        ideias.salvar("Documentação viva para projetos de software")
+        ideias.processar_pendentes()
+        skill = obter_catalogo().skill("ideias")
+        ctx = Contexto(servicos={"ideias": ideias, "llm_local": ModeloLocal()})
+        consulta = motor.executar(skill, ctx, "Me dê ideias de melhorias para a documentação de sistemas", {"acao": "consultar"})
+        self.assertEqual(consulta.encaminhar, "conversa-geral")
+        criar = motor.executar(skill, ctx, "Me dê uma ideia de documentação para projetos de software", {"acao": "criar"})
+        self.assertEqual(criar.encaminhar, "conversa-geral")
+        self.assertEqual(len(ideias.listar()), 1)
+        self.assertIsNone(motor.executar(skill, ctx, "como sigo a ideia da documentação?", {"acao": "consultar"}).encaminhar)
+
+
+class TestP23NoApp(fase1.BaseBanco):
+    def test_pedido_encaminhado_vai_ao_assistente_local(self):
+        for patcher in (mock.patch.object(app_main, "emitir_electron", lambda *a, **k: None),
+                        mock.patch.object(app_main, "TEMPO_RETRY", 0)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        runtime = app_main.AssistenteRuntime()
+        runtime.db_service = self.db
+        runtime.ai_service = mock.Mock()
+        runtime.memory_service = mock.Mock()
+        runtime.context_retrieval = mock.Mock()
+        runtime.context_retrieval.montar_contexto_recuperado.return_value = ""
+        runtime.ideias = IdeiasService(self.db, None, Path(tempfile.mkdtemp()), prompt_analise=lambda: "")
+        decisao = {"dificuldade": "facil", "mudanca_de_contexto": False, "contexto": "ideias", "acao": "consultar", "skill": "ideias"}
+        with mock.patch.object(app_main, "orquestrar_requisicao", return_value=decisao), \
+                mock.patch.object(app_main, "executar_assistente_local", return_value="Algumas sugestões: ...") as local:
+            resposta = runtime._processar_solicitacao("Me dê ideias de melhorias para a documentação de sistemas")
+        self.assertEqual(resposta, "Algumas sugestões: ...")
+        self.assertEqual(local.call_args[0][0], "geral")
+        self.assertEqual(runtime.ideias.listar(), [])
+
+
 class TestAvisoNoApp(unittest.TestCase):
     def test_analise_volta_para_o_telegram_de_origem(self):
         runtime = app_main.AssistenteRuntime.__new__(app_main.AssistenteRuntime)

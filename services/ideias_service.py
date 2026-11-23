@@ -39,6 +39,40 @@ TAMANHO_MAXIMO = 8000
 MINIMO_PALAVRAS = 4
 
 
+_RE_PREFIXO = re.compile(
+    r"^\s*(?:(?:ei|oi|ol[aá])[,!]?\s*)?(?:/ideia\b|(?:eu\s+)?(?:tive|tenho)\s+uma\s+ideia|ideia\s*:|pensei\s+(?:em|num|numa)\s+(?=\w)|"
+    r"(?:anot|salv|guard|regist)\w*\s+(?:essa\s+|esta\s+|uma\s+|a\s+|minha\s+)?ideia)\s*(?:de\b|:|,|-|que\b)?\s*",
+    re.IGNORECASE,
+)
+_RE_INTERROGATIVO = re.compile(
+    r"^(?:o que|oque|qual|quais|como|quando|onde|por que|porque|quanto|quantos|quantas|quem|sera que|voce|vc|pode|poderia|consegue)\b")
+_RE_PEDIDO = re.compile(
+    r"^(?:analis|procur|leia|le |verifiqu|verifica|resum|list|mostr|explic|sugir|pesquis|busc|abr|confer|avali|diga|fala|fale|conta|conte)\w*\b"
+    r"|\bme (?:de|da|diga|diz|fala|fale|mostra|mostre|explica|explique|ajuda|ajude|sugira|sugere|passa|passe|conta|conte|indica|indique|responda)\b"
+    r"|\bsugest(?:ao|oes)\b")
+
+
+def _normalizar(texto: str) -> str:
+    texto = unicodedata.normalize("NFKD", texto or "")
+    return " ".join("".join(c for c in texto if not unicodedata.combining(c)).lower().split())
+
+
+def pede_para_salvar(texto: str) -> bool:
+    """A pessoa disse explicitamente que é uma ideia nova ("ideia: ...", "/ideia ...", "tive uma ideia...")."""
+    return bool(_RE_PREFIXO.match(texto or ""))
+
+
+def limpar_prefixo(texto: str) -> str:
+    """Tira "tive uma ideia:", "ideia:", "/ideia" etc. do começo, preservando o restante como foi escrito."""
+    return _RE_PREFIXO.sub("", texto or "", count=1).strip()
+
+
+def parece_pergunta(texto: str) -> bool:
+    """Pergunta ou pedido ao assistente (não uma ideia para guardar). Heurística simples e conservadora."""
+    normalizado = _normalizar(texto)
+    return normalizado.endswith("?") or bool(_RE_INTERROGATIVO.match(normalizado) or _RE_PEDIDO.search(normalizado))
+
+
 def titulo_provisorio(texto: str) -> str:
     primeira = " ".join(texto.split())
     return primeira if len(primeira) <= 60 else primeira[:57].rstrip() + "..."
@@ -241,6 +275,8 @@ class IdeiasService:
         comando = (texto or "").strip()
         minusculo = comando.lower()
         ajuda = ("Mande a ideia em texto, com pelo menos algumas palavras, que eu salvo no assistente e o Claude analisa.\n"
+                 "Por aqui eu só guardo ideias; perguntas e pedidos ficam para o assistente no PC.\n"
+                 "/ideia texto — salva mesmo que pareça pergunta\n"
                  "/ideias — últimas ideias\n/ver 3 — análise da ideia 3\n/reanalisar 3 — analisar de novo")
         if minusculo in ("/start", "/ajuda", "ajuda", "/help"):
             return ajuda
@@ -255,8 +291,16 @@ class IdeiasService:
                 self.reanalisar(ideia["id"])
                 return f"Ideia #{ideia['id']} voltou para a fila de análise."
             return self.detalhe(ideia)
+        if pede_para_salvar(comando):  # "ideia: ...", "/ideia ...", "tive uma ideia...": sempre salva
+            conteudo = limpar_prefixo(comando)
+            if len(re.findall(r"\w+", conteudo)) < MINIMO_PALAVRAS:
+                return "Qual é a ideia? Mande assim: ideia: um app que..."
+            return self.confirmacao(self.salvar(conteudo, origem))
         if minusculo.startswith("/"):
             return "Comando desconhecido. Mande /ajuda."
         if len(re.findall(r"\w+", comando)) < MINIMO_PALAVRAS:
             return "Oi! Estou ligado. " + ajuda
+        if parece_pergunta(comando):
+            return ("Isso parece uma pergunta ou um pedido, e por aqui eu só guardo ideias, então não salvei. "
+                    "Se for uma ideia, mande de novo começando com \"ideia:\".")
         return self.confirmacao(self.salvar(comando, origem))
