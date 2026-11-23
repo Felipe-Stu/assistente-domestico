@@ -15,5 +15,5 @@ Responde perguntas gerais com o modelo local, usando a memória semântica como 
 
 ## Regras
 
-- É a única skill que pode ir à nuvem (Gemini), e só quando a pergunta é difícil ou o modelo local falha.
+- É a única skill que pode ir à nuvem (Gemini), e só quando a pessoa pede ("pergunta pro Gemini...", "pesquisa na internet...") ou quando o modelo local falha (M16).
 - Para a nuvem, só seguem memórias de contextos que também podem sair da máquina.

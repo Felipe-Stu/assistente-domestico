@@ -96,9 +96,7 @@ def prompt_decisao(catalogo: Catalogo) -> str:
         "- criar: registrar, anotar ou agendar algo novo\n"
         "- consultar: perguntar, verificar ou pedir informação\n"
         "- corrigir: alterar ou apagar algo, ou avisar que um item acabou\n"
-        "- delegar: pedir ajuda de outra natureza\n\n"
-        "dificuldade: \"facil\" para quase tudo, inclusive compras com muitos itens e números. "
-        "\"medio_dificil\" só para perguntas gerais que exigem pesquisa, análise ou comparação complexa."
+        "- delegar: pedir ajuda de outra natureza"
     )
 
 
@@ -108,9 +106,8 @@ def esquema_decisao(catalogo: Catalogo) -> Dict[str, Any]:
         "properties": {
             "skill": {"type": "string", "enum": nomes(catalogo)},
             "acao": {"type": "string", "enum": ACOES},
-            "dificuldade": {"type": "string", "enum": DIFICULDADES},
         },
-        "required": ["skill", "acao", "dificuldade"],
+        "required": ["skill", "acao"],
     }
 
 
@@ -126,9 +123,8 @@ def converter_decisao(dados: Dict[str, Any], catalogo: Catalogo, contexto_atual:
     acao = dados.get("acao")
     if acao not in ACOES:
         raise DecisaoInvalidaError(f"Ação inválida na resposta do modelo: {acao!r}")
-    dificuldade = dados.get("dificuldade")
-    if dificuldade not in DIFICULDADES:
-        dificuldade = "facil"
+    # M16: o modelo não estima mais a dificuldade; o campo fica no formato da decisão por compatibilidade
+    dificuldade = dados.get("dificuldade") if dados.get("dificuldade") in DIFICULDADES else "facil"
     return {
         "dificuldade": dificuldade,
         "mudanca_de_contexto": bool(contexto_atual) and contexto_atual not in skill.contextos,

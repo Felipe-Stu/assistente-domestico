@@ -115,6 +115,23 @@ class TestOrquestradorPeloCatalogo(Base):
         self.assertEqual(decisao["contexto"], "musica")
 
 
+class TestM16(unittest.TestCase):
+    def test_prompt_e_esquema_sem_dificuldade(self):
+        catalogo = obter_catalogo()
+        self.assertNotIn("dificuldade", seletor.prompt_decisao(catalogo))
+        self.assertNotIn("dificuldade", seletor.esquema_decisao(catalogo)["properties"])
+        decisao = seletor.converter_decisao({"skill": "conversa-geral", "acao": "consultar"}, catalogo, None)
+        self.assertEqual(decisao["dificuldade"], "facil")
+
+    def test_pedidos_de_nuvem(self):
+        from services.intent_router import pede_nuvem
+        for frase in ("Pergunta pro Gemini quem foi Santos Dumont", "pesquisa na internet o preço do arroz",
+                      "procura no Google a previsão", "busca online receitas de bolo"):
+            self.assertTrue(pede_nuvem(frase), frase)
+        for frase in ("Quem foi Santos Dumont?", "Comprei arroz no Moreschi", "o que tenho na agenda"):
+            self.assertFalse(pede_nuvem(frase), frase)
+
+
 class TestConversao(unittest.TestCase):
     def test_converter_decisao(self):
         catalogo = obter_catalogo()

@@ -44,3 +44,16 @@ def rotear_por_regras(texto: str, contexto_atual: Optional[str] = None) -> Optio
         return None
     skill = obter_catalogo().skill(gatilho.skill)
     return _decisao(skill.contexto, gatilho.acao, contexto_atual, dict(gatilho.parametros) or None)
+
+
+# M16: a nuvem entra por escolha do usuário, não por "dificuldade" estimada pelo modelo
+_RE_PEDE_NUVEM = re.compile(
+    r"\b(?:gemini|google|na nuvem|na internet|na web)\b"
+    r"|\b(?:pesquis|busc|procur)\w*\b.{0,25}\b(?:online|internet|web)\b"
+)
+
+
+def pede_nuvem(texto: str) -> bool:
+    """A pessoa pediu explicitamente a nuvem: "pergunta pro Gemini...", "pesquisa na internet...", "procura no Google..."."""
+    return bool(_RE_PEDE_NUVEM.search(normalizar_texto(texto)))
+

@@ -24,6 +24,7 @@ from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
 from core.skills import Contexto, obter_catalogo
 from core.skills import motor as motor_skills
+from services.intent_router import pede_nuvem
 from services.inventory_assistant import InventoryAssistant
 from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
 import services.llm_provider as llm_provider_estado
@@ -507,10 +508,9 @@ class AssistenteRuntime(ModoVoz):
         custom_logger.evento(
             "main", "decisao",
             skill=decisao.get("skill"), contexto=decisao.get("contexto"), acao=decisao.get("acao"),
-            dificuldade=decisao.get("dificuldade"), resposta_direta="resposta_direta" in decisao,
+            resposta_direta="resposta_direta" in decisao,
         )
 
-        dificuldade = decisao.get("dificuldade", "medio_dificil")
         contexto = decisao.get("contexto", "outro")
         mudanca_contexto = decisao.get("mudanca_de_contexto", False)
 
@@ -530,7 +530,8 @@ class AssistenteRuntime(ModoVoz):
 
         resposta_texto = ""
         fala_texto = None
-        usar_nuvem = dificuldade != "facil" and self._pode_usar_nuvem(contexto)
+        # M16: a nuvem só entra quando a pessoa pede (ou na falha local, mais abaixo), nunca pela "dificuldade"
+        usar_nuvem = pede_nuvem(solicitacao_original) and self._pode_usar_nuvem(contexto)
 
         # =====================================================================
         # PASSO 2: Roteamento de Execução
@@ -557,8 +558,8 @@ class AssistenteRuntime(ModoVoz):
 
                 if resposta is not None:
                     pass  # o roteiro da skill já respondeu
-                elif dificuldade != "facil" and self._pode_usar_nuvem(contexto):
-                    usar_nuvem = True  # encaminhada para uma skill que pode ir à nuvem
+                elif pede_nuvem(solicitacao_original) and self._pode_usar_nuvem(contexto):
+                    usar_nuvem = True  # encaminhada para a conversa geral, e a pessoa pediu a nuvem
                 else:
                     resposta_texto = execute_with_retry(
                         func=custom_logger.cronometrado("assistente_local", executar_assistente_local),

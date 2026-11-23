@@ -35,7 +35,7 @@ graph TD
     ORQ -->|"estoque"| INV["InventoryAssistant"]
     ORQ -->|"analisar projeto"| PA["ProjectAnalyzer"]
     ORQ -->|"geral, programação"| LOCAL["Assistente local"]
-    LOCAL -->|"geral difícil ou falha"| NUVEM["Gemini (opcional)"]
+    LOCAL -->|"pedido de nuvem ou falha"| NUVEM["Gemini (opcional)"]
     SH --> SQL[("SQLite")]
     SH --> CH[("ChromaDB")]
     LOCAL --> OLL["Ollama"]

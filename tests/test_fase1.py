@@ -407,7 +407,7 @@ class TestRuntime(BaseBanco):
         for contexto in ("compras", "inventario", "agenda", "programacao"):
             with self.subTest(contexto=contexto), self.decidir(contexto, "medio_dificil"), \
                     mock.patch.object(app_main, "executar_assistente_local", return_value="local"):
-                self.responder("Pedido difícil")
+                self.responder("Pergunte ao Gemini: pedido difícil")
         self.gemini.assert_not_called()
 
     def test_ollama_parado_nao_envia_frase_desconhecida_a_nuvem(self):
@@ -453,9 +453,14 @@ class TestRuntime(BaseBanco):
         self.assertEqual(self.contar("compras"), 0)
         self.gemini.assert_not_called()
 
-    def test_pergunta_geral_pode_ir_a_nuvem(self):
-        with self.decidir("geral", "medio_dificil"):
-            self.assertEqual(self.responder("Pesquise algo"), "Resposta da nuvem")
+    def test_pergunta_geral_vai_a_nuvem_quando_pedida(self):
+        with self.decidir("geral"):
+            self.assertEqual(self.responder("Pergunte ao Gemini quem ganhou a Copa de 2022"), "Resposta da nuvem")
+
+    def test_m16_dificil_sem_pedido_fica_local(self):
+        with self.decidir("geral", "medio_dificil"), mock.patch.object(app_main, "executar_assistente_local", return_value="local"):
+            self.assertEqual(self.responder("Compare a economia do Brasil e da Argentina"), "local")
+        self.gemini.assert_not_called()
 
     def test_falha_local_em_pergunta_geral_usa_a_nuvem(self):
         with self.decidir("geral"), mock.patch.object(app_main, "executar_assistente_local", side_effect=ConnectionError()):
@@ -464,28 +469,28 @@ class TestRuntime(BaseBanco):
     def test_sem_chave_pergunta_geral_fica_local(self):
         self.runtime.ai_service.disponivel.return_value = False
         with self.decidir("geral", "medio_dificil"), mock.patch.object(app_main, "executar_assistente_local", return_value="local"):
-            self.assertEqual(self.responder("Pesquise algo"), "local")
+            self.assertEqual(self.responder("Pesquise na internet algo"), "local")
         self.gemini.assert_not_called()
 
     def test_modo_qwen_nao_usa_a_nuvem(self):
         llm_provider.MODO_QWEN_ATIVO = True
         with self.decidir("geral", "medio_dificil"), mock.patch.object(app_main, "executar_assistente_local", return_value="local"):
-            self.assertEqual(self.responder("Analise este código"), "local")
+            self.assertEqual(self.responder("Pergunte ao Gemini: analise este código"), "local")
         self.gemini.assert_not_called()
 
     def test_nuvem_nao_recebe_historico_nem_memoria_restritos(self):
         self.runtime.sessao.contexto_ativo = "compras"
         self.runtime.sessao.historico = [{"role": "user", "content": "Comprei remédio"}]
-        with self.decidir("geral", "medio_dificil"):
-            self.responder("Pesquise algo")
+        with self.decidir("geral"):
+            self.responder("Pesquise na internet algo")
         self.assertEqual(self.gemini.call_args.args[1], [])
         filtro = self.runtime.context_retrieval.montar_contexto_recuperado.call_args.kwargs["assistant"]
         self.assertEqual(filtro, ["geral", "outro"])
 
     def test_cota_esgotada_informa_sem_repetir(self):
         self.gemini.side_effect = TokenExhaustedException("cota")
-        with self.decidir("geral", "medio_dificil"):
-            self.assertIn("limite de uso", self.responder("Pesquise algo"))
+        with self.decidir("geral"):
+            self.assertIn("limite de uso", self.responder("Pesquise na internet algo"))
         self.assertEqual(self.gemini.call_count, 1)
 
     def test_agenda_nao_exibe_json(self):
