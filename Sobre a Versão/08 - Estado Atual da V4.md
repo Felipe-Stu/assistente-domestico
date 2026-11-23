@@ -20,7 +20,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 191 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, SK2, SK3 e SKP, já sem os 5 do orquestrador antigo); ver seções 11 a 13 |
+| Testes automatizados | 198 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, SK2, SK3, SKP e SK6, já sem os 5 do orquestrador antigo); ver seções 11 a 13 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
 | Problemas abertos | 10 (1 alto, 5 médios, 4 baixos); 12 resolvidos (P21 em 17/11, P13 e P22 em 22/11, P10 em 23/11) |
@@ -349,6 +349,8 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 | Limpeza (SK5) | Orquestrador antigo removido; documentação de projeto com roteiro; contextos válidos vindos do catálogo; `main.py` dividido em `ipc`, `sessao` e `voz` | `TESTADO` (191 testes) e teste de fumaça do processo real |
 
+| Fábrica de skills (SK6) | `scripts/nova_skill.py` a partir de `skills/_modelo`; `scripts/validar_skills.py` na integração contínua; `llm_local` para toda skill | `TESTADO` (7 testes) |
+
 **O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
 
-**Validação:** 191 de 191 testes aprovados, nas mesmas condições da seção 12.
+**Validação:** 198 de 198 testes aprovados, nas mesmas condições da seção 12.

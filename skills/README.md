@@ -46,12 +46,17 @@ gatilhos:                           # opcional: frases resolvidas sem modelo
 
 ## Criar uma skill
 
-1. Crie `skills/<nome>/SKILL.md` com o cabeçalho acima e as instruções.
-2. Se a skill usa modelo, ponha o prompt em `prompts/`.
-3. Rode `python -m unittest tests.test_skills`. Erros de formato apontam o arquivo e o campo.
-4. Se mudou um gatilho, `tests/dados/roteador_referencia.json` aponta qualquer decisão que mudou.
+```
+python scripts/nova_skill.py musica --descricao "Toca músicas e playlists no Spotify. Use quando a pessoa pede para tocar, pausar ou trocar a música."
+```
 
-Uma skill nova com `execucao: roteiro` é escolhida pelo orquestrador e executada sem nenhuma alteração no núcleo.
+1. O comando copia `skills/_modelo` para `skills/<nome>/`: `SKILL.md`, `roteiro.py` e `exemplos.jsonl`, já validados.
+2. Escreva o que a skill faz no `SKILL.md` (a `description` é o que o orquestrador lê para escolher) e os passos no `roteiro.py`.
+3. Preencha `exemplos.jsonl` com frases reais e a ação esperada (`criar`, `consultar`, `corrigir` ou `delegar`).
+4. `python scripts/validar_skills.py`: cabeçalho, roteiro, prompts e exemplos (também roda na integração contínua).
+5. No PC, com o Ollama: `python scripts/avaliar.py --skill <nome> --so-roteamento --modelos gemma4:e4b` mede se o orquestrador escolhe a skill.
+
+Uma skill com `execucao: roteiro` é escolhida pelo orquestrador e executada sem nenhuma alteração no núcleo. O roteiro recebe `llm_local` (modelo residente), `db_service` e `progresso`, entre outros serviços (lista em `core/skills/motor.py`). Se mudar um gatilho, `tests/dados/roteador_referencia.json` aponta qualquer decisão que mudou.
 
 ## Skills atuais
 

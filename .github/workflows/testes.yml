@@ -34,6 +34,9 @@ jobs:
       - name: Verificar sintaxe (JavaScript)
         run: node --check main.js && node --check preload.js && node --check renderer.js
 
+      - name: Validar skills
+        run: python scripts/validar_skills.py
+
       - name: Testes automatizados
         run: python -m unittest discover -s tests -v
 

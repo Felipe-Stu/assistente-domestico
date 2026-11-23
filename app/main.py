@@ -353,6 +353,8 @@ class AssistenteRuntime(ModoVoz):
             "db_service": self.db_service,
             "project_analyzer": getattr(self, "project_analyzer", None),
             "progresso": lambda mensagem: emitir_electron("debug_log", {"message": mensagem}),
+            # Modelo local residente, para qualquer skill (SK6): uma skill nova não precisa mudar o núcleo
+            "llm_local": LocalLLMProvider(temperatura=0.1),
         }
         if skill is not None and skill.nome == "programacao":
             servicos.update({

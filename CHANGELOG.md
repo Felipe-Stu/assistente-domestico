@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [V4.1] — SK6: fábrica de skills (2026-11-23)
+
+### Adicionado
+- `skills/_modelo/` e `scripts/nova_skill.py`: cria `skills/<nome>/` com `SKILL.md`, `roteiro.py` e `exemplos.jsonl` já válidos; recusa nome inválido, skill existente, descrição curta e contexto já usado, sem deixar pasta pela metade.
+- `scripts/validar_skills.py`: cabeçalhos, roteiros importáveis, marcadores dos prompts e `exemplos.jsonl`. Novo passo **Validar skills** na integração contínua.
+- `scripts/avaliar.py --skill <nome>`: mede no PC se o orquestrador escolhe a skill para os exemplos dela.
+- Serviço `llm_local` (modelo residente) entregue a toda skill, para que uma skill nova use o modelo sem mudar o núcleo.
+- `tests/test_sk6.py` (7 testes). Suíte: 198 testes.
+
+### Alterado
+- O catálogo ignora pastas que começam com `_` ou `.` (o modelo `skills/_modelo` não é uma skill).
+
 ## [V4.1] — SK5: remoção do código antigo e divisão do main.py (2026-11-23)
 
 ### Removido

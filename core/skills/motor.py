@@ -10,7 +10,10 @@ O roteiro define:
     responder_pendencia(ctx, texto, dados) -> Resposta     # opcional, se a skill pede confirmação
 
 `ctx` dá acesso só ao que o núcleo entrega (serviços e a função de repetição); o roteiro não
-conhece o runtime, o Electron nem a política de nuvem.
+conhece o runtime, o Electron nem a política de nuvem. Serviços entregues a toda skill:
+llm_local (modelo residente), db_service, shopping_assistant, inventory_assistant,
+project_analyzer e progresso. A skill de programação recebe também llm_programacao,
+biblioteca e historico; o Claude só vai para as skills autorizadas em CLAUDE_SKILLS.
 """
 import importlib.util
 import sys

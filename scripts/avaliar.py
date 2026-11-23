@@ -71,6 +71,17 @@ def carregar_casos(caminho: Path = ARQUIVO_CASOS, catalogo=None) -> list:
     return casos
 
 
+def casos_da_skill(nome: str) -> list:
+    """Exemplos da própria skill (skills/<nome>/exemplos.jsonl), no formato dos casos de avaliação."""
+    from core.skills import obter_catalogo
+    skill = obter_catalogo().skill(nome)
+    caminho = skill.pasta / "exemplos.jsonl"
+    if not caminho.exists():
+        raise SystemExit(f"A skill '{nome}' não tem exemplos.jsonl.")
+    return [{"id": f"{nome}-{i}", "frase": c["frase"], "skill": nome, "acoes": [c["acao"]], "grupo": "atual"}
+            for i, c in enumerate(ler_jsonl(caminho), 1)]
+
+
 def normalizar(texto) -> str:
     texto = unicodedata.normalize("NFKD", texto or "")
     return "".join(c for c in texto if not unicodedata.combining(c)).lower()
@@ -406,6 +417,7 @@ def main(argv=None):
     parser.add_argument("--so-extracao", action="store_true")
     parser.add_argument("--so-troca", action="store_true")
     parser.add_argument("--saida", default=str(PASTA_SAIDA_PADRAO))
+    parser.add_argument("--skill", help="usa skills/<nome>/exemplos.jsonl em vez de evals/casos.jsonl")
     args = parser.parse_args(argv)
 
     instalados = modelos_instalados()
@@ -427,7 +439,8 @@ def main(argv=None):
         dados["troca"] = medir_troca(modelos)
     if fazer(0):
         modos = [m for m in args.modos.split(",") if m in MODOS]
-        dados["roteamento"] = avaliar_roteamento(carregar_casos(), modos, modelos, args.repeticoes,
+        casos = casos_da_skill(args.skill) if args.skill else carregar_casos()
+        dados["roteamento"] = avaliar_roteamento(casos, modos, modelos, args.repeticoes,
                                                  Avaliador(usar_regras=not args.sem_regras))
     if fazer(1):
         raciocinios = [r for r in args.raciocinio.split(",") if r in RACIOCINIO]

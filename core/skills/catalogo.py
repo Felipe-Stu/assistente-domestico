@@ -226,7 +226,9 @@ def carregar_catalogo(pasta: Path = PASTA_SKILLS) -> Catalogo:
     pasta = Path(pasta)
     if not pasta.is_dir():
         raise SkillInvalidaError(f"Pasta de skills não encontrada: {pasta}")
-    return Catalogo([carregar_skill(p) for p in sorted(pasta.iterdir()) if (p / "SKILL.md").is_file()])
+    # Pastas que começam com "_" ou "." não são skills (ex.: skills/_modelo, usado por scripts/nova_skill.py)
+    return Catalogo([carregar_skill(p) for p in sorted(pasta.iterdir())
+                     if (p / "SKILL.md").is_file() and not p.name.startswith(("_", "."))])
 
 
 @lru_cache(maxsize=1)
