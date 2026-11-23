@@ -1,5 +1,4 @@
 """Testes do SK6 (roadmap das skills): fábrica de skills e validação."""
-import json
 import shutil
 import sys
 import tempfile
@@ -65,13 +64,10 @@ class TestValidacao(Base):
 
 class TestAvaliarPorSkill(Base):
     def test_casos_da_skill(self):
-        exemplos = PASTA_SKILLS / "compras" / "exemplos.jsonl"
-        criado = not exemplos.exists()
-        if criado:
-            exemplos.write_text(json.dumps({"frase": "comprei pão", "acao": "criar"}) + "\n", encoding="utf-8")
-            self.addCleanup(exemplos.unlink)
-        casos = avaliar.casos_da_skill("compras")
-        self.assertTrue(all(c["skill"] == "compras" and c["acoes"] for c in casos))
+        # agenda já tem exemplos.jsonl: o teste não escreve na pasta real das skills
+        casos = avaliar.casos_da_skill("agenda")
+        self.assertTrue(casos)
+        self.assertTrue(all(c["skill"] == "agenda" and c["acoes"] for c in casos))
 
 
 class TestContextoGenerico(unittest.TestCase):

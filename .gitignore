@@ -23,6 +23,8 @@ secret_key.json
 *.db
 *.db-journal
 core/database/chroma_db/
+# Cópias de segurança automáticas (M11)
+core/database/backups/
 
 # Logs gerados em runtime
 *.log
