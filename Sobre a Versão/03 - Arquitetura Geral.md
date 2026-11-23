@@ -13,14 +13,17 @@ Este documento detalha a estrutura de diretórios, os módulos constituintes, su
 assistente-domestico/
 ├── assets/                              # Armazenamento temporário de arquivos de voz (temp_voice.mp3)
 ├── app/
-│   └── main.py                          # Runtime principal (AssistenteRuntime) com event loop e IPC
+│   ├── main.py                          # Runtime (AssistenteRuntime): ciclo de vida, filas e pipeline orquestrador → skill
+│   ├── ipc.py                           # [SK5] UTF-8, pipe do Electron isolado e emitir_electron
+│   ├── sessao.py                        # [SK5] GerenciadorDeSessao (contexto ativo e histórico)
+│   └── voz.py                           # [SK5] Modo voz e laço do microfone (classe base do runtime)
 ├── core/
 │   ├── database/
 │   │   ├── assistente_casa.db           # Banco de dados SQLite (compras, itens, controle_consumo)
 │   │   └── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (persistência local)
 │   ├── __init__.py
 │   ├── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
-│   └── skills/                          # [SK1] Carregador e catálogo das skills; seletor.py é protótipo do SK0
+│   └── skills/                          # Catálogo, seletor (orquestrador pelo catálogo) e motor de roteiros
 ├── skills/                              # [SK1] Uma pasta por capacidade: SKILL.md (cabeçalho + instruções) e prompts/
 │   ├── compras/  estoque/  agenda/
 │   └── documentar-projeto/  programacao/  conversa-geral/

@@ -79,7 +79,9 @@ class TestInatividade(BaseOrquestrador):
 
 class TestPromptProgramacao(unittest.TestCase):
     def test_caminho_do_projeto_preservado_no_prompt(self):
-        self.assertIn(r"E:\Agente IA\assistente-domestico\Sobre a Versão", gemma_service.PROMPT_PROGRAMACAO)
+        from core.skills import obter_catalogo
+        prompt = obter_catalogo().skill("programacao").prompt("sistema")
+        self.assertIn(r"E:\Agente IA\assistente-domestico\Sobre a Versão", prompt)
 
     def test_modulo_compila_sem_escape_invalido(self):
         codigo = Path(gemma_service.__file__).read_text(encoding="utf-8")

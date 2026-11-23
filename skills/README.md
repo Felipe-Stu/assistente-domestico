@@ -6,7 +6,7 @@ Cada capacidade do assistente é uma pasta aqui, no estilo das skills do Claude.
 - os assistentes leem os **prompts** em `prompts/*.md`;
 - a política de nuvem continua no núcleo (`AssistenteRuntime.CONTEXTOS_NUVEM`); o campo `privacidade` declara a intenção e um teste garante que os dois concordam.
 
-Estado: **SK2** do roadmap das skills. Quando nenhum gatilho casa, o orquestrador escolhe a skill pelo `name` e pela `description` de cada pasta (`ORQUESTRADOR_MODO=catalogo`). Por isso a `description` precisa dizer com clareza quando usar a skill.
+Estado: **SK5** do roadmap das skills. Quando nenhum gatilho casa, o orquestrador escolhe a skill pelo `name` e pela `description` de cada pasta. Por isso a `description` precisa dizer com clareza quando usar a skill. Os contextos declarados em `contextos` são aceitos pelo orquestrador sem mudar o núcleo.
 
 ## Estrutura
 
@@ -60,6 +60,6 @@ Uma skill nova com `execucao: roteiro` é escolhida pelo orquestrador e executad
 | `compras` | compras | ativa | local | 4 (com pesquisa de preço) | roteiro |
 | `estoque` | inventario | ativa | local | 2 | roteiro |
 | `agenda` | agenda | planejada | local | 2 | roteiro |
-| `documentar-projeto` | projetos | ativa | local | 1 | núcleo |
+| `documentar-projeto` | projetos | ativa | local | 1 | roteiro |
 | `programacao` | programacao | ativa | claude | 0 | roteiro (Claude → Qwen) |
 | `conversa-geral` | geral, outro | ativa | nuvem-permitida | 0 | núcleo |

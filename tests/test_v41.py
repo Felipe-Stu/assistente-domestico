@@ -65,17 +65,6 @@ class ClienteOllamaFalso:
 
 
 class TestEsquemas(unittest.TestCase):
-    def test_enums_do_orquestrador_sao_aceitos_pela_validacao(self):
-        propriedades = esquemas.ESQUEMA_ORQUESTRADOR["properties"]
-        for campo, permitidos in gemma_service.VALORES_PERMITIDOS.items():
-            self.assertTrue(set(propriedades[campo]["enum"]) <= permitidos, campo)
-
-    def test_campos_obrigatorios_do_orquestrador(self):
-        self.assertEqual(
-            set(esquemas.ESQUEMA_ORQUESTRADOR["required"]),
-            {"dificuldade", "mudanca_de_contexto", "contexto", "acao"},
-        )
-
     def test_item_de_compra_exige_os_campos_usados_na_validacao(self):
         item = esquemas.ESQUEMA_COMPRAS["properties"]["compras"]["items"]["properties"]["itens"]["items"]
         self.assertEqual(
@@ -99,8 +88,8 @@ class TestProvedorLocal(BaseSemLogs):
 
     def test_esquema_vai_no_parametro_format(self):
         cliente = ClienteOllamaFalso()
-        dados = self.gerar(cliente, esquemas.ESQUEMA_ORQUESTRADOR)
-        self.assertEqual(cliente.formatos, [esquemas.ESQUEMA_ORQUESTRADOR])
+        dados = self.gerar(cliente, esquemas.ESQUEMA_COMPRAS)
+        self.assertEqual(cliente.formatos, [esquemas.ESQUEMA_COMPRAS])
         self.assertEqual(dados["contexto"], "geral")
 
     def test_sem_esquema_usa_json_simples(self):
@@ -110,20 +99,20 @@ class TestProvedorLocal(BaseSemLogs):
 
     def test_opcao_desligada_ignora_o_esquema(self):
         cliente = ClienteOllamaFalso()
-        self.gerar(cliente, esquemas.ESQUEMA_ORQUESTRADOR, ligado=False)
+        self.gerar(cliente, esquemas.ESQUEMA_COMPRAS, ligado=False)
         self.assertEqual(cliente.formatos, ["json"])
 
     def test_biblioteca_antiga_recai_em_json_simples(self):
         cliente = ClienteOllamaFalso(recusar_esquema=True)
-        dados = self.gerar(cliente, esquemas.ESQUEMA_ORQUESTRADOR)
-        self.assertEqual(cliente.formatos, [esquemas.ESQUEMA_ORQUESTRADOR, "json"])
+        dados = self.gerar(cliente, esquemas.ESQUEMA_COMPRAS)
+        self.assertEqual(cliente.formatos, [esquemas.ESQUEMA_COMPRAS, "json"])
         self.assertEqual(dados["acao"], "consultar")
 
     def test_erro_de_conexao_nao_dispara_segunda_chamada(self):
         cliente = ClienteOllamaFalso()
         cliente.chat = mock.Mock(side_effect=ConnectionError("Ollama parado"))
         with self.assertRaises(llm_provider.OllamaIndisponivelException):
-            self.gerar(cliente, esquemas.ESQUEMA_ORQUESTRADOR)
+            self.gerar(cliente, esquemas.ESQUEMA_COMPRAS)
         self.assertEqual(cliente.chat.call_count, 1)
 
 
@@ -174,17 +163,6 @@ class ProvedorEspiao:
 
 
 class TestUsoDosEsquemas(BaseSemLogs):
-    def test_orquestrador_envia_o_esquema(self):
-        espiao = ProvedorEspiao(
-            {"dificuldade": "facil", "mudanca_de_contexto": False, "contexto": "geral", "acao": "consultar"}
-        )
-        with mock.patch.object(gemma_service, "obter_provedor_local", return_value=espiao), \
-                mock.patch.object(gemma_service, "ORQUESTRADOR_MODO", "contextos"), \
-                mock.patch.object(llm_provider, "MODO_QWEN_ATIVO", False):
-            gemma_service.orquestrar_requisicao("Qual é a capital da França?")
-        self.assertIs(espiao.chamadas[0]["esquema"], esquemas.ESQUEMA_ORQUESTRADOR)
-        self.assertIs(espiao.chamadas[0]["raciocinio"], False)
-
     def test_extracao_de_compras_envia_o_esquema(self):
         espiao = ProvedorEspiao({"compras": []})
         assistente = ShoppingAssistant(mock.Mock(), llm_provider=espiao, vector_store=mock.Mock())

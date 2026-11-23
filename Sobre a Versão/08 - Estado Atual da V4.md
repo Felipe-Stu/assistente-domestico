@@ -20,7 +20,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 195 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, 10 do SK2, 7 do SK3 e 18 do SKP); ver seções 11 a 13 |
+| Testes automatizados | 191 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, SK2, SK3 e SKP, já sem os 5 do orquestrador antigo); ver seções 11 a 13 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
 | Problemas abertos | 10 (1 alto, 5 médios, 4 baixos); 12 resolvidos (P21 em 17/11, P13 e P22 em 22/11, P10 em 23/11) |
@@ -340,13 +340,15 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Medição (SK0) | `scripts/avaliar.py` com `evals/casos.jsonl` (48 frases) e `evals/compras.jsonl` (8 compras) | Ferramenta `TESTADO`; medição real `NÃO TESTADO` (requer o Ollama no PC) |
 
 | Medição (SK0, PC do usuário) | Gemma no catálogo: 45/48 em 0,55 s; prompt por contextos: 43/48 em 1,39 s; Qwen Coder falha na chamada nativa; troca de modelo 13 a 15 s | `MEDIDO` (`Planejamento/medicoes/sk0-20261123-0825.md`) |
-| Orquestrador (SK2) | Escolhe a skill pelo catálogo, com prompt fixo; `ORQUESTRADOR_MODO=contextos` volta ao anterior; resolve o P10 | `TESTADO` (10 testes) e `MEDIDO` no PC: 44/48 em 0,87 s (antes 43/48 em 1,39 s) |
+| Orquestrador (SK2) | Escolhe a skill pelo catálogo, com prompt fixo; resolve o P10 (o prompt por contextos foi removido no SK5) | `TESTADO` (10 testes) e `MEDIDO` no PC: 44/48 em 0,87 s (antes 43/48 em 1,39 s) |
 | Privacidade | Pesquisa de preço entre mercados passa por gatilho de `compras` (antes podia cair na conversa geral) | `TESTADO` |
 
 | Roteiros (SK3) | Compras, estoque e agenda executam `skills/<nome>/roteiro.py`; confirmação de compra virou pendência genérica de qualquer skill | `TESTADO` (7 testes) |
 
 | Programação (SKP) | Claude (API) como principal; sem cota, Qwen local; reteste na primeira solicitação depois das 8h; limite mensal de gasto; biblioteca de contexto no ChromaDB | `TESTADO` (18 testes); chamada real `NÃO TESTADO` |
 
-**O que ainda não muda:** conversa geral e documentação ainda são executadas pelo `app/main.py` (SK5).
+| Limpeza (SK5) | Orquestrador antigo removido; documentação de projeto com roteiro; contextos válidos vindos do catálogo; `main.py` dividido em `ipc`, `sessao` e `voz` | `TESTADO` (191 testes) e teste de fumaça do processo real |
 
-**Validação:** 195 de 195 testes aprovados, nas mesmas condições da seção 12.
+**O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
+
+**Validação:** 191 de 191 testes aprovados, nas mesmas condições da seção 12.

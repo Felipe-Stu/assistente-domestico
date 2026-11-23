@@ -7,21 +7,7 @@ A validação em Python continua existindo como segunda barreira.
 """
 from typing import Any, Dict
 
-# Valores que o orquestrador pode devolver (os mesmos descritos no prompt)
-DIFICULDADES_LLM = ["facil", "medio_dificil"]
-CONTEXTOS_LLM = ["compras", "agenda", "inventario", "outro", "geral"]
-ACOES_LLM = ["criar", "corrigir", "consultar", "delegar"]
-
-ESQUEMA_ORQUESTRADOR: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "dificuldade": {"type": "string", "enum": DIFICULDADES_LLM},
-        "mudanca_de_contexto": {"type": "boolean"},
-        "contexto": {"type": "string", "enum": CONTEXTOS_LLM},
-        "acao": {"type": "string", "enum": ACOES_LLM},
-    },
-    "required": ["dificuldade", "mudanca_de_contexto", "contexto", "acao"],
-}
+# O esquema da decisão do orquestrador é montado do catálogo: core/skills/seletor.esquema_decisao()
 
 _ITEM_COMPRA: Dict[str, Any] = {
     "type": "object",

@@ -1,7 +1,7 @@
 """
 Escolha da skill pelo catálogo.
 
-- decisao_pelo_catalogo(): usada pelo orquestrador do app (SK2, ORQUESTRADOR_MODO=catalogo).
+- decisao_pelo_catalogo(): usada pelo orquestrador do app (SK2).
   O prompt é fixo (só nome e descrição das skills, sem a frase do usuário), então o Ollama
   reaproveita o prefixo entre chamadas. A resposta traz skill, ação e dificuldade, e é convertida
   para o formato de decisão que o resto do app já usa (contexto, acao, dificuldade...).

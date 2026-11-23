@@ -5,7 +5,7 @@ Roda no PC com o Ollama aberto. Não grava no banco (a extração usa preparar_c
 
 Mede:
   1. Escolha da skill para as frases de evals/casos.jsonl, em três modos:
-       atual    — orquestrador do app, no modo de ORQUESTRADOR_MODO (desde o SK2, "catalogo")
+       atual    — orquestrador do app (desde o SK2, escolha pelo catálogo)
        catalogo — saída estruturada com o nome das skills como enum (proposta do SK2)
        nativo   — chamada de ferramentas do Ollama, uma ferramenta por skill
   2. Extração de compras (evals/compras.jsonl) com o raciocínio desligado e ligado.
@@ -420,9 +420,8 @@ def main(argv=None):
 
     so = [args.so_roteamento, args.so_extracao, args.so_troca]
     fazer = (lambda i: so[i] or not any(so))
-    from core.config import ORQUESTRADOR_MODO
     dados = {"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "modelos": modelos, "usar_regras": not args.sem_regras,
-             "orquestrador": ORQUESTRADOR_MODO,
+             "orquestrador": "catalogo",
              "repeticoes": args.repeticoes, "roteamento": None, "extracao": None, "troca": None}
     if fazer(2):
         dados["troca"] = medir_troca(modelos)

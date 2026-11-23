@@ -39,11 +39,6 @@ BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(DB_DIR / "backups")))
 BACKUP_DIARIOS = int(os.getenv("BACKUP_DIARIOS", "7"))
 BACKUP_SEMANAIS = int(os.getenv("BACKUP_SEMANAIS", "4"))
 
-# Orquestrador (SK2): "catalogo" escolhe a skill pelo catálogo de skills/; "contextos" volta ao prompt antigo
-ORQUESTRADOR_MODO = os.getenv("ORQUESTRADOR_MODO", "catalogo").strip().lower()
-if ORQUESTRADOR_MODO not in ("catalogo", "contextos"):
-    ORQUESTRADOR_MODO = "catalogo"
-
 # Claude (SKP): agente principal de programação quando houver cota; sem cota, o Qwen local responde
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 CLAUDE_MODELO = os.getenv("CLAUDE_MODELO", "claude-sonnet-5-5")

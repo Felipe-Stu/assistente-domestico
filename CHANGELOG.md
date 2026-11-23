@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [V4.1] — SK5: remoção do código antigo e divisão do main.py (2026-11-23)
+
+### Removido
+- Orquestrador por contextos fixos (prompt de ~250 linhas) e a opção `ORQUESTRADOR_MODO`: o orquestrador pelo catálogo foi confirmado no PC (44/48 em 0,87 s contra 43/48 em 1,39 s). O código antigo está no histórico do Git até o commit `d128516`.
+- `ESQUEMA_ORQUESTRADOR` e as listas de valores do orquestrador antigo em `services/esquemas.py`.
+- No assistente local, os ramos de compras e agenda que ficaram inalcançáveis (essas skills têm roteiro). Também `PROMPT_PROGRAMACAO` e `_sanitizar_resposta_json` do `gemma_service.py`, sem uso.
+- `services/gemma_service.py`: 373 → 159 linhas.
+
+### Alterado
+- A skill `documentar-projeto` passou a ter roteiro (`skills/documentar-projeto/roteiro.py`). O `app/main.py` não tem mais nenhum `if contexto ==`: todas as skills, exceto `conversa-geral`, executam o próprio roteiro.
+- Os contextos válidos na decisão do orquestrador vêm do catálogo (`gemma_service.valores_permitidos()`). Antes eram uma lista fixa, e uma skill nova com contexto próprio seria recusada quando escolhida pelo modelo.
+- `app/main.py` dividido (974 → 788 linhas): `app/ipc.py` (UTF-8, pipe do Electron isolado e `emitir_electron`), `app/sessao.py` (`GerenciadorDeSessao`) e `app/voz.py` (modo voz e laço do microfone, classe base do runtime). O pipeline continua no `main.py`.
+
+### Decisões (23/11/2026)
+- O código de estoque nunca ligado ao app (validação por voz, baixa direta; P8 e P20) fica até a V4.3, que refaz o estoque dentro da skill.
+- Divisão segura do `main.py`: o pipeline e o orquestrador continuam onde estão, para não reescrever os testes.
+
+### Testes
+- 191 de 191 aprovados. Saíram 5 testes do orquestrador antigo e entrou 1: o contexto de uma skill nova é aceito quando o modelo a escolhe.
+- Teste de fumaça do processo real, numa cópia do projeto: `app/main.py` por pipe (como o Electron), com respostas de estoque, desfazer compra e agenda pelos roteiros, sem erros.
+
 ## [V4.1] — SKP: programação com Claude (API) e Qwen local como reserva (2026-11-23)
 
 ### Adicionado

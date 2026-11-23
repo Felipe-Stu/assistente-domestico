@@ -69,10 +69,11 @@ class TestCatalogoDoProjeto(unittest.TestCase):
             ["agenda", "compras", "conversa-geral", "documentar-projeto", "estoque", "programacao"],
         )
 
-    def test_todo_contexto_do_orquestrador_tem_uma_skill(self):
-        for contexto in gemma_service.VALORES_PERMITIDOS["contexto"]:
-            with self.subTest(contexto=contexto):
-                self.assertIsNotNone(self.catalogo.por_contexto(contexto))
+    def test_contextos_validos_vem_do_catalogo(self):
+        contextos = {c for s in self.catalogo for c in s.contextos}
+        self.assertEqual(gemma_service.valores_permitidos()["contexto"], contextos)
+        for contexto in contextos:
+            self.assertIsNotNone(self.catalogo.por_contexto(contexto))
 
     def test_privacidade_declarada_concorda_com_a_politica_do_nucleo(self):
         from app import main as app_main
@@ -80,7 +81,7 @@ class TestCatalogoDoProjeto(unittest.TestCase):
         self.assertEqual(permitidos, app_main.AssistenteRuntime.CONTEXTOS_NUVEM)
 
     def test_prompts_usados_pelo_codigo_existem(self):
-        self.assertIn("# PAPEL", gemma_service.PROMPT_PROGRAMACAO)
+        self.assertIn("# PAPEL", self.catalogo.skill("programacao").prompt("sistema"))
         extracao = self.catalogo.skill("compras").prompt("extracao", data_atual="2026-01-31")
         self.assertIn('"data_compra": "2026-01-31"', extracao)
         self.assertNotIn("{{", extracao)

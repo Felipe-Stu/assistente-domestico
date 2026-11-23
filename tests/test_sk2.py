@@ -12,7 +12,6 @@ from unittest import mock
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from core import config  # noqa: E402
 from core.skills import obter_catalogo, seletor  # noqa: E402
 from services import gemma_service, llm_provider, logger_service  # noqa: E402
 from services.resilience_service import InvalidOrchestratorOutputException  # noqa: E402
@@ -34,7 +33,6 @@ class Base(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         for patcher in (
             mock.patch.object(logger_service.logger, "base_dir", os.path.join(self._tmp.name, "logs")),
-            mock.patch.object(gemma_service, "ORQUESTRADOR_MODO", "catalogo"),
             mock.patch.object(llm_provider, "MODO_QWEN_ATIVO", False),
         ):
             patcher.start()
@@ -48,9 +46,6 @@ class Base(unittest.TestCase):
 
 
 class TestOrquestradorPeloCatalogo(Base):
-    def test_padrao_e_o_catalogo(self):
-        self.assertEqual(config.ORQUESTRADOR_MODO, "catalogo")
-
     def test_decisao_no_formato_do_app(self):
         decisao, espiao = self.orquestrar("Me ajuda com um erro de Python",
                                           {"skill": "programacao", "acao": "delegar", "dificuldade": "facil"})
@@ -99,13 +94,25 @@ class TestOrquestradorPeloCatalogo(Base):
             self.assertEqual(gemma_service.orquestrar_requisicao("Pesquise na internet o preço do frango e compare três mercados")["contexto"], "compras")
         provedor.assert_not_called()
 
-    def test_modo_contextos_continua_disponivel(self):
-        espiao = Espiao({"dificuldade": "facil", "mudanca_de_contexto": False, "contexto": "geral", "acao": "consultar"})
-        with mock.patch.object(gemma_service, "ORQUESTRADOR_MODO", "contextos"), \
-                mock.patch.object(gemma_service, "obter_provedor_local", return_value=espiao):
-            decisao = gemma_service.orquestrar_requisicao("Qual a capital da França?")
-        self.assertEqual(decisao["contexto"], "geral")
-        self.assertIn("ORQUESTRADOR", espiao.chamadas[0]["prompt"])
+    def test_contexto_de_skill_nova_e_aceito_pela_validacao(self):
+        """SK5: os contextos válidos vêm do catálogo; uma skill nova escolhida pelo modelo não é recusada."""
+        from core.skills import carregar_catalogo
+        tmp = Path(self._tmp.name) / "skills"
+        for skill in obter_catalogo():
+            destino = tmp / skill.nome
+            for arquivo in skill.pasta.rglob("*"):
+                if arquivo.is_file() and "__pycache__" not in arquivo.parts:
+                    alvo = destino / arquivo.relative_to(skill.pasta)
+                    alvo.parent.mkdir(parents=True, exist_ok=True)
+                    alvo.write_bytes(arquivo.read_bytes())
+        (tmp / "musica").mkdir()
+        (tmp / "musica" / "SKILL.md").write_text(
+            "---\nname: musica\ndescription: Toca músicas e playlists no Spotify da casa.\ncontextos: [musica]\n"
+            "estado: ativa\nprivacidade: local\nversao: 1\n---\n", encoding="utf-8")
+        catalogo = carregar_catalogo(tmp)
+        with mock.patch.object(gemma_service, "obter_catalogo", return_value=catalogo):
+            decisao, _ = self.orquestrar("toca algo animado", {"skill": "musica", "acao": "criar", "dificuldade": "facil"})
+        self.assertEqual(decisao["contexto"], "musica")
 
 
 class TestConversao(unittest.TestCase):

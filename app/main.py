@@ -1,50 +1,24 @@
+"""
+AssistenteRuntime: ciclo de vida, filas e pipeline de cada solicitação
+(orquestrador → skill → resposta). IPC em app/ipc.py, sessão em app/sessao.py, modo voz em app/voz.py.
+"""
 import logging
-import os
-import sys
-import io
 import json
 import queue
+import sys
 import threading
-import time
 from pathlib import Path
 
-# Configura codificação de fluxo para UTF-8 no Windows antes de qualquer saída
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-
-
-def _isolar_entrada_ipc():
-    """
-    Devolve um leitor UTF-8 exclusivo para os comandos do Electron e troca a entrada
-    padrão do processo por uma vazia (os.devnull).
-
-    Motivo: no Windows, enquanto a thread de leitura espera a próxima linha no pipe,
-    qualquer consulta de outra thread a esse mesmo pipe (bibliotecas que checam o stdin
-    ao serem importadas, como na carga do modelo de embeddings) fica bloqueada até chegar
-    uma nova mensagem. Com o pipe em um descritor privado, ninguém além do leitor o toca.
-    O Electron envia os comandos em UTF-8; sem isso, acentos chegam corrompidos ("café" -> "cafÃ©").
-    """
-    try:
-        fd_privado = os.dup(sys.stdin.fileno())
-        fd_nulo = os.open(os.devnull, os.O_RDONLY)
-        os.dup2(fd_nulo, 0)  # no Windows também atualiza o handle padrão de entrada
-        os.close(fd_nulo)
-        entrada = open(fd_privado, "r", encoding="utf-8", closefd=True)
-        sys.stdin = open(os.devnull, "r", encoding="utf-8")
-        return entrada
-    except Exception:
-        # Sem descritor real (ex.: execução embutida): mantém o comportamento anterior
-        sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
-        return sys.stdin
-
-
-ENTRADA_IPC = _isolar_entrada_ipc()
-
-# 1. Ajusta o sys.path PRIMEIRO
+# 1. sys.path primeiro: os módulos do app vêm da raiz do projeto
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
-# 2. Importações organizadas — apenas serviços essenciais no topo
+# 2. UTF-8 nos fluxos e pipe do Electron isolado, antes de qualquer outra importação (ver app/ipc.py)
+from app.ipc import ENTRADA_IPC, emitir_electron  # noqa: E402
+from app.sessao import GerenciadorDeSessao  # noqa: E402
+from app.voz import ModoVoz  # noqa: E402
+
+# 3. Importações organizadas — apenas serviços essenciais no topo
 from services.ai_service import AIService, ServiceUnavailableException, TokenExhaustedException
 from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
@@ -68,7 +42,7 @@ from services.backup_service import BackupService
 from services.biblioteca_service import BibliotecaService
 from services.claude_service import ClaudeService
 import core.config as config_app
-from services.project_analyzer import ProjectAnalyzer, ProjetoInvalidoError
+from services.project_analyzer import ProjectAnalyzer
 from services.logger_service import logger as custom_logger
 from services.resilience_service import (
     InvalidOrchestratorOutputException,
@@ -108,38 +82,19 @@ MSG_OLLAMA_FORA = (
 # EMISSÃO IPC PADRONIZADA
 # =============================================================================
 
-def emitir_electron(tipo, payload=None):
-    """Auxiliar para padronizar o envio de mensagens JSON ao Electron."""
-    msg = {"type": tipo}
-    if payload is not None:
-        msg["payload"] = payload
-    print(json.dumps(msg, ensure_ascii=False), flush=True)
 
 
 # =============================================================================
 # GERENCIADOR DE SESSÃO
 # =============================================================================
 
-class GerenciadorDeSessao:
-    def __init__(self):
-        self.contexto_ativo = None
-        self.historico = []
-
-    def atualizar_sessao(self, novo_contexto, mensagem_user, resposta_ai, mudanca_de_contexto=False):
-        if mudanca_de_contexto or self.contexto_ativo != novo_contexto:
-            logger.info(f"🔄 Alterando contexto de '{self.contexto_ativo}' para '{novo_contexto}'. Histórico resetado.")
-            self.contexto_ativo = novo_contexto
-            self.historico = []
-
-        self.historico.append({"role": "user", "content": mensagem_user})
-        self.historico.append({"role": "assistant", "content": resposta_ai})
 
 
 # =============================================================================
 # RUNTIME PRINCIPAL — TEXT-FIRST COM ATIVAÇÃO DINÂMICA DE VOZ
 # =============================================================================
 
-class AssistenteRuntime:
+class AssistenteRuntime(ModoVoz):
     """
     Runtime unificado do Assistente Doméstico.
     
@@ -292,73 +247,6 @@ class AssistenteRuntime:
     # FASE 2: Ativação Dinâmica de Voz (Lazy, sob demanda)
     # -------------------------------------------------------------------------
 
-    def _ativar_modo_voz(self):
-        """
-        Tenta inicializar VoiceService (TTS) e AudioService (Microfone).
-        Retorna dict com status detalhado para o frontend.
-        Nunca lança exceção.
-        """
-        emitir_electron("debug_log", {"message": "Ativando modo voz... Verificando hardware..."})
-
-        tts_ready = False
-        mic_ready = False
-        erro = None
-
-        # TTS (Síntese de Voz)
-        if self.voice_service:
-            tts_ready = self.voice_service.inicializar()
-            if not tts_ready:
-                erro = self.voice_service.obter_erro()
-                emitir_electron("debug_log", {"message": f"⚠️ TTS indisponível: {erro}"})
-            else:
-                emitir_electron("debug_log", {"message": "✓ TTS (síntese de voz) ativado."})
-
-        # Microfone (Captura de Áudio)
-        if self.audio_service:
-            mic_ready = self.audio_service.inicializar()
-            if not mic_ready:
-                mic_erro = self.audio_service.obter_erro()
-                if not erro:
-                    erro = mic_erro
-                else:
-                    erro += f" | {mic_erro}"
-                emitir_electron("debug_log", {"message": f"⚠️ Microfone indisponível: {mic_erro}"})
-            else:
-                emitir_electron("debug_log", {"message": "✓ Microfone detectado e pronto."})
-
-        available = tts_ready or mic_ready
-        self.voice_mode_active = available
-
-        status = {
-            "available": available,
-            "tts_ready": tts_ready,
-            "mic_ready": mic_ready,
-            "error": erro
-        }
-
-        if available:
-            emitir_electron("debug_log", {"message": "Modo voz ativado com sucesso."})
-        else:
-            emitir_electron("debug_log", {"message": "Modo voz indisponível — nenhum hardware detectado."})
-
-        return status
-
-    def _desativar_modo_voz(self):
-        """Desativa o modo voz e aborta capturas em andamento."""
-        self.voice_mode_active = False
-
-        if self.audio_service:
-            self.audio_service.abortar_captura()
-
-        emitir_electron("debug_log", {"message": "Modo voz desativado."})
-
-        return {
-            "available": False,
-            "tts_ready": self.voice_service.esta_disponivel() if self.voice_service else False,
-            "mic_ready": self.audio_service.esta_disponivel() if self.audio_service else False,
-            "error": None
-        }
-
     # -------------------------------------------------------------------------
     # Falar (resposta por voz) — condicional
     # -------------------------------------------------------------------------
@@ -383,7 +271,7 @@ class AssistenteRuntime:
     # Contextos que geram JSON estruturado não recebem contexto RAG no prompt
     CONTEXTOS_SEM_RAG = {"compras", "agenda"}
     # Compras já são vetorizadas pelo ShoppingAssistant; consultas de estoque e agenda não são fatos
-    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario", "agenda"}
+    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario", "agenda", "projetos"}
     # Somente perguntas gerais podem ir ao Gemini; os demais contextos permanecem locais
     CONTEXTOS_NUVEM = {"geral", "outro"}
 
@@ -433,22 +321,6 @@ class AssistenteRuntime:
         if not llm_provider_estado.MODO_QWEN_ATIVO and PROJECT_ANALYZER_MODEL != MODELO_PADRAO:
             alternar_modelo_vram(PROJECT_ANALYZER_MODEL)
 
-    def _executar_analise_projeto(self, caminho):
-        """Executa a Skill de forma síncrona (o chat fica em PROCESSING até o fim). Nunca usa a nuvem."""
-        if not caminho:
-            return "Informe o caminho da pasta do projeto. Exemplo: analisar projeto E:\\MOBA"
-        emitir_electron("debug_log", {"message": f"ProjectAnalyzer: analisando '{caminho}'. Isso pode levar alguns minutos..."})
-        try:
-            with custom_logger.etapa("analise_projeto"):
-                resultado = self.project_analyzer.analisar(caminho)
-            return ProjectAnalyzer.formatar_resposta(resultado)
-        except ProjetoInvalidoError as e:
-            return f"Não foi possível analisar: {e}"
-        except Exception as e:
-            logger.error(f"Falha na análise de projeto: {e}")
-            custom_logger.log_geral(f"[ProjectAnalyzer] Falha na análise de '{caminho}': {e}")
-            return f"A análise do projeto falhou: {e}"
-
     # -------------------------------------------------------------------------
     # Compras
     # -------------------------------------------------------------------------
@@ -479,6 +351,8 @@ class AssistenteRuntime:
             "shopping_assistant": self.shopping_assistant,
             "inventory_assistant": self.inventory_assistant,
             "db_service": self.db_service,
+            "project_analyzer": getattr(self, "project_analyzer", None),
+            "progresso": lambda mensagem: emitir_electron("debug_log", {"message": mensagem}),
         }
         if skill is not None and skill.nome == "programacao":
             servicos.update({
@@ -583,7 +457,6 @@ class AssistenteRuntime:
         dificuldade = decisao.get("dificuldade", "medio_dificil")
         contexto = decisao.get("contexto", "outro")
         mudanca_contexto = decisao.get("mudanca_de_contexto", False)
-        parametros = decisao.get("parametros") or {}
 
         # =====================================================================
         # INTERCEPTAÇÃO: Resposta direta
@@ -595,19 +468,6 @@ class AssistenteRuntime:
             logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
             self._falar_se_permitido(resposta_texto)
 
-            emitir_electron("assistant_message", {"text": resposta_texto})
-            self._set_estado("WAITING_INPUT")
-            return resposta_texto
-
-        # =====================================================================
-        # INTERCEPTAÇÃO: Skill ProjectAnalyzer (local, sem fallback para nuvem)
-        # =====================================================================
-        if contexto == "projetos":
-            caminho = parametros.get("caminho")
-            resposta_texto = self._executar_analise_projeto(caminho)
-            self.sessao.atualizar_sessao(contexto, solicitacao_original, resposta_texto, mudanca_de_contexto=mudanca_contexto)
-            # Por voz, apenas a primeira linha (sem caminhos de pasta)
-            self._falar_se_permitido(resposta_texto.split("\n", 1)[0])
             emitir_electron("assistant_message", {"text": resposta_texto})
             self._set_estado("WAITING_INPUT")
             return resposta_texto
@@ -718,52 +578,6 @@ class AssistenteRuntime:
                     self.fila.put({"type": "send_text", "payload": {"text": conteudo}})
             except Exception as e:
                 logger.error(f"Erro ao processar stdin: {e}")
-
-    def _loop_microfone(self):
-        """Thread daemon para captação contínua do microfone físico."""
-        while not self.deve_encerrar:
-            if (self.voice_mode_active 
-                and self.audio_service 
-                and self.audio_service.esta_disponivel() 
-                and self.estado == "WAITING_INPUT"):
-                
-                emitir_electron("voice_mode_status", {
-                    "available": True,
-                    "tts_ready": self.voice_service.esta_disponivel() if self.voice_service else False,
-                    "mic_ready": True,
-                    "listening": True,
-                    "error": None
-                })
-                
-                try:
-                    transcricao = self.audio_service.capturar_audio_e_transcrever(ativar_trava_inicial=True)
-                    if transcricao and transcricao.strip():
-                        if self.voice_mode_active and self.estado == "WAITING_INPUT":
-                            self.fila.put({"type": "voice_input", "payload": {"text": transcricao}})
-                except Exception as e:
-                    logger.error(f"Erro no loop do microfone: {e}")
-                    # Se o mic foi desconectado em runtime, atualiza estado
-                    if self.audio_service and not self.audio_service.esta_disponivel():
-                        self.voice_mode_active = False
-                        emitir_electron("voice_mode_status", {
-                            "available": False,
-                            "tts_ready": self.voice_service.esta_disponivel() if self.voice_service else False,
-                            "mic_ready": False,
-                            "listening": False,
-                            "error": "Microfone desconectado durante uso."
-                        })
-                        emitir_electron("debug_log", {"message": "⚠️ Microfone desconectado. Voltando ao modo texto."})
-                    time.sleep(1)
-                finally:
-                    emitir_electron("voice_mode_status", {
-                        "available": self.voice_mode_active,
-                        "tts_ready": self.voice_service.esta_disponivel() if self.voice_service else False,
-                        "mic_ready": self.audio_service.esta_disponivel() if self.audio_service else False,
-                        "listening": False,
-                        "error": None
-                    })
-            else:
-                time.sleep(0.3)
 
     # -------------------------------------------------------------------------
     # Loop Principal
