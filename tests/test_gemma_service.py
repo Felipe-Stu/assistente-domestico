@@ -22,7 +22,9 @@ class ProvedorFalso:
     """Simula o LocalLLMProvider devolvendo uma classificação válida."""
 
     def gerar_json(self, *_args, **_kwargs):
-        return {"dificuldade": "facil", "mudanca_de_contexto": False, "contexto": "geral", "acao": "consultar"}
+        # Serve aos dois modos do orquestrador: catálogo (skill) e contextos (contexto)
+        return {"skill": "conversa-geral", "dificuldade": "facil", "mudanca_de_contexto": False,
+                "contexto": "geral", "acao": "consultar"}
 
 
 class BaseOrquestrador(unittest.TestCase):

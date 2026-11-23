@@ -1,0 +1,8 @@
+{"id": "c01", "frase": "fui ao mercado Moreschi e comprei peito de frango por r$ 16,99 o quilo comprei 3 kg 124 G comprei também detergente Minuano por r$ 2,69 comprei chiclete Trident por r$ 3,49 comprei também cebola por r$ 7,49 o quilo comprei 484 g e também comprei alho por r$ 27,99 o quilo comprei 106 gramas", "mercado": "moreschi", "itens": 5, "total": 65.86, "embalagem": false}
+{"id": "c02", "frase": "Comprei 2 pacotes de café de 500g por R$ 18,90 cada no Mercado Central", "mercado": "central", "itens": 1, "total": 37.8, "embalagem": true}
+{"id": "c03", "frase": "Dia 18/07/2026 eu comprei no mercado Max Atacadista 1 salgadinho elma chips de 400g por R$14.99, 4 chocolates kitkat por R$2.99 cada, 4 petiscos para gatos whiskas 80g por R$18.49 cada", "mercado": "max", "itens": 3, "total": 100.91, "embalagem": true}
+{"id": "c04", "frase": "Comprei hoje no Engenho Santo Mário dois pastéis e uma coca-cola, por R$39.00 reais. O valor da coca foi de 6 reais, dos pasteis eu não lembro", "mercado": "engenho", "itens": 2, "total": 39.0, "embalagem": false}
+{"id": "c05", "frase": "Comprei ontem um pacote de arroz de 5 kg por 27,90", "mercado": null, "itens": 1, "total": 27.9, "embalagem": true}
+{"id": "c06", "frase": "Anotar que gastei no restaurante costela de chão o valor de 150 reais em um almoço de família", "mercado": "costela", "itens": 1, "total": 150.0, "embalagem": false}
+{"id": "c07", "frase": "Comprei no Tauste 3 iogurtes de 170g a 2,49 cada e um queijo minas de 500g por 21,90", "mercado": "tauste", "itens": 2, "total": 29.37, "embalagem": true}
+{"id": "c08", "frase": "Paguei 12,50 em 2 kg de banana na feira", "mercado": "feira", "itens": 1, "total": 12.5, "embalagem": false}

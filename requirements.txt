@@ -16,3 +16,5 @@ sentence-transformers>=2.5.0
 # Síntese de voz neural (TTS) e reprodução de áudio
 edge-tts>=6.1.0
 pygame>=2.5.0
+# Cabeçalhos das skills (skills/<nome>/SKILL.md)
+PyYAML>=6.0

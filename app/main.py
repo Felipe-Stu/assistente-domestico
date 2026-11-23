@@ -556,7 +556,7 @@ class AssistenteRuntime:
         logger.info(f"🧠 [Decisão do Orquestrador]: {decisao}")
         custom_logger.evento(
             "main", "decisao",
-            contexto=decisao.get("contexto"), acao=decisao.get("acao"),
+            skill=decisao.get("skill"), contexto=decisao.get("contexto"), acao=decisao.get("acao"),
             dificuldade=decisao.get("dificuldade"), resposta_direta="resposta_direta" in decisao,
         )
 

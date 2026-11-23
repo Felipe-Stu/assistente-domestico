@@ -1,0 +1,48 @@
+{"id": "r01", "frase": "Comprei 2 litros de leite por 12 reais no Moreschi", "skill": "compras", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r02", "frase": "Fui no Tauste e paguei 45 reais em frutas", "skill": "compras", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r03", "frase": "Gastei 80 reais no açougue hoje", "skill": "compras", "acoes": ["criar"], "grupo": "atual", "nota": "sem 'comprei' nem 'paguei': depende do modelo"}
+{"id": "r04", "frase": "Anota aí: pão e leite na padaria, deu 18,50", "skill": "compras", "acoes": ["criar"], "grupo": "atual", "nota": "depende do modelo"}
+{"id": "r05", "frase": "Quanto gastei no Moreschi este mês?", "skill": "compras", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r06", "frase": "Qual mercado está com o frango mais barato?", "skill": "compras", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r07", "frase": "O que preciso comprar esta semana?", "skill": "compras", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r08", "frase": "Desfazer última compra", "skill": "compras", "acoes": ["corrigir"], "grupo": "atual"}
+{"id": "r09", "frase": "Corrige a compra de ontem, o leite foi 4,99", "skill": "compras", "acoes": ["corrigir"], "grupo": "atual"}
+{"id": "r10", "frase": "Pesquise na internet o preço do frango e compare três mercados", "skill": "compras", "acoes": ["consultar"], "grupo": "atual", "nota": "privado: não deve ir à conversa geral"}
+{"id": "r11", "frase": "Quanto foi a conta do mercado semana passada?", "skill": "compras", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r12", "frase": "Ainda tenho leite em casa?", "skill": "estoque", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r13", "frase": "Acabou o detergente", "skill": "estoque", "acoes": ["corrigir"], "grupo": "atual"}
+{"id": "r14", "frase": "Tá faltando detergente aqui", "skill": "estoque", "acoes": ["consultar", "corrigir"], "grupo": "atual"}
+{"id": "r15", "frase": "Tem ração do gato sobrando?", "skill": "estoque", "acoes": ["consultar"], "grupo": "atual", "nota": "depende do modelo"}
+{"id": "r16", "frase": "O café terminou hoje de manhã", "skill": "estoque", "acoes": ["corrigir"], "grupo": "atual", "nota": "depende do modelo"}
+{"id": "r17", "frase": "Me lembre de pagar a conta de luz amanhã", "skill": "agenda", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r18", "frase": "Marquei dentista pra quinta às 14h", "skill": "agenda", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r19", "frase": "Que horas é meu dentista amanhã?", "skill": "agenda", "acoes": ["consultar"], "grupo": "atual", "nota": "depende do modelo"}
+{"id": "r20", "frase": "Agende a revisão da moto para sábado", "skill": "agenda", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r21", "frase": "Escreva a documentação do sistema de inventário do MOBA", "skill": "documentar-projeto", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r22", "frase": "Gera a documentação técnica desse projeto pra mim", "skill": "documentar-projeto", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r23", "frase": "Analisa a estrutura do repositório do assistente", "skill": "documentar-projeto", "acoes": ["consultar"], "grupo": "atual", "nota": "depende do modelo; hoje o orquestrador não oferece 'projetos' (P10)"}
+{"id": "r24", "frase": "Vou programar agora, me ajuda com um erro de Python", "skill": "programacao", "grupo": "atual", "nota": "hoje o orquestrador não oferece 'programacao' (P10)"}
+{"id": "r25", "frase": "Por que meu teste unitário está falhando com KeyError?", "skill": "programacao", "grupo": "atual", "nota": "P10"}
+{"id": "r26", "frase": "Revisa essa função que calcula o total da compra", "skill": "programacao", "grupo": "atual", "nota": "P10"}
+{"id": "r27", "frase": "Qual a capital da Austrália?", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r28", "frase": "Bom dia, tudo bem?", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r29", "frase": "Me dê uma dica rápida para economizar energia elétrica.", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r30", "frase": "Como faço arroz soltinho?", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r31", "frase": "Conta uma curiosidade sobre o espaço", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r32", "frase": "Quanto é 15% de 230?", "skill": "conversa-geral", "grupo": "atual"}
+{"id": "r33", "frase": "Eu prefiro café sem açúcar e sempre compro a marca Pilão", "skill": "conversa-geral", "grupo": "atual", "nota": "preferência: aceita compras também", "aceita": ["compras"]}
+{"id": "r34", "frase": "Lê esse PDF do contrato e me resume", "skill": "conversa-geral", "grupo": "futuro", "futuro": "ler-pdf"}
+{"id": "r35", "frase": "Lê o PDF do boleto e me diz o vencimento", "skill": "conversa-geral", "grupo": "futuro", "futuro": "ler-pdf", "nota": "dado financeiro: quando a skill existir, deve ser local"}
+{"id": "r36", "frase": "Gera um relatório dos meus gastos de outubro", "skill": "compras", "acoes": ["consultar"], "grupo": "futuro", "futuro": "relatorios"}
+{"id": "r37", "frase": "Faz um relatório do estoque da despensa", "skill": "estoque", "acoes": ["consultar"], "grupo": "futuro", "futuro": "relatorios"}
+{"id": "r38", "frase": "Toca Legião Urbana no Spotify", "skill": "conversa-geral", "grupo": "futuro", "futuro": "musica"}
+{"id": "r39", "frase": "Pausa a música da cozinha", "skill": "conversa-geral", "grupo": "futuro", "futuro": "musica"}
+{"id": "r40", "frase": "Teve alguém no portão hoje?", "skill": "conversa-geral", "grupo": "futuro", "futuro": "cameras"}
+{"id": "r41", "frase": "Liga a luz da sala", "skill": "conversa-geral", "grupo": "futuro", "futuro": "casa"}
+{"id": "r42", "frase": "Qual a previsão do tempo pra amanhã?", "skill": "conversa-geral", "grupo": "futuro", "futuro": "clima"}
+{"id": "r43", "frase": "Quanto falta pagar das parcelas do cartão?", "skill": "conversa-geral", "grupo": "futuro", "futuro": "financas", "nota": "dado financeiro: quando a skill existir, deve ser local"}
+{"id": "r44", "frase": "Bom dia! O que tenho pra hoje?", "skill": "agenda", "acoes": ["consultar"], "grupo": "futuro", "futuro": "rotina-bom-dia"}
+{"id": "r45", "frase": "Anota uma ideia: app para a lista de compras do mercado", "skill": "conversa-geral", "grupo": "futuro", "futuro": "notas", "nota": "contém 'compras' mas não é compra", "aceita": ["compras"]}
+{"id": "r46", "frase": "Lembra que a namorada mora em Bauru", "skill": "conversa-geral", "grupo": "futuro", "futuro": "memoria"}
+{"id": "r47", "frase": "Manda um áudio resumindo meu dia", "skill": "conversa-geral", "grupo": "futuro", "futuro": "voz"}
+{"id": "r48", "frase": "Exporta minhas compras do mês em PDF", "skill": "compras", "acoes": ["consultar"], "grupo": "futuro", "futuro": "relatorios"}

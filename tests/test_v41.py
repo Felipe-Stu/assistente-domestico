@@ -179,6 +179,7 @@ class TestUsoDosEsquemas(BaseSemLogs):
             {"dificuldade": "facil", "mudanca_de_contexto": False, "contexto": "geral", "acao": "consultar"}
         )
         with mock.patch.object(gemma_service, "obter_provedor_local", return_value=espiao), \
+                mock.patch.object(gemma_service, "ORQUESTRADOR_MODO", "contextos"), \
                 mock.patch.object(llm_provider, "MODO_QWEN_ATIVO", False):
             gemma_service.orquestrar_requisicao("Qual é a capital da França?")
         self.assertIs(espiao.chamadas[0]["esquema"], esquemas.ESQUEMA_ORQUESTRADOR)

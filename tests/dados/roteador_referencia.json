@@ -1,0 +1,1505 @@
+[
+ {
+  "frase": "Comprei 2 litros de leite por 12 reais no Moreschi",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Comprei 2 litros de leite por 12 reais no Moreschi",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Comprei 2 litros de leite por 12 reais no Moreschi",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Fui no Moreschi e comprei arroz",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Fui no Moreschi e comprei arroz",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Fui no Moreschi e comprei arroz",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Quanto gastei no Moreschi este mês?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Quanto gastei no Moreschi este mês?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Quanto gastei no Moreschi este mês?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que eu tenho comprado ultimamente?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que eu tenho comprado ultimamente?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que eu tenho comprado ultimamente?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que preciso comprar esta semana?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que preciso comprar esta semana?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "O que preciso comprar esta semana?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Qual mercado está com o frango mais barato?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Qual mercado está com o frango mais barato?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Qual mercado está com o frango mais barato?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Ainda tenho leite em casa?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Ainda tenho leite em casa?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Ainda tenho leite em casa?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Acabou o detergente",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "Acabou o detergente",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "Acabou o detergente",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "O detergente acabou",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "O detergente acabou",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "O detergente acabou",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "Me lembre de pagar a conta de luz amanhã",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Me lembre de pagar a conta de luz amanhã",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Me lembre de pagar a conta de luz amanhã",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Escreva a documentação do sistema de inventário do MOBA",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "Escreva a documentação do sistema de inventário do MOBA",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "Escreva a documentação do sistema de inventário do MOBA",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "Desfazer última compra",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "Desfazer última compra",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "Desfazer última compra",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "Vou programar agora",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Vou programar agora",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Vou programar agora",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Bom dia, tudo bem?",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Bom dia, tudo bem?",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Bom dia, tudo bem?",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Qual a capital da França?",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Qual a capital da França?",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Qual a capital da França?",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Paguei 30 reais na farmácia",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Paguei 30 reais na farmácia",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Paguei 30 reais na farmácia",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "comprei pão?",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "comprei pão?",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "comprei pão?",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Registre uma compra no Tauste",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Registre uma compra no Tauste",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Registre uma compra no Tauste",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "anota compra de 50 reais",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "anota compra de 50 reais",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "anota compra de 50 reais",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "Cancele a minha última compra",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Cancele a minha última compra",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Cancele a minha última compra",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "apagar compra anterior",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "apagar compra anterior",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "apagar compra anterior",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "corrigir",
+   "parametros": {
+    "operacao": "desfazer"
+   }
+  }
+ },
+ {
+  "frase": "quanto pagamos de luz",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "quanto pagamos de luz",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "quanto pagamos de luz",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "onde eu comprei o café",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "onde eu comprei o café",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "onde eu comprei o café",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus gastos de outubro",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus gastos de outubro",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus gastos de outubro",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "gastos com carne",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "gastos com carne",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "gastos com carne",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "últimas compras",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "últimas compras",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "últimas compras",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "quais itens eu preciso comprar",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "quais itens eu preciso comprar",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "quais itens eu preciso comprar",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "lista de compras",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "lista de compras",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "lista de compras",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "qual foi o preço do arroz",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "qual foi o preço do arroz",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "qual foi o preço do arroz",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "temos café em casa?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "temos café em casa?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "temos café em casa?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meu estoque de arroz",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meu estoque de arroz",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meu estoque de arroz",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "o que tem em estoque",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "o que tem em estoque",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "o que tem em estoque",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Já acabou o café",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "Já acabou o café",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "Já acabou o café",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "os ovos acabaram",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "os ovos acabaram",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "os ovos acabaram",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "corrigir"
+  }
+ },
+ {
+  "frase": "minha agenda de amanhã",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "minha agenda de amanhã",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "minha agenda de amanhã",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus compromissos",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus compromissos",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "meus compromissos",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "agende dentista quinta",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "agende dentista quinta",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "agende dentista quinta",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "marca uma consulta pra sexta",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "marca uma consulta pra sexta",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "marca uma consulta pra sexta",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "lembrete de remédio",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "lembrete de remédio",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "lembrete de remédio",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "agenda",
+   "acao": "criar"
+  }
+ },
+ {
+  "frase": "documente o módulo de compras",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "documente o módulo de compras",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "documente o módulo de compras",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "gerar documentação do projeto",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "gerar documentação do projeto",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "gerar documentação do projeto",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "projetos",
+   "acao": "consultar",
+   "parametros": {
+    "caminho": null
+   }
+  }
+ },
+ {
+  "frase": "toca minha playlist na sala",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "toca minha playlist na sala",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "toca minha playlist na sala",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "lê esse PDF e resume",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "lê esse PDF e resume",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "lê esse PDF e resume",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "gera um relatório dos gastos do mês",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "gera um relatório dos gastos do mês",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "gera um relatório dos gastos do mês",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "Ativar modo qwen",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Ativar modo qwen",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Ativar modo qwen",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "analisar projeto E:\\MOBA",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "analisar projeto E:\\MOBA",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "analisar projeto E:\\MOBA",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Tá faltando detergente aqui",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Tá faltando detergente aqui",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Tá faltando detergente aqui",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Marquei dentista pra quinta às 14h",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Marquei dentista pra quinta às 14h",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Marquei dentista pra quinta às 14h",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Corrige a compra de ontem, o leite foi 4,99",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Corrige a compra de ontem, o leite foi 4,99",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Corrige a compra de ontem, o leite foi 4,99",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "Pesquise na internet o preço do frango",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  },
+  "alteracao": "2026-11-23 (SK2): gatilho de preço em compras; antes ia ao modelo e podia cair na conversa geral, que vai à nuvem"
+ },
+ {
+  "frase": "Pesquise na internet o preço do frango",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  },
+  "alteracao": "2026-11-23 (SK2): gatilho de preço em compras; antes ia ao modelo e podia cair na conversa geral, que vai à nuvem"
+ },
+ {
+  "frase": "Pesquise na internet o preço do frango",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  },
+  "alteracao": "2026-11-23 (SK2): gatilho de preço em compras; antes ia ao modelo e podia cair na conversa geral, que vai à nuvem"
+ },
+ {
+  "frase": "Eu prefiro café sem açúcar e sempre compro a marca Pilão",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "Eu prefiro café sem açúcar e sempre compro a marca Pilão",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "Eu prefiro café sem açúcar e sempre compro a marca Pilão",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "comprei e paguei, quanto gastei?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "comprei e paguei, quanto gastei?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "comprei e paguei, quanto gastei?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "o arroz e o feijão acabaram",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "o arroz e o feijão acabaram",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "o arroz e o feijão acabaram",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "acabou tudo",
+  "contexto_atual": null,
+  "decisao": null
+ },
+ {
+  "frase": "acabou tudo",
+  "contexto_atual": "compras",
+  "decisao": null
+ },
+ {
+  "frase": "acabou tudo",
+  "contexto_atual": "geral",
+  "decisao": null
+ },
+ {
+  "frase": "ainda temos ração do gato?",
+  "contexto_atual": null,
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "ainda temos ração do gato?",
+  "contexto_atual": "compras",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ },
+ {
+  "frase": "ainda temos ração do gato?",
+  "contexto_atual": "geral",
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "inventario",
+   "acao": "consultar"
+  }
+ }
+]
