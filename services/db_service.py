@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from core.config import DB_PATH
+from services import estoque_service
 from services.dinheiro import para_centavos
 from services.produtos_service import TABELA_PRODUTOS, resolver_produto
 from services.logger_service import logger as custom_logger
@@ -76,7 +77,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 5
+        SCHEMA_VERSION = 6
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -235,6 +236,21 @@ class DatabaseService:
                     for item_id, unitario, total in cursor.fetchall():
                         cursor.execute("UPDATE itens_compra SET valor_unitario_centavos = ?, valor_total_centavos = ? WHERE id = ?",
                                        (para_centavos(unitario), para_centavos(total), item_id))
+                    cursor.execute("PRAGMA user_version = 5;")
+                    atual_version = 5
+
+                if atual_version < 6:
+                    msg_migracao = "Aplicando migração v6 (M06): controle_consumo ligado ao catálogo (produto_id, unidade)."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute("PRAGMA table_info(controle_consumo);")
+                    existentes = [coluna[1] for coluna in cursor.fetchall()]
+                    if "produto_id" not in existentes:
+                        cursor.execute("ALTER TABLE controle_consumo ADD COLUMN produto_id INTEGER REFERENCES produtos(id);")
+                    if "unidade" not in existentes:
+                        cursor.execute("ALTER TABLE controle_consumo ADD COLUMN unidade TEXT;")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_consumo_produto ON controle_consumo (produto_id);")
+                    # Sem preencher com compras antigas: sem ritmo conhecido, elas apareceriam como estoque cheio
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -386,6 +402,13 @@ class DatabaseService:
                     para_centavos(valor_total),
                 )
             )
+            # M06: a compra alimenta o estoque do produto, na mesma transação
+            qtd_base, unidade_base = estoque_service.quantidade_base(
+                quantidade, unidade, item.get("embalagem_quantidade"), item.get("embalagem_unidade"))
+            cursor.execute("SELECT categoria FROM produtos WHERE id = ?", (produto_id,))
+            linha_produto = cursor.fetchone()
+            estoque_service.registrar_entrada(cursor, produto_id, produto_nome, linha_produto[0] if linha_produto else categoria,
+                                              qtd_base, unidade_base, data_compra)
 
         return compra_id
 
@@ -443,8 +466,15 @@ class DatabaseService:
         try:
             with custom_logger.etapa("banco", componente=NOME_ASSISTENTE, operacao="remover_compras", compras=len(compra_ids)):
                 cursor = conn.cursor()
-                cursor.execute(f"SELECT id FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
-                itens_ids = [linha[0] for linha in cursor.fetchall()]
+                cursor.execute(
+                    f"SELECT id, produto_id, quantidade, unidade, embalagem_quantidade, embalagem_unidade "
+                    f"FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
+                itens = cursor.fetchall()
+                itens_ids = [linha[0] for linha in itens]
+                # M06: o estoque perde o que estas compras tinham somado
+                for _, produto_id, quantidade, unidade, emb_qtd, emb_unid in itens:
+                    estoque_service.reverter_entrada(cursor, produto_id,
+                                                     estoque_service.quantidade_base(quantidade, unidade, emb_qtd, emb_unid)[0])
                 # A origem fica, marcada como desfeita (M09): o histórico do que foi pedido não se perde
                 cursor.execute(
                     f"UPDATE entradas SET situacao = 'desfeita' WHERE id IN "

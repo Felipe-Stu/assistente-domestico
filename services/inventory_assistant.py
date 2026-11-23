@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 import logging
 import re
+import unicodedata
 from typing import Any, Callable, Dict, Optional
 
 from services.audio_service import AudioService
@@ -14,6 +15,24 @@ logger = logging.getLogger(__name__)
 
 # Identificador do serviço para o logger estruturado
 NOME_ASSISTENTE = "inventory_assistant"
+
+
+def _sem_acentos(texto: str) -> str:
+    texto = unicodedata.normalize("NFKD", texto or "")
+    return "".join(c for c in texto if not unicodedata.combining(c)).lower()
+
+
+def _rotulo_unidade(unidade: str, quantidade: float) -> str:
+    if unidade == "litro":
+        return "litro" if round(quantidade, 1) == 1 else "litros"
+    if unidade == "un":
+        return "unidade" if round(quantidade, 1) == 1 else "unidades"
+    return unidade
+
+
+def _data_br(data_iso: str) -> str:
+    partes = str(data_iso or "")[:10].split("-")
+    return "/".join(reversed(partes)) if len(partes) == 3 else str(data_iso)
 
 
 class InventoryAssistant:
@@ -96,7 +115,7 @@ class InventoryAssistant:
 
         itens = self.db.executar_consulta(
             """SELECT produto_nome, quantidade_comprada, quantidade_residual_confirmada,
-                      tempo_medio_calculado, data_ultima_compra, validacao_pendente
+                      tempo_medio_calculado, data_ultima_compra, validacao_pendente, unidade
                FROM controle_consumo
                WHERE status_estoque = 1
                ORDER BY produto_nome"""
@@ -107,9 +126,11 @@ class InventoryAssistant:
 
         termos = self._extrair_termos_produto(texto_usuario)
         if termos:
+            termos_sem_acento = [_sem_acentos(t) for t in termos]
+
             def corresponde(nome: str) -> bool:
-                nome_lower = nome.lower()
-                return any(t in nome_lower or (t.endswith("s") and t[:-1] in nome_lower) for t in termos)
+                nome_lower = _sem_acentos(nome)
+                return any(t in nome_lower or (t.endswith("s") and t[:-1] in nome_lower) for t in termos_sem_acento)
             selecionados = [it for it in itens if corresponde(it[0])]
             if not selecionados:
                 msg = f"Não encontrei estoque ativo para: {', '.join(termos)}."
@@ -119,9 +140,11 @@ class InventoryAssistant:
             selecionados = list(itens)
 
         linhas = []
-        for nome, qtd_comprada, qtd_residual, ritmo, data_ultima, pendente in selecionados[:limite]:
+        for nome, qtd_comprada, qtd_residual, ritmo, data_ultima, pendente, unidade in selecionados[:limite]:
             restante = self._estimar_estoque_restante(qtd_comprada, qtd_residual, ritmo, data_ultima)
-            linha = f"{nome}: cerca de {self._formatar_numero(restante)} restante(s) (última compra em {data_ultima})"
+            quanto = f"{self._formatar_numero(restante)} {_rotulo_unidade(unidade, restante)}" if unidade else \
+                f"{self._formatar_numero(restante)} restante(s)"
+            linha = f"{nome}: cerca de {quanto} (última compra em {_data_br(data_ultima)})"
             if pendente:
                 linha += " — aguardando sua confirmação"
             linhas.append(linha)
