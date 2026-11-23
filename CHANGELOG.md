@@ -27,6 +27,10 @@
 - `CLAUDE_SKILLS` padrão: `programacao,ideias`.
 - A biblioteca aceita pastas extras, lidas a cada indexação.
 
+### Validação no PC (23/11)
+- Claude Code instalado e logado no plano (`instalar-claude-code.bat`): resposta em 5,5 s.
+- Três ideias mandadas pelo Telegram foram analisadas em cerca de 20 s cada, e as análises voltaram ao chat.
+
 ### Privacidade
 - O texto da ideia vai ao Claude; a consulta sobre a ideia fica local.
 - Pelo Telegram, a mensagem passa pelos servidores do Telegram.

@@ -354,7 +354,7 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 | Agenda (SK7) | Anotar, consultar e cancelar compromissos, feita só em `skills/agenda/`; resolve o P9 | `TESTADO` (8 testes); no PC com o modelo real `NÃO TESTADO` |
 
-| Ideias (23/11) | Skill `ideias`, fila de análise pelo Claude, `.md` na biblioteca local, Claude pela assinatura (`claude -p`) e bot do Telegram | `TESTADO` (20 testes) e teste de fumaça com Claude Code simulado; Claude Code e Telegram reais `NÃO TESTADO` |
+| Ideias (23/11) | Skill `ideias`, fila de análise pelo Claude, `.md` na biblioteca local, Claude pela assinatura (`claude -p`) e bot do Telegram | `TESTADO` (21 testes) e `TESTADO` no PC em 23/11: ideias #9 a #11 enviadas pelo Telegram, analisadas pelo Claude pela assinatura em cerca de 20 s, `.md` gravado e análise devolvida ao chat |
 
 **O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
 
