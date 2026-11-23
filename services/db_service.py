@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from core.config import DB_PATH
+from services.dinheiro import para_centavos
 from services.produtos_service import TABELA_PRODUTOS, resolver_produto
 from services.logger_service import logger as custom_logger
 
@@ -75,7 +76,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 4
+        SCHEMA_VERSION = 5
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -212,6 +213,28 @@ class DatabaseService:
                     for item_id, produto, categoria, unidade in cursor.fetchall():
                         produto_id = resolver_produto(cursor, produto, categoria, unidade, nome_primeiro=True)
                         cursor.execute("UPDATE itens_compra SET produto_id = ? WHERE id = ?", (produto_id, item_id))
+                    cursor.execute("PRAGMA user_version = 4;")
+                    atual_version = 4
+
+                if atual_version < 5:
+                    msg_migracao = "Aplicando migração v5 (M08): valores em centavos inteiros."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    novas = {"compras": ["total_centavos"], "itens_compra": ["valor_unitario_centavos", "valor_total_centavos"]}
+                    for tabela, colunas in novas.items():
+                        cursor.execute(f"PRAGMA table_info({tabela});")
+                        existentes = [coluna[1] for coluna in cursor.fetchall()]
+                        for coluna in colunas:
+                            if coluna not in existentes:
+                                cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} INTEGER;")
+                    # As colunas REAL antigas ficam como estão; as novas recebem a conversão (meio centavo para cima)
+                    cursor.execute("SELECT id, total_gasto FROM compras")
+                    for compra_id, total in cursor.fetchall():
+                        cursor.execute("UPDATE compras SET total_centavos = ? WHERE id = ?", (para_centavos(total), compra_id))
+                    cursor.execute("SELECT id, valor_unitario, valor_total FROM itens_compra")
+                    for item_id, unitario, total in cursor.fetchall():
+                        cursor.execute("UPDATE itens_compra SET valor_unitario_centavos = ?, valor_total_centavos = ? WHERE id = ?",
+                                       (para_centavos(unitario), para_centavos(total), item_id))
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -310,10 +333,10 @@ class DatabaseService:
 
         cursor.execute(
             """
-            INSERT INTO compras (data_compra, nome_comercio, total_gasto, entrada_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO compras (data_compra, nome_comercio, total_gasto, total_centavos, entrada_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (data_compra, nome_comercio, total_gasto, entrada_id)
+            (data_compra, nome_comercio, total_gasto, para_centavos(total_gasto), entrada_id)
         )
         compra_id = cursor.lastrowid
 
@@ -341,9 +364,11 @@ class DatabaseService:
                     categoria,
                     embalagem_quantidade,
                     embalagem_unidade,
-                    produto_id
+                    produto_id,
+                    valor_unitario_centavos,
+                    valor_total_centavos
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     compra_id,
@@ -357,6 +382,8 @@ class DatabaseService:
                     item.get("embalagem_quantidade"),
                     item.get("embalagem_unidade"),
                     produto_id,
+                    para_centavos(valor_unitario),
+                    para_centavos(valor_total),
                 )
             )
 

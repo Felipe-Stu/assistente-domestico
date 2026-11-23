@@ -7,6 +7,7 @@ import time
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.esquemas import ESQUEMA_COMPRAS
+from services.dinheiro import formatar_reais, para_centavos, para_reais
 from services.produtos_service import inferir_categoria
 from services.intent_router import normalizar_texto
 from core.skills import obter_catalogo
@@ -32,7 +33,7 @@ _RE_DATA_VAGA = re.compile(r"\b(?:semana passada|semana retrasada|mes passado|ou
 
 
 def _formatar_moeda(valor: float) -> str:
-    return f"R$ {valor:.2f}".replace(".", ",")
+    return formatar_reais(valor)  # M08: arredondamento comercial e separador de milhar
 
 
 def _formatar_numero(valor: float) -> str:
@@ -89,7 +90,7 @@ class ShoppingAssistant:
         dados_validados = dados_compra.copy()
         itens = dados_validados.get("itens", [])
         itens_validados = []
-        valor_total_calculado_compra = 0.0
+        valor_total_calculado_compra = 0  # centavos
 
         for item in itens:
             if not isinstance(item, dict):
@@ -154,11 +155,11 @@ class ShoppingAssistant:
                 item_validado["embalagem_quantidade"] = None
                 item_validado["embalagem_unidade"] = None
 
-            valor_total_calculado_compra += valor_total
+            valor_total_calculado_compra += para_centavos(item_validado["valor_total"])  # M08: soma em centavos
             itens_validados.append(item_validado)
 
         dados_validados["itens"] = itens_validados
-        dados_validados["valor_total_compra"] = round(valor_total_calculado_compra, 2)
+        dados_validados["valor_total_compra"] = para_reais(valor_total_calculado_compra)
         return dados_validados
 
     def _resolver_data(self, texto: str, hoje: Optional[date] = None) -> Tuple[str, Optional[str]]:
