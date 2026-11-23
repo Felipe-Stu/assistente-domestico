@@ -21,7 +21,7 @@ from services import llm_provider, logger_service  # noqa: E402
 class TestRoteirosDoProjeto(unittest.TestCase):
     def test_skills_com_roteiro(self):
         com_roteiro = {s.nome for s in obter_catalogo() if s.execucao == "roteiro"}
-        self.assertEqual(com_roteiro, {"compras", "estoque", "agenda", "programacao", "documentar-projeto"})
+        self.assertEqual(com_roteiro, {"compras", "estoque", "agenda", "programacao", "documentar-projeto", "ideias"})
         for nome in com_roteiro:
             with self.subTest(skill=nome):
                 self.assertTrue(callable(motor.carregar_roteiro(obter_catalogo().skill(nome)).executar))

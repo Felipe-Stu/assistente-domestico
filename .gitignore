@@ -37,3 +37,8 @@ node_modules/
 # Estado do Claude (disponibilidade e gasto do mês) e índice da biblioteca
 core/database/estado_claude.json
 core/database/biblioteca_indice.json
+
+# Ideias de projetos (análises pessoais), estado do Claude pela assinatura e do bot do Telegram
+/Ideias/
+core/database/estado_claude_assinatura.json
+core/database/telegram_offset.json

@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [V4.1] — Ideias de projetos, Claude pela assinatura e bot do Telegram (2026-11-23)
+
+### Adicionado
+- Skill `ideias`:
+  - "tive uma ideia: ..." salva no SQLite na hora (tabela `ideias`).
+  - "minhas ideias" e "ver ideia 3" listam e mostram.
+  - "como sigo a ideia X?" é respondida pelo modelo local com a análise salva, sem internet.
+- `services/ideias_service.py`:
+  - Fila de análise em segundo plano: o Claude devolve título, resumo, MVP, como construir, riscos, próximos passos e perguntas (`skills/ideias/prompts/analise.md`).
+  - Sem Claude disponível, a ideia fica pendente e é tentada de novo a cada `IDEIAS_RETESTE_MIN`.
+  - A análise vai para o banco e para `Ideias/ideia-NNNN-*.md` (fora do Git), que entra na biblioteca local.
+- `services/claude_assinatura_service.py` (`CLAUDE_MODO=assinatura`, padrão): usa o Claude Code logado no plano (`claude -p`), sem chave de API.
+  - Sem ferramentas: `--tools ""` e sem MCP.
+  - Roda numa pasta temporária, sem gravar sessão, e com `ANTHROPIC_API_KEY` retirada do ambiente.
+  - Limite do plano: reteste em `CLAUDE_ASSINATURA_RETESTE_MIN`. Sem login: reteste na manhã seguinte.
+  - O modo `api` continua disponível.
+- `services/telegram_service.py`: bot opcional para mandar ideias do celular.
+  - Long polling, sem expor o PC; só os chats de `TELEGRAM_CHAT_IDS` são atendidos.
+  - Comandos `/ideias`, `/ver N`, `/reanalisar N`.
+  - A análise volta para o chat de origem. O token nunca vai para os logs.
+- `testar-claude-assinatura.bat` (instalação, login e resposta) e `configurar-telegram.bat` (descobre o número do chat).
+- `tests/test_ideias.py` (20 testes) e 4 casos de avaliação. Suíte: 226 testes.
+
+### Alterado
+- `CLAUDE_SKILLS` padrão: `programacao,ideias`.
+- A biblioteca aceita pastas extras, lidas a cada indexação.
+
+### Privacidade
+- O texto da ideia vai ao Claude; a consulta sobre a ideia fica local.
+- Pelo Telegram, a mensagem passa pelos servidores do Telegram.
+
 ## [V4.1] — SK7: agenda (2026-11-23)
 
 ### Adicionado

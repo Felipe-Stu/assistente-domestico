@@ -5,7 +5,8 @@ Indexa a documentação do projeto no ChromaDB (coleção própria, separada das
 os trechos mais próximos de uma pergunta. Só os trechos relevantes vão ao modelo, nunca a
 biblioteca inteira: um prompt grande deixa o modelo local lento e menos preciso.
 
-Fontes: documentação que já é pública no repositório e a documentação gerada a partir do código.
+Fontes: documentação que já é pública no repositório, a documentação gerada a partir do código e,
+como pasta extra, as análises de ideias (Ideias/*.md, que já vieram do Claude).
 A pasta de planejamento fica de fora (tem informação pessoal, e os trechos podem ir ao Claude).
 """
 import hashlib
@@ -55,14 +56,19 @@ def dividir(texto: str, tamanho: int = TAMANHO_MAXIMO) -> List[str]:
 
 
 class BibliotecaService:
-    def __init__(self, vector_store, raiz: Path, arquivo_indice: Path, fontes: Optional[Iterable[Path]] = None):
+    def __init__(self, vector_store, raiz: Path, arquivo_indice: Path, fontes: Optional[Iterable[Path]] = None,
+                 pastas_extras: Iterable[Path] = ()):
         self.vector_store = vector_store
         self.raiz = Path(raiz)
         self.arquivo_indice = Path(arquivo_indice)
         self._fontes = list(fontes) if fontes is not None else None
+        self.pastas_extras = [Path(p) for p in pastas_extras]
 
     def fontes(self) -> List[Path]:
-        return self._fontes if self._fontes is not None else fontes_padrao(self.raiz)
+        arquivos = self._fontes if self._fontes is not None else fontes_padrao(self.raiz)
+        for pasta in self.pastas_extras:  # lidas a cada indexação: arquivos novos entram sozinhos
+            arquivos = arquivos + sorted(pasta.glob("*.md"))
+        return arquivos
 
     def _nome(self, arquivo: Path) -> str:
         try:

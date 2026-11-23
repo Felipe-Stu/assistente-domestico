@@ -104,7 +104,7 @@ graph TD
 | `gemini-2.5-flash` | Perguntas gerais difíceis e contingência delas | Chamada real não executada |
 | `paraphrase-multilingual-MiniLM-L12-v2` | Embeddings na CPU | Em cache; carregou com sucesso |
 
-**Dados que saem da máquina:** perguntas gerais enviadas ao Gemini, com histórico e memórias apenas de `geral` e `outro`; e, no modo voz, áudio enviado ao Google Speech e texto enviado ao Edge TTS. Compras, estoque, agenda, programação e documentação não vão ao Gemini. Com o Ollama parado, frases sem regra também não vão, pois não há como saber se são privadas.
+**Dados que saem da máquina (atualizado em 23/11/2026):** texto das ideias e pedidos de programação enviados ao Claude (assinatura ou API); mensagens ao bot do Telegram, quando ligado. Antes: perguntas gerais enviadas ao Gemini, com histórico e memórias apenas de `geral` e `outro`; e, no modo voz, áudio enviado ao Google Speech e texto enviado ao Edge TTS. Compras, estoque, agenda, programação e documentação não vão ao Gemini. Com o Ollama parado, frases sem regra também não vão, pois não há como saber se são privadas.
 
 ---
 
@@ -353,6 +353,8 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 | Agenda (SK7) | Anotar, consultar e cancelar compromissos, feita só em `skills/agenda/`; resolve o P9 | `TESTADO` (8 testes); no PC com o modelo real `NÃO TESTADO` |
 
+| Ideias (23/11) | Skill `ideias`, fila de análise pelo Claude, `.md` na biblioteca local, Claude pela assinatura (`claude -p`) e bot do Telegram | `TESTADO` (20 testes) e teste de fumaça com Claude Code simulado; Claude Code e Telegram reais `NÃO TESTADO` |
+
 **O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
 
-**Validação:** 206 de 206 testes aprovados, nas mesmas condições da seção 12.
+**Validação:** 226 de 226 testes aprovados, nas mesmas condições da seção 12.

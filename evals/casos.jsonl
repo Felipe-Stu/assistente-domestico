@@ -46,3 +46,7 @@
 {"id": "r46", "frase": "Lembra que a namorada mora em Bauru", "skill": "conversa-geral", "grupo": "futuro", "futuro": "memoria"}
 {"id": "r47", "frase": "Manda um áudio resumindo meu dia", "skill": "conversa-geral", "grupo": "futuro", "futuro": "voz"}
 {"id": "r48", "frase": "Exporta minhas compras do mês em PDF", "skill": "compras", "acoes": ["consultar"], "grupo": "futuro", "futuro": "relatorios"}
+{"id": "r49", "frase": "Tive uma ideia: um app que sugere receitas pelo que tem na geladeira", "skill": "ideias", "acoes": ["criar"], "grupo": "atual"}
+{"id": "r50", "frase": "Pensei num sistema para dividir as tarefas da casa, guarda isso pra mim", "skill": "ideias", "acoes": ["criar"], "grupo": "atual", "nota": "sem a palavra ideia: depende do modelo"}
+{"id": "r51", "frase": "Quais são minhas ideias?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual"}
+{"id": "r52", "frase": "Quais os próximos passos do projeto de receitas que eu salvei?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual", "nota": "sem gatilho: depende do modelo"}

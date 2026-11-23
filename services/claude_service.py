@@ -84,6 +84,9 @@ class ClaudeService:
     def configurado(self) -> bool:
         return bool(self._api_key)
 
+    def _motivo_nao_configurado(self) -> str:
+        return "Claude não configurado (sem ANTHROPIC_API_KEY no .env)"
+
     def _ler_estado(self) -> Dict:
         try:
             dados = json.loads(self.arquivo_estado.read_text(encoding="utf-8"))
@@ -113,7 +116,7 @@ class ClaudeService:
     def verificar_disponibilidade(self) -> None:
         """Lança ClaudeIndisponivelError se não for hora de tentar o Claude."""
         if not self.configurado():
-            raise ClaudeIndisponivelError("Claude não configurado (sem ANTHROPIC_API_KEY no .env)")
+            raise ClaudeIndisponivelError(self._motivo_nao_configurado())
         with self._trava:
             dados = self._ler_estado()
             ate = dados.get("indisponivel_ate")

@@ -40,7 +40,10 @@ from core.config import (
 )
 from services.backup_service import BackupService
 from services.biblioteca_service import BibliotecaService
+from services.claude_assinatura_service import ClaudeAssinaturaService
 from services.claude_service import ClaudeService
+from services.ideias_service import IdeiasService
+from services.telegram_service import TelegramService
 import core.config as config_app
 from services.project_analyzer import ProjectAnalyzer
 from services.logger_service import logger as custom_logger
@@ -122,6 +125,8 @@ class AssistenteRuntime(ModoVoz):
         self.shopping_assistant = None
         self.claude_service = None
         self.biblioteca = None
+        self.ideias = None
+        self.telegram = None
 
         # Serviços de voz (inicializados sob demanda na Fase 2)
         self.voice_service = None
@@ -172,22 +177,22 @@ class AssistenteRuntime(ModoVoz):
 
             self.ai_service = AIService()
 
-            # SKP: Claude para programação (sem chave, fica desligado) e biblioteca de contexto
-            self.claude_service = ClaudeService(
-                api_key=config_app.ANTHROPIC_API_KEY,
-                modelo=config_app.CLAUDE_MODELO,
-                versao_api=config_app.CLAUDE_API_VERSAO,
-                arquivo_estado=config_app.CLAUDE_ESTADO_ARQUIVO,
-                limite_mensal_usd=config_app.CLAUDE_LIMITE_MENSAL_USD,
-                preco_entrada=config_app.CLAUDE_PRECO_ENTRADA,
-                preco_saida=config_app.CLAUDE_PRECO_SAIDA,
-                hora_reteste=config_app.CLAUDE_HORA_RETESTE,
-                max_tokens=config_app.CLAUDE_MAX_TOKENS,
-            )
+            # SKP: Claude (assinatura ou API; sem ele, a reserva local responde) e biblioteca de contexto
+            self.claude_service = self._criar_claude()
             self.biblioteca = BibliotecaService(
                 vector_store=self.vector_store,
                 raiz=ROOT_DIR,
                 arquivo_indice=config_app.DB_DIR / "biblioteca_indice.json",
+                pastas_extras=[config_app.IDEIAS_DIR],
+            )
+            # Ideias de projetos: salvas na hora, analisadas pelo Claude em segundo plano
+            self.ideias = IdeiasService(
+                db=self.db_service,
+                claude=self.claude_service if "ideias" in CLAUDE_SKILLS else None,
+                pasta=config_app.IDEIAS_DIR,
+                prompt_analise=lambda: obter_catalogo().skill("ideias").prompt("analise"),
+                biblioteca=self.biblioteca,
+                intervalo_reteste_s=config_app.IDEIAS_RETESTE_MIN * 60,
             )
             emitir_electron("debug_log", {"message": "✓ Serviço de IA inicializado."})
 
@@ -271,7 +276,7 @@ class AssistenteRuntime(ModoVoz):
     # Contextos que geram JSON estruturado não recebem contexto RAG no prompt
     CONTEXTOS_SEM_RAG = {"compras", "agenda"}
     # Compras já são vetorizadas pelo ShoppingAssistant; consultas de estoque e agenda não são fatos
-    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario", "agenda", "projetos"}
+    CONTEXTOS_SEM_MEMORIA = {"compras", "inventario", "agenda", "projetos", "ideias"}
     # Somente perguntas gerais podem ir ao Gemini; os demais contextos permanecem locais
     CONTEXTOS_NUVEM = {"geral", "outro"}
 
@@ -345,6 +350,52 @@ class AssistenteRuntime(ModoVoz):
             nome_servico=nome_servico,
         )
 
+    def _criar_claude(self):
+        if config_app.CLAUDE_MODO == "api":
+            return ClaudeService(
+                api_key=config_app.ANTHROPIC_API_KEY,
+                modelo=config_app.CLAUDE_MODELO,
+                versao_api=config_app.CLAUDE_API_VERSAO,
+                arquivo_estado=config_app.CLAUDE_ESTADO_ARQUIVO,
+                limite_mensal_usd=config_app.CLAUDE_LIMITE_MENSAL_USD,
+                preco_entrada=config_app.CLAUDE_PRECO_ENTRADA,
+                preco_saida=config_app.CLAUDE_PRECO_SAIDA,
+                hora_reteste=config_app.CLAUDE_HORA_RETESTE,
+                max_tokens=config_app.CLAUDE_MAX_TOKENS,
+            )
+        return ClaudeAssinaturaService(
+            comando=config_app.CLAUDE_COMANDO,
+            modelo=config_app.CLAUDE_MODELO_ASSINATURA,
+            arquivo_estado=config_app.CLAUDE_ESTADO_ASSINATURA_ARQUIVO,
+            hora_reteste=config_app.CLAUDE_HORA_RETESTE,
+            reteste_minutos=config_app.CLAUDE_ASSINATURA_RETESTE_MIN,
+            timeout=config_app.CLAUDE_ASSINATURA_TIMEOUT,
+        )
+
+    def _avisar_ideia_analisada(self, ideia):
+        emitir_electron("debug_log", {"message": f"💡 Ideia #{ideia['id']} analisada pelo Claude: {ideia['titulo']}."})
+        origem = ideia.get("origem") or ""
+        if origem.startswith("telegram:") and self.telegram is not None:
+            self.telegram.enviar(int(origem.split(":", 1)[1]), f"💡 Análise da ideia #{ideia['id']}\n\n{ideia['analise']}")
+
+    def _iniciar_ideias_e_telegram(self):
+        if self.ideias is None:
+            return
+        self.ideias.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar, notificar=self._avisar_ideia_analisada)
+        telegram = TelegramService(
+            token=config_app.TELEGRAM_BOT_TOKEN,
+            chats_permitidos=config_app.TELEGRAM_CHAT_IDS,
+            arquivo_offset=config_app.TELEGRAM_OFFSET_ARQUIVO,
+            ao_receber=lambda chat, texto: self.ideias.responder_mensagem(texto, f"telegram:{chat}"),
+        )
+        if not telegram.configurado():
+            if config_app.TELEGRAM_BOT_TOKEN:
+                emitir_electron("debug_log", {"message": "⚠️ Telegram sem TELEGRAM_CHAT_IDS: rode configurar-telegram.bat."})
+            return
+        self.telegram = telegram
+        telegram.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
+        emitir_electron("debug_log", {"message": "✓ Bot do Telegram ativo para receber ideias."})
+
     def _contexto_skill(self, skill=None) -> Contexto:
         """O que as skills podem usar: serviços e a política de repetição. Nada de runtime ou IPC."""
         servicos = {
@@ -353,6 +404,7 @@ class AssistenteRuntime(ModoVoz):
             "db_service": self.db_service,
             "project_analyzer": getattr(self, "project_analyzer", None),
             "progresso": lambda mensagem: emitir_electron("debug_log", {"message": mensagem}),
+            "ideias": getattr(self, "ideias", None),
             # Modelo local residente, para qualquer skill (SK6): uma skill nova não precisa mudar o núcleo
             "llm_local": LocalLLMProvider(temperatura=0.1),
         }
@@ -644,6 +696,9 @@ class AssistenteRuntime(ModoVoz):
 
         # Cópia de segurança do dia (M11), em segundo plano: o chat não espera por ela
         self._iniciar_backup_diario()
+
+        # Fila de análise das ideias e bot do Telegram, em segundo plano
+        self._iniciar_ideias_e_telegram()
 
         # =====================================================================
         # SISTEMA PRONTO PARA TEXTO — Chat desbloqueado!

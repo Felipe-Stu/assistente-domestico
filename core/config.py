@@ -52,7 +52,25 @@ CLAUDE_PRECO_SAIDA = float(os.getenv("CLAUDE_PRECO_SAIDA", "10"))
 # Sem cota, o Claude volta a ser testado na primeira solicitação depois desta hora
 CLAUDE_HORA_RETESTE = int(os.getenv("CLAUDE_HORA_RETESTE", "8"))
 # Única skill autorizada a enviar dados ao Claude (decisão de 23/11/2026)
-CLAUDE_SKILLS = {s.strip() for s in os.getenv("CLAUDE_SKILLS", "programacao").split(",") if s.strip()}
+CLAUDE_SKILLS = {s.strip() for s in os.getenv("CLAUDE_SKILLS", "programacao,ideias").split(",") if s.strip()}
+# Como o assistente fala com o Claude: "assinatura" (Claude Code logado no seu plano, comando `claude -p`)
+# ou "api" (ANTHROPIC_API_KEY, cobrada à parte)
+CLAUDE_MODO = os.getenv("CLAUDE_MODO", "assinatura").strip().lower()
+CLAUDE_COMANDO = os.getenv("CLAUDE_COMANDO", "claude")
+CLAUDE_MODELO_ASSINATURA = os.getenv("CLAUDE_MODELO_ASSINATURA", "sonnet")
+# Limite da assinatura atingido: tenta de novo depois destes minutos (a sessão do plano renova a cada 5 h)
+CLAUDE_ASSINATURA_RETESTE_MIN = int(os.getenv("CLAUDE_ASSINATURA_RETESTE_MIN", "60"))
+CLAUDE_ASSINATURA_TIMEOUT = int(os.getenv("CLAUDE_ASSINATURA_TIMEOUT", "300"))
+CLAUDE_ESTADO_ASSINATURA_ARQUIVO = DB_DIR / "estado_claude_assinatura.json"
+
+# Ideias de projetos (skill ideias): banco SQLite + um .md por ideia, fora do Git
+IDEIAS_DIR = Path(os.getenv("IDEIAS_DIR", str(BASE_DIR / "Ideias")))
+IDEIAS_RETESTE_MIN = int(os.getenv("IDEIAS_RETESTE_MIN", "30"))
+
+# Bot do Telegram para mandar ideias do celular (opcional). Só os chats listados são atendidos.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_IDS = {int(c) for c in os.getenv("TELEGRAM_CHAT_IDS", "").replace(";", ",").split(",") if c.strip().lstrip("-").isdigit()}
+TELEGRAM_OFFSET_ARQUIVO = DB_DIR / "telegram_offset.json"
 CLAUDE_ESTADO_ARQUIVO = DB_DIR / "estado_claude.json"
 
 # Credenciais e chaves

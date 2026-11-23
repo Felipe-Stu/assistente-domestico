@@ -225,14 +225,14 @@ class TestRoteiroDeProgramacao(BaseLogs):
 
 
 class TestPoliticaDoClaude(unittest.TestCase):
-    def test_so_programacao_recebe_o_claude(self):
+    def test_so_skills_autorizadas_recebem_o_claude(self):
         from app import main as app_main
         runtime = app_main.AssistenteRuntime()
         runtime.claude_service = object()
         for skill in obter_catalogo():
             with self.subTest(skill=skill.nome):
                 servicos = runtime._contexto_skill(skill).servicos
-                self.assertEqual("claude" in servicos, skill.nome == "programacao")
+                self.assertEqual("claude" in servicos, skill.nome in {"programacao", "ideias"})
         with mock.patch.object(app_main, "CLAUDE_SKILLS", set()):
             self.assertNotIn("claude", runtime._contexto_skill(obter_catalogo().skill("programacao")).servicos)
 

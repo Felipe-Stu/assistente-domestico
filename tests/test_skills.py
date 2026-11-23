@@ -66,7 +66,7 @@ class TestCatalogoDoProjeto(unittest.TestCase):
     def test_skills_do_projeto(self):
         self.assertEqual(
             [s.nome for s in self.catalogo],
-            ["agenda", "compras", "conversa-geral", "documentar-projeto", "estoque", "programacao"],
+            ["agenda", "compras", "conversa-geral", "documentar-projeto", "estoque", "ideias", "programacao"],
         )
 
     def test_contextos_validos_vem_do_catalogo(self):
