@@ -286,7 +286,11 @@ class TestMigracao(BaseBanco):
             db = DatabaseService()
             DatabaseService()  # A segunda inicialização deve ser inofensiva
 
-        self.assertEqual(db.executar_consulta_uma_linha("PRAGMA user_version")[0], 3)  # v3: entradas (M09)
+        self.assertEqual(db.executar_consulta_uma_linha("PRAGMA user_version")[0], 4)  # v3: entradas (M09); v4: produtos (M07)
+        # M07: o item antigo entrou no catálogo, com a categoria convertida para a lista fechada
+        self.assertEqual(db.executar_consulta("SELECT p.nome, p.categoria FROM itens_compra i JOIN produtos p ON p.id = i.produto_id"),
+                         [("leite", "laticinios")])
+        self.assertEqual(db.executar_consulta_uma_linha("SELECT categoria FROM itens_compra")[0], "laticinio")  # original preservado
         self.assertEqual(db.executar_consulta_uma_linha("SELECT produto, embalagem_quantidade FROM itens_compra"), ("leite", None))
 
 

@@ -7,6 +7,8 @@ A validação em Python continua existindo como segunda barreira.
 """
 from typing import Any, Dict
 
+from services.produtos_service import CATEGORIAS
+
 # O esquema da decisão do orquestrador é montado do catálogo: core/skills/seletor.esquema_decisao()
 
 _ITEM_COMPRA: Dict[str, Any] = {
@@ -18,7 +20,7 @@ _ITEM_COMPRA: Dict[str, Any] = {
         "unidade": {"type": "string"},
         "valor_unitario": {"type": "number"},
         "valor_total": {"type": "number"},
-        "categoria": {"type": "string"},
+        "categoria": {"type": "string", "enum": list(CATEGORIAS)},  # M07: lista fechada
         "embalagem_quantidade": {"type": ["number", "null"]},
         "embalagem_unidade": {"type": ["string", "null"]},
     },

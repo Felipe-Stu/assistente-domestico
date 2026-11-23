@@ -30,7 +30,15 @@ Sua única tarefa é converter a transcrição de voz fornecida pelo usuário em
     * Exemplo: "um pacote de arroz de 5 kg por 27,90" -> quantidade: 1.0, unidade: "un", valor_unitario: 27.90, valor_total: 27.90, embalagem_quantidade: 5.0, embalagem_unidade: "kg"
 - Sem conteúdo informado, embalagem_quantidade e embalagem_unidade -> null
 
-4. VALORES PADRÃO (QUANDO NÃO INFORMADO):
+4. CATEGORIA (use exatamente um destes valores):
+- hortifruti (frutas, verduras, legumes) · carnes (carnes, frango, peixes) · laticinios (leite, queijo, iogurte, frios)
+- padaria (pães, bolos) · mercearia (arroz, feijão, massas, óleo, enlatados, temperos, café)
+- bebidas (água, refrigerante, suco, cerveja) · doces_lanches (chocolate, bala, salgadinho, biscoito)
+- limpeza · higiene (sabonete, pasta de dente, papel higiênico) · pet · farmacia (remédios)
+- casa (utensílios, pilhas, lâmpadas) · alimentacao_fora (restaurante, lanchonete, delivery) · lazer (passeios, cinema)
+- outros (só quando nenhum dos anteriores servir)
+
+5. VALORES PADRÃO (QUANDO NÃO INFORMADO):
 - marca -> null
 - estabelecimento -> "Não informado" (se nenhum for dito)
 - data_compra -> "{{data_atual}}"
@@ -56,7 +64,7 @@ SAÍDA:
         "unidade": "kg",
         "valor_unitario": 16.99,
         "valor_total": 53.08,
-        "categoria": "carne"
+        "categoria": "carnes"
         },
         {
         "produto": "detergente",
@@ -99,7 +107,7 @@ SAÍDA:
         "unidade": "un",
         "valor_unitario": 0.0,
         "valor_total": 0.0,
-        "categoria": "categoria",
+        "categoria": "mercearia",
         "embalagem_quantidade": null,
         "embalagem_unidade": null
         }

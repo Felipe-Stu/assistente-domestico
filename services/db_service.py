@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from core.config import DB_PATH
+from services.produtos_service import TABELA_PRODUTOS, resolver_produto
 from services.logger_service import logger as custom_logger
 
 # Logger do console (terminal)
@@ -74,7 +75,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 3
+        SCHEMA_VERSION = 4
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -195,6 +196,22 @@ class DatabaseService:
                     cursor.execute("PRAGMA table_info(compras);")
                     if "entrada_id" not in [coluna[1] for coluna in cursor.fetchall()]:
                         cursor.execute("ALTER TABLE compras ADD COLUMN entrada_id INTEGER REFERENCES entradas(id);")
+                    cursor.execute("PRAGMA user_version = 3;")
+                    atual_version = 3
+
+                if atual_version < 4:
+                    msg_migracao = "Aplicando migração v4 (M07): catálogo de produtos e itens_compra.produto_id."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute(TABELA_PRODUTOS)
+                    cursor.execute("PRAGMA table_info(itens_compra);")
+                    if "produto_id" not in [coluna[1] for coluna in cursor.fetchall()]:
+                        cursor.execute("ALTER TABLE itens_compra ADD COLUMN produto_id INTEGER REFERENCES produtos(id);")
+                    # Itens já gravados entram no catálogo; o texto original de produto e categoria não muda
+                    cursor.execute("SELECT id, produto, categoria, unidade FROM itens_compra WHERE produto_id IS NULL ORDER BY id")
+                    for item_id, produto, categoria, unidade in cursor.fetchall():
+                        produto_id = resolver_produto(cursor, produto, categoria, unidade, nome_primeiro=True)
+                        cursor.execute("UPDATE itens_compra SET produto_id = ? WHERE id = ?", (produto_id, item_id))
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -308,7 +325,8 @@ class DatabaseService:
             unidade = item.get("unidade") or item.get("unidade_medida") or "UN"
             valor_unitario = float(item.get("valor_unitario") or item.get("preco_unitario") or 0.0)
             valor_total = float(item.get("valor_total") or item.get("preco_total") or (quantidade * valor_unitario))
-            categoria = item.get("categoria") or "Geral"
+            categoria = item.get("categoria") or "outros"
+            produto_id = resolver_produto(cursor, produto_nome, categoria, unidade)
 
             cursor.execute(
                 """
@@ -322,9 +340,10 @@ class DatabaseService:
                     valor_total, 
                     categoria,
                     embalagem_quantidade,
-                    embalagem_unidade
+                    embalagem_unidade,
+                    produto_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     compra_id,
@@ -336,7 +355,8 @@ class DatabaseService:
                     valor_total,
                     categoria,
                     item.get("embalagem_quantidade"),
-                    item.get("embalagem_unidade")
+                    item.get("embalagem_unidade"),
+                    produto_id,
                 )
             )
 

@@ -7,6 +7,7 @@ import time
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.esquemas import ESQUEMA_COMPRAS
+from services.produtos_service import inferir_categoria
 from services.intent_router import normalizar_texto
 from core.skills import obter_catalogo
 from services.llm_provider import BaseLLMProvider
@@ -99,6 +100,7 @@ class ShoppingAssistant:
             if not produto:
                 continue
             item_validado["produto"] = produto
+            item_validado["categoria"] = inferir_categoria(produto, item_validado.get("categoria"))  # M07: lista fechada
 
             quantidade = item_validado.get("quantidade")
             valor_unitario = item_validado.get("valor_unitario")
