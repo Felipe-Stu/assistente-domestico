@@ -176,7 +176,7 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 
 | ID | Problema | Local | Efeito | Evidência |
 |---|---|---|---|---|
-| P23 | Pedido de sugestões com a palavra "ideias" vai para a skill `ideias` (ideias salvas), não para a conversa. Ex.: "Me dê ideias de melhorias para a documentação de sistemas" → `ideias/consultar` → "Não encontrei essa ideia". | Orquestrador (`skills/ideias/SKILL.md`, descrição) e `skills/ideias/roteiro.py` (`_consultar`) | Conversa respondida fora de contexto | `TESTADO` no PC (23/11, log da conversa) |
+| P23 | Pedido de sugestões com a palavra "ideias" vai para a skill `ideias` (ideias salvas), não para a conversa. Ex.: "Me dê ideias de melhorias para a documentação de sistemas" → `ideias/consultar` → "Não encontrei essa ideia". | Orquestrador (`skills/ideias/SKILL.md`, descrição) e `skills/ideias/roteiro.py` (`_consultar`) | Conversa respondida fora de contexto. No Telegram, todo texto com 4 ou mais palavras vira ideia, inclusive perguntas | `TESTADO` no PC (23/11, log da conversa e do bot) |
 | P7 | Assistentes usam Gemma fixo mesmo no modo Qwen. | `app/main.py:170` | Os dois modelos podem ocupar a VRAM ao mesmo tempo | `CÓDIGO` |
 | P8 | A varredura roda só no início, com o modo voz ainda desligado, e `validacao_pendente` nunca vira pergunta. | `app/main.py:691`, `services/inventory_assistant.py:307` | Validação por voz inalcançável | `CÓDIGO` |
 | P12 | Vetores de compras em tempo real não têm `entity_id`, e a busca híbrida não está ligada ao fluxo. | `services/shopping_assistant.py:500` | Sem hidratação de valores exatos do SQLite | `CÓDIGO` |
