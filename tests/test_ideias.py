@@ -94,6 +94,13 @@ class TestClaudeAssinatura(Pasta):
             servico.gerar_texto("s", "m")
         servico.verificar_disponibilidade()  # não marcou indisponível
 
+    def test_acha_o_instalador_nativo_fora_do_path(self):
+        from services import claude_assinatura_service as modulo
+        (self.pasta / ".local" / "bin").mkdir(parents=True)
+        (self.pasta / ".local" / "bin" / "claude.exe").write_text("", encoding="utf-8")
+        with mock.patch.object(modulo.shutil, "which", return_value=None), mock.patch.object(modulo.Path, "home", return_value=self.pasta):
+            self.assertEqual(modulo.localizar_claude("claude"), str(self.pasta / ".local" / "bin" / "claude.exe"))
+
     def test_conversa_sem_historico_e_o_proprio_texto(self):
         self.assertEqual(montar_conversa(None, "oi"), "oi")
 

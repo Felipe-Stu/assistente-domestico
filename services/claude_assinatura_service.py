@@ -37,6 +37,18 @@ _SINAIS_LOGIN = ("/login", "not logged", "log in", "login", "authentication", "i
 _SINAIS_LIMITE = ("usage limit", "limit reached", "rate limit", "rate_limit", "quota", "resets at", "limite de uso")
 
 
+def localizar_claude(comando: str) -> Optional[str]:
+    """PATH primeiro; senão, a pasta do instalador nativo (~/.local/bin), que pode não estar no PATH no Windows."""
+    encontrado = shutil.which(comando)
+    if encontrado:
+        return encontrado
+    for nome in (f"{comando}.exe", comando):
+        candidato = Path.home() / ".local" / "bin" / nome
+        if candidato.is_file():
+            return str(candidato)
+    return None
+
+
 def montar_conversa(historico: Optional[List[Dict[str, str]]], mensagem: str) -> str:
     """O `claude -p` recebe um texto só: o histórico vai como transcrição antes da mensagem atual."""
     linhas = []
@@ -60,7 +72,7 @@ class ClaudeAssinaturaService(ClaudeService):
         timeout: float = 300.0,
         agora: Callable[[], datetime] = datetime.now,
         executar: Callable = subprocess.run,
-        localizar: Callable[[str], Optional[str]] = shutil.which,
+        localizar: Callable[[str], Optional[str]] = localizar_claude,
     ):
         super().__init__(api_key="", modelo=modelo, versao_api="", arquivo_estado=arquivo_estado,
                          limite_mensal_usd=0, hora_reteste=hora_reteste, agora=agora, timeout=timeout)
