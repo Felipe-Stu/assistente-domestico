@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [V4.1] — M27: configuração e portabilidade; M02: integração contínua na v4.1 (2026-11-23)
+
+### Adicionado
+- Configuração no `.env` (`core/config.py`):
+  - `OLLAMA_MODELO_PADRAO` e `OLLAMA_MODELO_AVANCADO`.
+  - `OLLAMA_TIMEOUT` e `OLLAMA_KEEP_ALIVE`.
+  - `RETRY_TENTATIVAS` e `RETRY_ESPERA_S`.
+  - O endereço do servidor continua em `OLLAMA_HOST`.
+- Electron escolhe o Python assim: `ASSISTENTE_PYTHON`, senão `.venv` do projeto, senão `python` (Windows) ou `python3`.
+- `scripts/fixar_versoes.py` e `fixar-versoes.bat`: geram `requirements-lock.txt` com as versões exatas instaladas das dependências.
+- `LICENSE` (MIT) e `"license": "MIT"` no `package.json`.
+- `tests/test_m27.py` (7 testes). Suíte: 238 testes.
+
+### Alterado
+- `llm_provider.py` e `app/main.py` leem modelos, tempos e repetição da configuração (antes fixos no código).
+- Bipes do modo voz: `winsound` só no Windows; nos outros sistemas, silêncio, sem erro.
+- Integração contínua também roda em push na `v4.1`.
+- `requests` entra no `requirements-ci.txt` (usado pelo Claude e pelo Telegram).
+
+### Corrigido
+- P16: Python ausente derrubava o Electron sem aviso; agora o erro aparece na interface com a orientação.
+
 ## [V4.1] — P23: pedido de sugestões não é ideia salva (2026-11-23)
 
 ### Corrigido

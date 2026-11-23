@@ -20,10 +20,10 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 15.600 linhas em 23/11/2026, com os testes (≈ 8.070 em 03/11) |
-| Testes automatizados | 231 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
+| Testes automatizados | 238 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`**; 3 ideias analisadas (23/11) |
-| Problemas abertos | 9 (1 alto, 4 médios, 4 baixos); 14 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P9, P10 e P23 em 23/11) |
+| Problemas abertos | 8 (1 alto, 4 médios, 3 baixos); 15 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P9, P10, P16 e P23 em 23/11) |
 
 ---
 
@@ -189,7 +189,6 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 
 | ID | Problema | Local | Evidência |
 |---|---|---|---|
-| P16 | Sem tratamento do evento `error` do processo Python; falha ao iniciar `python` não é informada na interface. | `main.js:48` | `CÓDIGO` |
 | P18 | Erros aparecem apenas no terminal interno, não no chat. | `renderer.js:282` | `CÓDIGO` |
 | P19 | Toda frase com 4 ou mais palavras vira memória de longo prazo. | `services/vector/memory_service.py:48` | `CÓDIGO` |
 | P20 | Heurística confunde respostas: "sim, mas sobraram dois" e "assim que abri acabou" viram `CONFIRMACAO`. Efeito futuro, pois o fluxo está inativo. | `services/inventory_assistant.py:175` | `TESTADO` |
@@ -198,6 +197,7 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 
 | ID | Problema | Correção | Validação |
 |---|---|---|---|
+| P16 | Python ausente derrubava o Electron sem aviso | `main.js` trata o evento `error` do processo e mostra a orientação; Python configurável por `ASSISTENTE_PYTHON` ou `.venv` (M27) | `tests/test_m27.py` (`TESTADO`); janela real `NÃO TESTADO` |
 | P10 | `programacao` (e `projetos`) não estavam entre as opções do orquestrador | O orquestrador escolhe entre todas as skills do catálogo (SK2) | `tests/test_sk2.py` (`TESTADO`) |
 | P23 | Pedido de sugestões com a palavra "ideias" ia para a skill `ideias`; no Telegram, perguntas viravam ideias | A skill só consulta quando o pedido se refere a uma ideia salva e encaminha o resto à conversa geral (`Resposta.encaminhar`). No Telegram, perguntas e pedidos não são salvos; "ideia: ..." ou "/ideia ..." salvam sempre | `tests/test_ideias.py` (`TestP23`, `TestP23NoApp`) (`TESTADO`) |
 | P9 | Agenda não persistia dados | Skill `agenda` com roteiro e tabela `compromissos` (SK7) | `tests/test_sk7.py` (`TESTADO`) |
@@ -236,6 +236,7 @@ A verificação de inatividade ocorre na solicitação seguinte, não em segundo
 
 - **Sem chamadas no projeto:** `parse_json_com_fallback`, `classificar_intencao_usuario`, `enviar_prompt_json`, `salvar_compra_da_ia`, `obter_itens_expirados_para_validacao`, `obter_dados_produto_por_nome`, `atualizar_recompra_e_ritmo`, `zerar_estoque_item`, `zerar_estoque_por_nome`, `pre_carregar_modelo` e os callbacks de áudio e voz.
 - **Duplicado:** `_sanitizar_resposta_json` nos dois provedores de LLM (a cópia sem uso do `gemma_service.py` saiu no SK5).
+- **M27 (23/11):** modelos, tempos e repetição foram para o `config.py`; o Electron não depende mais de `python` no PATH; bipes não dependem do Windows.
 - **Configurações sem uso:** `SAMPLE_RATE`, `CHANNELS`, `CHUNK_SIZE`, `RECORD_SECONDS` e `GEMINI_API_KEY` em `core/config.py`.
 - **Estado de interface sem origem:** o back-end nunca emite `RESPONDING`.
 - **Cobertura:** roteamento, compras, política da nuvem e parte do runtime têm testes. Faltam estoque, serviços vetoriais reais, voz e IPC.
@@ -384,7 +385,7 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Claude pela assinatura | `CLAUDE_MODO=assinatura` (padrão), Claude Code instalado e logado no plano; resposta curta em 5,5 s | `TESTADO` no PC (`testar-claude-assinatura.bat`) |
 | Ideias pelo Telegram | Três ideias recebidas, analisadas em cerca de 20 s cada e devolvidas ao chat; `.md` gravados em `Ideias/` | `TESTADO` no PC |
 | P23 | Pedido de sugestões encaminhado à conversa geral; perguntas no Telegram não viram ideia | `TESTADO` (4 testes) |
-| Suíte | 231 de 231 testes aprovados (ambiente com bibliotecas externas simuladas) | `TESTADO` |
+| Suíte | 238 de 238 testes aprovados (231 ao fechar a fase; +7 do M27) (ambiente com bibliotecas externas simuladas) | `TESTADO` |
 
 **Dados que saem da máquina, em resumo:** perguntas gerais (Gemini, se configurado), texto das ideias e pedidos de programação (Claude), mensagens ao bot (Telegram) e, no modo voz, áudio (Google Speech) e texto (Edge TTS). Compras, estoque e agenda não saem.
 

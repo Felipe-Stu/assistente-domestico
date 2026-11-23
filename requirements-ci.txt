@@ -5,3 +5,5 @@ python-dotenv>=1.0.1
 google-genai>=1.0.0
 # Cabeçalhos das skills (skills/<nome>/SKILL.md)
 PyYAML>=6.0
+# Claude pela API e bot do Telegram
+requests>=2.31.0

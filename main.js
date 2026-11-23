@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 let mainWindow;
@@ -42,11 +43,30 @@ function sendToRenderer(channel, payload) {
     }
 }
 
-function startPythonBackend() {
-    console.log("Iniciando back-end Python...");
+// Python do back-end (M27): ASSISTENTE_PYTHON no ambiente; senão, o ambiente virtual do projeto (.venv);
+// senão, "python" no Windows e "python3" nos outros sistemas.
+function resolverPython() {
+    if (process.env.ASSISTENTE_PYTHON) return process.env.ASSISTENTE_PYTHON;
+    const venv = process.platform === 'win32'
+        ? path.join(__dirname, '.venv', 'Scripts', 'python.exe')
+        : path.join(__dirname, '.venv', 'bin', 'python');
+    if (fs.existsSync(venv)) return venv;
+    return process.platform === 'win32' ? 'python' : 'python3';
+}
 
-    pythonProcess = spawn('python', ['-u', 'app/main.py'], {
+function startPythonBackend() {
+    const python = resolverPython();
+    console.log(`Iniciando back-end Python (${python})...`);
+
+    pythonProcess = spawn(python, ['-u', 'app/main.py'], {
         cwd: __dirname
+    });
+
+    // Sem este tratamento, um Python ausente derrubava o Electron sem aviso (P16)
+    pythonProcess.on('error', (erro) => {
+        console.error(`Não foi possível iniciar o Python (${python}): ${erro.message}`);
+        sendToRenderer('error', `Não foi possível iniciar o Python ("${python}"). Instale o Python 3.10+ ou defina ASSISTENTE_PYTHON com o caminho do executável.`);
+        sendToRenderer('state-changed', "ERROR");
     });
 
     let buffer = '';

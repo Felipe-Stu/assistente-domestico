@@ -11,13 +11,20 @@ try:
 except ImportError:  # pragma: no cover
     _ERROS_CONEXAO = (ConnectionError,)
 
-from core.config import OLLAMA_RACIOCINIO, OLLAMA_SAIDA_ESTRUTURADA
+from core.config import (
+    OLLAMA_KEEP_ALIVE,
+    OLLAMA_MODELO_AVANCADO,
+    OLLAMA_MODELO_PADRAO,
+    OLLAMA_RACIOCINIO,
+    OLLAMA_SAIDA_ESTRUTURADA,
+    OLLAMA_TIMEOUT,
+)
 from services.resilience_service import InvalidOrchestratorOutputException, OllamaIndisponivelException
 from services.logger_service import logger as custom_logger
 
-# Nomes dos Modelos Ollama Locais
-MODELO_PADRAO = "gemma4:e4b"
-MODELO_AVANCADO = "qwen2.5-coder:7b"
+# Nomes dos modelos Ollama locais (configuráveis no .env, M27)
+MODELO_PADRAO = OLLAMA_MODELO_PADRAO
+MODELO_AVANCADO = OLLAMA_MODELO_AVANCADO
 
 # Estado do Sistema em Memória
 MODO_QWEN_ATIVO = False
@@ -263,12 +270,12 @@ class LocalLLMProvider(BaseLLMProvider):
         garantir_ollama_disponivel()
         mensagens = self._construir_mensagens(prompt_sistema, mensagem_usuario, historico)
 
-        cliente_ollama = ollama.Client(timeout=120.0)
+        cliente_ollama = ollama.Client(timeout=OLLAMA_TIMEOUT)
         try:
             response = cliente_ollama.chat(
                 model=self.modelo,
                 messages=mensagens,
-                keep_alive="30m",
+                keep_alive=OLLAMA_KEEP_ALIVE,
                 options={"temperature": self.temperatura}
             )
         except _ERROS_CONEXAO as e:
@@ -287,11 +294,11 @@ class LocalLLMProvider(BaseLLMProvider):
         garantir_ollama_disponivel()
         mensagens = self._construir_mensagens(prompt_sistema, mensagem_usuario, historico)
 
-        cliente_ollama = ollama.Client(timeout=120.0)
+        cliente_ollama = ollama.Client(timeout=OLLAMA_TIMEOUT)
         parametros = {
             "model": self.modelo,
             "messages": mensagens,
-            "keep_alive": "30m",
+            "keep_alive": OLLAMA_KEEP_ALIVE,
             "options": {"temperature": self.temperatura},
         }
         think = OLLAMA_RACIOCINIO if OLLAMA_RACIOCINIO is not None else raciocinio
@@ -404,4 +411,4 @@ class CloudLLMProvider(BaseLLMProvider):
 def obter_provedor_local(temperatura: float = 0.1) -> LocalLLMProvider:
     """Instancia dinamicamente o provedor local utilizando a IA atualmente ativa."""
     modelo_atual = obter_modelo_ativo()
-    return LocalLLMProvider(modelo=modelo_atual, temperatura=temperatura)
+    return LocalLLMProvider(modelo=modelo_atual, temperatura=temperatura)

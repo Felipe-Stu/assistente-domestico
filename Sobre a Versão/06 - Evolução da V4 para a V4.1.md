@@ -121,7 +121,7 @@ Fase das skills, em 23/11/2026, no PC do usuário (`scripts/avaliar.py`, relató
 *   **M01** (credenciais em texto puro) foi concluído em 23/11/2026: chaves trocadas e anotações substituídas por `[REVOGADA]`.
 *   **M02:** a integração contínua roda a cada envio ao GitHub. Os commits da fase das skills ainda não foram enviados.
 *   **SK4** (fluxos abertos com ferramentas) ficou de fora por decisão: o SK3 bastou.
-*   **M27:** modelos e caminhos ainda estão espalhados pelo código, e o Electron inicia o Python com `spawn('python')`.
+*   **M27** concluído em 23/11/2026: modelos e tempos no `.env`, Python configurável no Electron, bipes sem `winsound`, script para o `requirements-lock.txt` (`fixar-versoes.bat`) e licença MIT.
 *   **Extração de compras com raciocínio desligado:** ainda não medida; continua no padrão do Ollama.
 *   Os problemas funcionais da V4 continuam abertos, entre eles o P1 (compras não alimentam o estoque).
 

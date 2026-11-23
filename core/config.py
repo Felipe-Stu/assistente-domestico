@@ -27,6 +27,15 @@ OLLAMA_SAIDA_ESTRUTURADA = os.getenv("OLLAMA_SAIDA_ESTRUTURADA", "1").strip() !=
 _raciocinio = os.getenv("OLLAMA_RACIOCINIO", "").strip()
 OLLAMA_RACIOCINIO = None if _raciocinio == "" else _raciocinio != "0"
 
+# Modelos e tempos do Ollama (M27). O endereço do servidor vem de OLLAMA_HOST (lido pela biblioteca ollama).
+OLLAMA_MODELO_PADRAO = os.getenv("OLLAMA_MODELO_PADRAO", "gemma4:e4b")      # residente: orquestrador, compras, conversa
+OLLAMA_MODELO_AVANCADO = os.getenv("OLLAMA_MODELO_AVANCADO", "qwen2.5-coder:7b")  # modo Qwen e reserva da programação
+OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "120"))          # segundos por chamada ao modelo
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")           # quanto tempo o modelo fica na VRAM depois do uso
+# Repetição das chamadas ao modelo local quando a resposta vem malformada
+RETRY_TENTATIVAS = int(os.getenv("RETRY_TENTATIVAS", "3"))
+RETRY_ESPERA_S = float(os.getenv("RETRY_ESPERA_S", "3"))
+
 # Registro de eventos (M26): uma linha JSON por evento em Logs/eventos-AAAA-MM-DD.jsonl
 LOGS_DIR = Path(os.getenv("LOGS_DIR", str(BASE_DIR / "Logs")))
 # 0 = não grava o texto das mensagens do usuário (fica só o tamanho)

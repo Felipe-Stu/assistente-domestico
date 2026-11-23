@@ -92,28 +92,32 @@ class AudioService:
     def abortar_captura(self):
         self.deve_abortar = True
 
-    def emitir_bip_inicial(self):
+    @staticmethod
+    def _bip(frequencia: int, duracao_ms: int) -> None:
+        """Bipe pelo winsound no Windows; nos outros sistemas, silêncio (M27: nada preso ao Windows).
+
+        O stdout é o canal com o Electron, então não se escreve o caractere de campainha nele.
+        """
         try:
             import winsound
-            winsound.Beep(800, 300)
+        except ImportError:
+            logging_logger.debug("Bipe ignorado: winsound só existe no Windows.")
+            return
+        try:
+            winsound.Beep(frequencia, duracao_ms)
         except Exception as e:
             logging_logger.debug(f"Erro ao emitir bip (sem hardware de áudio): {e}")
+
+    def emitir_bip_inicial(self):
+        self._bip(800, 300)
 
     def emitir_bip_aviso_10s(self):
-        try:
-            import winsound
-            winsound.Beep(600, 150)
-            time.sleep(0.05)
-            winsound.Beep(600, 150)
-        except Exception as e:
-            logging_logger.debug(f"Erro ao emitir bip (sem hardware de áudio): {e}")
+        self._bip(600, 150)
+        time.sleep(0.05)
+        self._bip(600, 150)
 
     def emitir_bip_final(self) -> None:
-        try:
-            import winsound
-            winsound.Beep(440, 600)
-        except Exception as e:
-            logging_logger.debug(f"Erro ao emitir bip (sem hardware de áudio): {e}")
+        self._bip(440, 600)
 
     def capturar_audio_e_transcrever(self, tempo_limite: int = 120, ativar_trava_inicial: bool = True) -> str:
         """

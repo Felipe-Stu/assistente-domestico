@@ -68,8 +68,8 @@ from services.audio_service import AudioService
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-TEMPO_RETRY = 3.0
-MAX_TENTATIVAS = 3
+TEMPO_RETRY = config_app.RETRY_ESPERA_S
+MAX_TENTATIVAS = config_app.RETRY_TENTATIVAS
 
 MSG_IA_LOCAL_INDISPONIVEL = (
     "A IA local não respondeu. Nada foi gravado nem enviado à nuvem. "
@@ -197,7 +197,7 @@ class AssistenteRuntime(ModoVoz):
             emitir_electron("debug_log", {"message": "✓ Serviço de IA inicializado."})
 
             # 2. Provedores LLM
-            self.local_llm = LocalLLMProvider(modelo="gemma4:e4b")
+            self.local_llm = LocalLLMProvider(modelo=MODELO_PADRAO)
             self.cloud_llm = CloudLLMProvider(ai_service=self.ai_service)
             emitir_electron("debug_log", {"message": "✓ Provedores LLM configurados."})
 

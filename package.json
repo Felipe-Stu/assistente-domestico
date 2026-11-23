@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Interface Desktop para o Assistente Doméstico Inteligente",
   "main": "main.js",
+  "license": "MIT",
   "scripts": {
     "start": "electron ."
   },

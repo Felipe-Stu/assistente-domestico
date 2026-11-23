@@ -60,14 +60,14 @@ graph TD
 
 O retrato completo, com evidências e problemas abertos, está em [`Sobre a Versão/08 - Estado Atual da V4.md`](Sobre%20a%20Vers%C3%A3o/08%20-%20Estado%20Atual%20da%20V4.md).
 
-## Como executar (Windows)
+## Como executar
 
-Requisitos: Python 3.10+, Node.js e [Ollama](https://ollama.com).
+Requisitos: Python 3.10+, Node.js e [Ollama](https://ollama.com). Feito e testado no Windows; o código não depende dele (os bipes do modo voz só tocam no Windows).
 
 ```bash
 ollama pull gemma4:e4b
 ollama pull qwen2.5-coder:7b
-pip install -r requirements.txt
+pip install -r requirements.txt      # ou requirements-lock.txt, com as versões exatas testadas
 npm install
 ```
 
@@ -77,6 +77,8 @@ Copie `.env.example` para `.env`. A chave do Gemini é opcional: sem ela, todo o
 ollama serve
 npm start
 ```
+
+No Windows, `iniciar-assistente.bat` faz os dois. O Electron usa `ASSISTENTE_PYTHON`, se definido; senão o `.venv` do projeto; senão `python` (Windows) ou `python3`. Modelos, tempos e endereço do Ollama ficam no `.env` (veja `.env.example`).
 
 Somente o back-end, sem interface: `python app/main.py`
 
@@ -93,7 +95,7 @@ services/project_analyzer/         Skill de análise de projetos e documentaçã
 scripts/                           Banco vetorial, cópia de segurança, leitura dos logs e medições
 skills/                            Uma pasta por capacidade: instruções, prompts e gatilhos (formato em skills/README.md)
 evals/                             Conjunto de avaliação usado por scripts/avaliar.py
-tests/                             198 testes automatizados (LLM, ChromaDB e embeddings simulados)
+tests/                             238 testes automatizados (LLM, ChromaDB e embeddings simulados)
 Sobre a Versão/                    Documentação técnica e evolução V1 → V4
 ```
 
@@ -106,3 +108,7 @@ Sobre a Versão/                    Documentação técnica e evolução V1 → 
 - [Evolução da V4 para a V4.1](Sobre%20a%20Vers%C3%A3o/06%20-%20Evolu%C3%A7%C3%A3o%20da%20V4%20para%20a%20V4.1.md)
 - [Estado atual](Sobre%20a%20Vers%C3%A3o/08%20-%20Estado%20Atual%20da%20V4.md)
 - [CHANGELOG](CHANGELOG.md)
+
+## Licença
+
+[MIT](LICENSE)
