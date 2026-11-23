@@ -119,7 +119,7 @@ Fase das skills, em 23/11/2026, no PC do usuário (`scripts/avaliar.py`, relató
 ## 7. O que a V4.1 Ainda Não Conclui
 
 *   **M01** (credenciais em texto puro) foi concluído em 23/11/2026: chaves trocadas e anotações substituídas por `[REVOGADA]`.
-*   **M02:** a integração contínua roda a cada envio ao GitHub. Os commits da fase das skills ainda não foram enviados.
+*   **M02** concluído em 23/11/2026: a `v4.1` foi enviada e a primeira execução da integração contínua passou (32 s). O selo do README aponta para a `V4`, que só mostra resultado depois do PR.
 *   **SK4** (fluxos abertos com ferramentas) ficou de fora por decisão: o SK3 bastou.
 *   **M27** concluído em 23/11/2026: modelos e tempos no `.env`, Python configurável no Electron, bipes sem `winsound`, script para o `requirements-lock.txt` (`fixar-versoes.bat`) e licença MIT.
 *   **Extração de compras com raciocínio desligado:** ainda não medida; continua no padrão do Ollama.
