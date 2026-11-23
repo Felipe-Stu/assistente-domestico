@@ -22,14 +22,16 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 
 *   **Modelo Gemma 4 e:4b (`gemma4:e4b`)**
     *   **Finalidade:** LLM local de 4 bilhões de parâmetros. Atua como:
-        1.  **Orquestrador de Intenções** (`gemma_service.py`)
+        1.  **Orquestrador** (`gemma_service.py`): desde a V4.1, escolhe a skill pelo catálogo
         2.  **Extrator de Dados de Compras** (via `LocalLLMProvider` no `ShoppingAssistant`)
         3.  **Classificador de Intenções de Inventário** (via `LocalLLMProvider` no `InventoryAssistant`)
+        4.  **Extrator de compromissos da agenda** e **respostas sobre ideias salvas** (V4.1, serviço `llm_local` das skills)
+        5.  **Conversa geral** (`executar_assistente_local`)
     *   **Formato de comunicação:** JSON Schema enviado no parâmetro `format` do Ollama (V4.1, `services/esquemas.py`); com biblioteca antiga, recai para `format="json"`. No orquestrador, o raciocínio (`think`) é desligado.
     *   **Introduzido em:** V3. Mantido na V4.
 
 *   **Modelo Qwen 2.5-Coder 7B (`qwen2.5-coder:7b`)**
-    *   **Finalidade:** LLM local mais forte, usado no Modo Qwen e na interpretação feita pelo ProjectAnalyzer. A troca descarrega o Gemma da VRAM.
+    *   **Finalidade:** LLM local mais forte, usado no Modo Qwen, na interpretação feita pelo ProjectAnalyzer e, desde a V4.1, como reserva da skill de programação quando o Claude não está disponível (com a biblioteca de contexto). A troca descarrega o Gemma da VRAM (13 a 15 s, medido no SK0).
     *   **Onde é utilizada:** `services/llm_provider.py` e `core/config.py` (`PROJECT_ANALYZER_MODEL`).
     *   **Introduzido em:** **V4**.
 
@@ -109,7 +111,7 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 *   **`queue`:** Event loop principal baseado em fila de comandos. **(NOVO na V4)**
 *   **`io`:** Configuração de codificação UTF-8 dos fluxos stdin/stdout. **(NOVO na V4)**
 *   **`uuid`:** Geração de identificadores únicos para documentos vetoriais. **(NOVO na V4)**
-*   **`requests` (>= 2.31.0):** Declarado em `requirements.txt`, sem import direto no código da V4. (V3)
+*   **`requests` (>= 2.31.0):** Declarado desde a V3. Na V4.1 passou a ser usado pela API do Claude (`claude_service.py`) e pelo bot do Telegram (`telegram_service.py`).
 *   **`unittest`:** Suíte de testes em `tests/` (137 testes na V4.1). **(NOVO na V4)**
 *   **`logging` e `contextvars`:** Registro de eventos em JSON com identificador de requisição. **(NOVO na V4.1)**
 *   **`zipfile` e API de backup do `sqlite3`:** Cópia de segurança diária. **(NOVO na V4.1)**
@@ -205,8 +207,24 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 
 *   **JSON Schema (saída estruturada do Ollama)**
     *   **Finalidade:** Restringir a resposta do modelo aos campos e valores permitidos, em vez de validar só depois.
-    *   **Onde é utilizada:** `services/esquemas.py`, passado por `LocalLLMProvider.gerar_json(esquema=...)`. Requer `ollama>=0.4.0`.
+    *   **Onde é utilizada:** `services/esquemas.py` e `core/skills/seletor.py` (decisão do orquestrador, com o nome das skills em `enum`), passado por `LocalLLMProvider.gerar_json(esquema=...)`. Requer `ollama>=0.4.0`.
     *   **Introduzido em:** **V4.1**.
+
+*   **PyYAML (>= 6.0)**
+    *   **Finalidade:** Ler o cabeçalho dos `SKILL.md` (contexto, privacidade, gatilhos, entradas e saídas).
+    *   **Onde é utilizada:** `core/skills/catalogo.py`.
+    *   **Introduzido em:** **V4.1** (SK1).
+
+*   **Claude (Anthropic)**
+    *   **Finalidade:** Agente principal de programação e analista das ideias de projetos.
+    *   **Modo assinatura (padrão):** Claude Code CLI (`claude -p --output-format json`), logado no plano do usuário, sem chave de API. Roda sem ferramentas (`--tools ""`), sem MCP, numa pasta temporária e sem a `ANTHROPIC_API_KEY` no ambiente (`services/claude_assinatura_service.py`).
+    *   **Modo API:** `POST https://api.anthropic.com/v1/messages` com `requests`, modelo `claude-sonnet-5-5`, limite mensal de gasto no `.env` (`services/claude_service.py`).
+    *   **Introduzido em:** **V4.1** (SKP e SK8).
+
+*   **Telegram Bot API**
+    *   **Finalidade:** Receber ideias pelo celular e devolver a análise.
+    *   **Onde é utilizada:** `services/telegram_service.py` (long polling com `getUpdates`, `sendMessage`), só com `requests`.
+    *   **Introduzido em:** **V4.1** (SK8).
 
 ---
 
@@ -216,4 +234,5 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 *   **OCR / Visão Computacional:** **Não identificado nesta versão.**
 *   **WebSocket / API REST Local:** **Não identificado nesta versão.** A comunicação entre Electron e Python utiliza stdin/stdout.
 *   **Whisper Local (STT):** **Não identificado nesta versão.** A transcrição de voz ainda depende da API Google Speech Recognition (serviço web externo).
-*   **Segunda LLM (Qwen2.5-Coder):** **Implementada parcialmente na V4.** A troca por comando e o retorno por inatividade funcionam; o botão no Electron e a troca por intenção não estão concluídos (ver documento 08).
+*   **Segunda LLM (Qwen2.5-Coder):** **Implementada parcialmente na V4.** A troca por comando e o retorno por inatividade funcionam; o botão no Electron e a troca por intenção não estão concluídos (ver documento 08). Na V4.1, a skill de programação usa o Qwen como reserva do Claude.
+*   **LLM na nuvem:** Gemini (perguntas gerais) e, desde a V4.1, Claude (programação e ideias), cada um restrito pela política de privacidade das skills.

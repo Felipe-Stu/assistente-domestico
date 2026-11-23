@@ -1,9 +1,9 @@
 # 05 - Engenharia do Software
 
-Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente (V4)**.
+Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente**, no estado da **V4.1**.
 
 > [!NOTE]
-> Os diagramas abaixo foram revisados a partir do código-fonte da V4 em 03/11/2026 (commit `c754a6a`). Linhas tracejadas indicam código existente que não é acionado pelo fluxo atual.
+> Os diagramas abaixo foram revisados a partir do código-fonte da V4.1 em 23/11/2026 (branch `v4.1`, depois do commit `e9441bf`). Linhas tracejadas indicam código existente que não é acionado pelo fluxo atual.
 
 ---
 
@@ -26,17 +26,28 @@ graph TB
         RT --> RETRY
     end
 
+    subgraph "Skills — core/skills + skills/"
+        ROUTER["intent_router<br>gatilhos das skills"]
+        GEMMA_SVC["gemma_service<br>orquestrador pelo catálogo"]
+        MOTOR["motor<br>roteiro.py de cada skill"]
+        ROUTER --> MOTOR
+        GEMMA_SVC --> MOTOR
+    end
+
     subgraph "Serviços de Domínio"
-        GEMMA_SVC["gemma_service<br>orquestrar_requisicao()"]
         SHOPPING["shopping_assistant"]
         INVENTORY["inventory_assistant"]
         PA["project_analyzer"]
+        IDEIAS["ideias_service<br>fila de análise"]
+        BIB["biblioteca_service"]
+        TG["telegram_service<br>bot (opcional)"]
     end
 
     subgraph "LLM"
         LOCAL_PROV["LocalLLMProvider"]
         OLLAMA["Ollama<br>gemma4:e4b / qwen2.5-coder:7b"]
         AI_SVC["ai_service<br>Gemini 2.5 Flash"]
+        CLAUDE["Claude<br>assinatura (claude -p) ou API"]
         LOCAL_PROV --> OLLAMA
     end
 
@@ -55,7 +66,7 @@ graph TB
 
     subgraph "Persistência Relacional"
         DB["DatabaseService"]
-        SQLITE[("SQLite<br>compras, itens_compra<br>controle_consumo")]
+        SQLITE[("SQLite<br>compras, itens_compra, controle_consumo<br>compromissos, ideias")]
         DB --> SQLITE
     end
 
@@ -65,11 +76,20 @@ graph TB
     end
 
     EMAIN <-->|"JSON stdin/stdout"| RT
+    RT --> ROUTER
     RETRY --> GEMMA_SVC --> LOCAL_PROV
-    RETRY --> SHOPPING --> LOCAL_PROV
+    MOTOR --> SHOPPING --> LOCAL_PROV
+    MOTOR --> INVENTORY --> DB
+    MOTOR --> PA --> LOCAL_PROV
+    MOTOR -->|"agenda: compromissos"| DB
+    MOTOR --> IDEIAS
+    MOTOR -->|"programacao"| CLAUDE
+    MOTOR -->|"programacao sem Claude"| BIB
+    IDEIAS --> CLAUDE
+    IDEIAS --> DB
+    IDEIAS --> BIB --> VS
+    TG <--> IDEIAS
     RETRY --> AI_SVC
-    RT --> PA --> LOCAL_PROV
-    RT --> INVENTORY --> DB
     SHOPPING --> DB
     SHOPPING --> VS
     RT --> CTX
@@ -85,49 +105,54 @@ graph TB
 
 ```mermaid
 flowchart TD
-    A([Texto do chat ou voz transcrita]) --> B{Comando<br>determinístico?}
+    A([Texto do chat ou voz transcrita]) --> PEND{Pendência de<br>uma skill?}
+    PEND -- Sim --> RP[responder_pendencia<br>ex.: confirmar compra]
+    RP --> R
+    PEND -- Não --> B{Comando<br>determinístico?}
     B -- Qwen --> C[Troca o modelo ativo]
     C --> FIM
     B -- Analisar projeto --> D[ProjectAnalyzer<br>local, sem nuvem]
     D --> FIM
+    B -- Gatilho de skill --> SK
     B -- Não --> H{Ollama responde<br>em 2 s?}
     H -- Não --> HX[Avisa: Ollama fechado<br>botão Tentar de novo]
     HX --> FIM
-    H -- Sim --> E[execute_with_retry<br>orquestrar_requisicao]
-    B -- Regra conhecida --> J{Contexto}
+    H -- Sim --> E[orquestrar_requisicao<br>Gemma 4 escolhe a skill pelo catálogo]
     E -- Falha após 3x --> X[Avisa: IA local indisponível<br>nada vai à nuvem]
-    E -- Classificado --> J
-    J -- geral/outro difícil --> N[Gemini<br>perguntas gerais]
-    J -- compras --> I{acao}
-    J -- inventario --> K{acao}
-    J -- agenda --> Y[Avisa: ainda indisponível]
-    J -- geral/outro/programacao --> L[executar_assistente_local]
+    E -- conversa-geral --> J{Difícil e pode<br>ir à nuvem?}
+    E -- skill com roteiro --> SK[roteiro.py da skill]
 
-    I -- consultar --> Z[Avisa: disponível na Fase 3]
-    I -- criar --> V[preparar_compra]
-    V -- Falha após 3x --> X
-    V -- Sem dúvida --> M[(SQLite + ChromaDB)]
-    V -- Com dúvida --> W{Usuário confirma?}
-    W -- Sim --> M
-    W -- Não --> R
-    K -- consultar/delegar --> O[consultar_estoque]
-    K -- criar/corrigir --> P[Informa a limitação]
+    SK -- compras --> V[preparar_compra → confirmação se houver dúvida → SQLite + ChromaDB]
+    SK -- estoque --> O[consultar_estoque]
+    SK -- agenda --> AG[anotar / consultar / cancelar<br>compromissos]
+    SK -- ideias --> ID{Fala de uma<br>ideia salva?}
+    ID -- Sim --> IDR[salva ou consulta<br>resposta local com a análise]
+    ID -- Não --> J
+    SK -- programacao --> PC{Claude<br>disponível?}
+    PC -- Sim --> CL[Claude<br>assinatura ou API]
+    PC -- Não --> QW[Qwen + biblioteca]
+    SK -- documentar-projeto --> D
+
+    J -- Sim --> N[Gemini<br>perguntas gerais]
+    J -- Não --> L[executar_assistente_local]
     L -- Falha em geral/outro --> N
-    L -- Falha em programacao --> X
-
     N -- Falha após 3x --> Q[Mensagem de indisponibilidade]
-    M --> R[Atualiza sessão]
+
+    V --> R[Atualiza sessão]
     O --> R
-    P --> R
-    Y --> R
-    Z --> R
+    AG --> R
+    IDR --> R
+    CL --> R
+    QW --> R
     L --> R
     N -- Sucesso --> R
-    R --> S[Registra memória semântica<br>exceto compras e inventário]
+    R --> S[Registra memória semântica<br>exceto compras, inventário, agenda, projetos e ideias]
     S --> FIM([assistant_message + TTS opcional])
     Q --> FIM
     X --> FIM
 ```
+
+Em paralelo, a **fila de ideias** manda as pendentes ao Claude e grava a análise. O **bot do Telegram** recebe ideias do celular e devolve a análise (seção 4.1).
 
 ---
 
@@ -157,6 +182,10 @@ graph LR
     RT -->|recupera e salva memória| CHROMA
     RT -->|perguntas gerais| AI["ai_service"]
     AI -->|HTTPS| GEMINI["Gemini<br>(Externo)"]
+    RT -->|programação, ideias| CLAUDE["Claude<br>(Externo, via Claude Code ou API)"]
+    PHONE["Celular"] -->|ideia| TGAPI["Telegram<br>(Externo)"]
+    TGAPI -->|getUpdates| RT
+    RT -->|sendMessage: análise| TGAPI
     RT -->|resposta, se voz ativa| VOICE["voice_service"]
     VOICE -->|texto| EDGE_TTS["Edge TTS<br>(Externo)"]
     VOICE -->|áudio| USER
@@ -183,11 +212,9 @@ sequenceDiagram
     User->>UI: Digita: "fui ao Moreschi, comprei frango..."
     UI->>Main: send_text (JSON por stdin)
 
-    Main->>Retry: execute_with_retry(orquestrar_requisicao)
-    Retry->>Gemma: orquestrar_requisicao(texto)
-    Gemma->>Gemma: rotear_por_regras(texto)
-    Gemma-->>Retry: decisao dict
-    Retry-->>Main: {dificuldade:"facil", contexto:"compras"}
+    Main->>Main: rotear_por_regras(texto): gatilho "comprei" da skill compras
+    Note over Main: Sem gatilho, orquestrar_requisicao escolheria a skill pelo catálogo
+    Main->>Main: motor.executar(skill compras) → skills/compras/roteiro.py
 
     Main->>Retry: execute_with_retry(preparar_compra)
     Retry->>Shopping: preparar_compra(texto)
@@ -215,18 +242,54 @@ sequenceDiagram
 
 ---
 
+## 4.1. Diagrama de Sequência — Ideia pelo Telegram (V4.1)
+
+```mermaid
+sequenceDiagram
+    actor User as 👤 Usuário (celular)
+    participant TG as Telegram
+    participant Bot as TelegramService
+    participant Ideias as IdeiasService
+    participant DB as SQLite
+    participant Claude as Claude Code (claude -p)
+    participant Bib as BibliotecaService
+
+    User->>TG: "Um app que sugere receitas pela geladeira"
+    Bot->>TG: getUpdates (long polling)
+    TG-->>Bot: mensagem do chat permitido
+    Bot->>Ideias: responder_mensagem(texto, "telegram:<chat>")
+    Ideias->>Ideias: parece_pergunta? não
+    Ideias->>DB: INSERT ideias (pendente)
+    Ideias-->>Bot: "Ideia #N salva..."
+    Bot->>TG: sendMessage
+    Note over Ideias: Fila em segundo plano
+    Ideias->>Claude: prompt de análise + ideia (sem ferramentas)
+    Claude-->>Ideias: # Título, resumo, MVP, próximos passos...
+    Ideias->>DB: UPDATE ideias (analisada)
+    Ideias->>Ideias: grava Ideias/ideia-NNNN-*.md
+    Ideias->>Bib: indexar() (incremental)
+    Ideias->>Bot: aviso para o chat de origem
+    Bot->>TG: sendMessage (análise)
+    TG-->>User: Análise da ideia
+```
+
+---
+
 ## 5. Diagrama de Bifurcações — Pontos de Decisão do Sistema
 
 ```mermaid
 flowchart TD
-    START([Texto Transcrito]) --> ORCH{Orquestrador\nGemma Local}
+    START([Texto Transcrito]) --> ORCH{Gatilhos ou orquestrador\npelo catálogo}
 
-    ORCH -->|dificuldade='facil'\ncontexto='compras'| COMP[ShoppingAssistant\nLocalLLMProvider → Gemma]
-    ORCH -->|dificuldade='facil'\ncontexto='agenda'| AGENDA[Avisa: agenda\nainda indisponível]
-    ORCH -->|dificuldade='facil'\ncontexto='inventario'| INVENT["InventoryAssistant\nconsultar_estoque\n(criar/corrigir: informa limitação)"]
-    ORCH -->|Regex\ncontexto='projetos'| PROJ[ProjectAnalyzer\nsem nuvem]
-    ORCH -->|dificuldade='facil'\ncontexto='geral' ou 'outro'| OUTRO[executar_assistente_local\nGemma Local]
-    ORCH -->|'geral' ou 'outro' difícil| NUVEM[ai_service\nGemini API]
+    ORCH -->|skill compras| COMP[ShoppingAssistant\nLocalLLMProvider → Gemma]
+    ORCH -->|skill agenda| AGENDA[Compromissos\nSQLite local]
+    ORCH -->|skill estoque| INVENT["InventoryAssistant\nconsultar_estoque\n(criar/corrigir: informa limitação)"]
+    ORCH -->|skill documentar-projeto\nou comando| PROJ[ProjectAnalyzer\nsem nuvem]
+    ORCH -->|skill ideias| IDEIA[IdeiasService\nfila → Claude]
+    IDEIA -->|não fala de ideia salva| OUTRO
+    ORCH -->|skill programacao| PROG[Claude\nou Qwen + biblioteca]
+    ORCH -->|conversa-geral fácil| OUTRO[executar_assistente_local\nGemma Local]
+    ORCH -->|conversa-geral difícil| NUVEM[ai_service\nGemini API]
     ORCH -->|Falha após 3x retry| AVISO[Avisa: IA local indisponível\nnada vai à nuvem]
     OUTRO -->|Falha após 3x retry| NUVEM
 
@@ -256,10 +319,10 @@ flowchart TD
 | **Dependency Injection** | `app/main.py` → `ShoppingAssistant`, `InventoryAssistant` | Provedores LLM são injetados externamente, facilitando testes e troca |
 | **Retry Pattern** | `resilience_service.execute_with_retry` | Resiliência uniforme a falhas em qualquer chamada de LLM |
 | **Fallback Chain** | `app/main.py`: Local → Gemini, só em `geral` e `outro` | Contingência sem enviar dados restritos à nuvem |
-| **Chain of Responsibility** | `orquestrar_requisicao` e `InventoryAssistant`: regras → LLM | Processamento progressivo, do mais rápido para o mais custoso |
+| **Chain of Responsibility** | Pipeline do runtime (pendência → comandos → gatilhos → orquestrador) e `InventoryAssistant`: regras → LLM | Processamento progressivo, do mais rápido para o mais custoso |
 | **Session Management** | `GerenciadorDeSessao` em `app/main.py` | Manutenção de contexto e histórico entre interações |
 | **Schema Validation** | `gemma_service._validar_schema_orquestrador` | Contrato rígido de saída do LLM orquestrador |
-| **Sanitization Pipeline** | `_sanitizar_resposta_json` (em múltiplos módulos) | Remove marcações Markdown residuais do LLM antes do parse |
+| **Sanitization Pipeline** | `llm_provider._sanitizar_resposta_json` | Remove marcações Markdown residuais do LLM antes do parse |
 | **Event Loop com Fila** | `AssistenteRuntime.rodar` | Processa comandos do chat, voz e controles em uma única sequência |
 | **Bridge Seguro** | `preload.js` (`contextBridge`) | Expõe ao renderer apenas a API necessária |
 | **Inicialização Lazy** | `VoiceService`, `AudioService` | Só acessa o hardware quando o modo voz é ativado |
@@ -271,3 +334,12 @@ flowchart TD
 | **Identificador de Correlação** (V4.1) | `logger_service.requisicao()` | Todos os eventos de uma solicitação levam o mesmo `req`, com o tempo de cada etapa |
 | **Escrita Atômica por Renomeação** (V4.1) | `BackupService.fazer_backup` | A cópia é montada em `.parcial` e só recebe o nome final quando termina |
 | **Retenção Avô-Pai-Filho** (V4.1) | `BackupService.aplicar_retencao` | 7 cópias diárias e a mais nova de cada uma de 4 semanas |
+| **Plugin por Catálogo** (V4.1) | `core/skills/catalogo.py` + `skills/*/SKILL.md` | Uma capacidade nova é uma pasta; gatilhos e contextos vêm do cabeçalho |
+| **Política no Cabeçalho** (V4.1) | `privacidade` das skills + `CLAUDE_SKILLS` em `_contexto_skill` | O núcleo só entrega o Claude (ou a nuvem) às skills autorizadas; testes conferem cabeçalho × política |
+| **Contexto Mínimo** (V4.1) | `core.skills.Contexto` | O roteiro recebe só os serviços de que precisa, sem acesso ao runtime |
+| **Encaminhamento** (V4.1) | `Resposta.encaminhar` | Um roteiro devolve o pedido à conversa geral quando não é com ele (P23) |
+| **Adapter** (V4.1) | `ClaudeService` / `ClaudeAssinaturaService` | Mesma interface para API e assinatura; as skills não sabem qual está em uso |
+| **Fila com Reteste** (V4.1) | `IdeiasService.iniciar_em_segundo_plano` | Ideia salva na hora; análise tentada de novo enquanto o Claude estiver indisponível |
+| **Circuit Breaker Simples** (V4.1) | `indisponivel_ate` no estado do Claude | Sem cota ou sem login, não insiste até o horário de reteste |
+| **Lista de Permissões** (V4.1) | `TELEGRAM_CHAT_IDS` | O bot ignora qualquer chat fora da lista |
+

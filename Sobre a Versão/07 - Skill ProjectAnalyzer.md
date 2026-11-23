@@ -40,8 +40,9 @@ python scripts/analyze_project.py "E:\MOBA" --modelo gemma4:e4b --saida "D:\Docs
 
 | Ponto | Alteração | Justificativa |
 |---|---|---|
-| `services/gemma_service.py` | `orquestrar_requisicao` detecta o comando por expressão regular **antes** de chamar a LLM e devolve `contexto="projetos"` com `parametros.caminho`; `projetos` incluído em `VALORES_PERMITIDOS` | Mesmo padrão dos comandos "ativar qwen"; não depende do Gemma acertar a classificação nem gasta inferência |
-| `app/main.py` | Cria `ProjectAnalyzer` na Fase 1; interceptação `contexto == "projetos"` antes do roteamento | A rota termina ali: **sem** `execute_with_retry` com fallback para Gemini, **sem** RAG e **sem** gravação na memória semântica |
+| `services/gemma_service.py` | `orquestrar_requisicao` detecta o comando por expressão regular (`detectar_comando_projeto`) **antes** de chamar a LLM e devolve `contexto="projetos"` com `parametros.caminho` | Mesmo padrão dos comandos "ativar qwen"; não depende do Gemma acertar a classificação nem gasta inferência |
+| `skills/documentar-projeto/` (V4.1, SK5) | A rota `projetos` virou a skill `documentar-projeto` (privacidade `local`), com `roteiro.py` que chama `ProjectAnalyzer.analisar()`; sem caminho, pede a pasta | Remove o último `if contexto ==` do `app/main.py`; continua **sem** fallback para Gemini, **sem** RAG e **sem** gravação na memória semântica (`projetos` está em `CONTEXTOS_SEM_MEMORIA`) |
+| `app/main.py` | Cria `ProjectAnalyzer` na Fase 1 e o entrega aos roteiros pelo serviço `project_analyzer` | O roteiro não acessa o runtime |
 | `app/main.py` | `_preparar_vram_analise` / `_liberar_vram_analise` | Reaproveitam `alternar_modelo_vram`: descarregam o Gemma antes de carregar o Qwen e liberam o Qwen ao final (se o modo Qwen não estiver ativo), evitando os dois modelos na VRAM |
 | `core/config.py` | Duas configurações novas | Pasta de saída e modelo definidos em um único lugar |
 

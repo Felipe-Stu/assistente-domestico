@@ -1,6 +1,9 @@
 # 03 - Arquitetura Geral
 
-Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência na **Versão 4 (V4)** do **Assistente Doméstico Inteligente**.
+Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência do **Assistente Doméstico Inteligente**, no estado da **V4.1 (atualizado em 23/11/2026)**.
+
+> [!NOTE]
+> **V4.1 (fase das skills):** cada capacidade virou uma skill em `skills/`, escolhida por gatilhos ou pelo orquestrador a partir do catálogo (`core/skills/`), e executada pelo próprio roteiro. Entraram também o Claude (programação e ideias), a fila de ideias, o bot do Telegram e a biblioteca de contexto.
 
 > [!IMPORTANT]
 > A V4 representa uma expansão arquitetural significativa em relação à V3. Foram adicionados: uma camada de interface desktop (Electron), um novo pacote de serviços vetoriais (`services/vector/`) com 5 módulos, scripts de gestão do banco vetorial, e uma arquitetura de persistência híbrida (SQLite + ChromaDB). O modelo de inicialização foi reformulado para Text-First com ativação dinâmica de voz.
@@ -19,14 +22,18 @@ assistente-domestico/
 │   └── voz.py                           # [SK5] Modo voz e laço do microfone (classe base do runtime)
 ├── core/
 │   ├── database/
-│   │   ├── assistente_casa.db           # Banco de dados SQLite (compras, itens, controle_consumo)
-│   │   └── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (persistência local)
+│   │   ├── assistente_casa.db           # Banco de dados SQLite (compras, itens, controle_consumo, compromissos, ideias)
+│   │   ├── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (memórias e biblioteca_projeto)
+│   │   ├── backups/                     # [M11] Cópias diárias (fora do Git)
+│   │   └── estado_*.json, telegram_offset.json, biblioteca_indice.json  # [V4.1] Estado do Claude, do bot e da biblioteca (fora do Git)
 │   ├── __init__.py
 │   ├── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
 │   └── skills/                          # Catálogo, seletor (orquestrador pelo catálogo) e motor de roteiros
-├── skills/                              # [SK1] Uma pasta por capacidade: SKILL.md (cabeçalho + instruções) e prompts/
-│   ├── compras/  estoque/  agenda/
-│   └── documentar-projeto/  programacao/  conversa-geral/
+├── skills/                              # [SK1] Uma pasta por capacidade: SKILL.md (cabeçalho + instruções), prompts/, roteiro.py, exemplos.jsonl
+│   ├── compras/  estoque/  agenda/  ideias/
+│   ├── documentar-projeto/  programacao/  conversa-geral/
+│   └── _modelo/                         # [SK6] Modelo usado por scripts/nova_skill.py (ignorado pelo catálogo)
+├── Ideias/                              # [SK8] Uma análise .md por ideia (fora do Git; entra na biblioteca)
 ├── evals/                               # [SK0] Frases com a skill esperada e compras para medir a extração
 ├── Logs/                                # Gerados automaticamente (ignorados pelo Git)
 │   └── eventos-AAAA-MM-DD.jsonl         # [M26] Uma linha JSON por evento; 30 dias de retenção
@@ -37,16 +44,27 @@ assistente-domestico/
 │   ├── rebuild_embeddings.py            # Reconstrução dos embeddings, preservando as memórias (P13)
 │   ├── fazer_backup.py                  # [M11] Cópia de segurança manual
 │   ├── ver_logs.py                      # [M26] Leitura dos eventos e tempo por etapa
+│   ├── avaliar.py                       # [SK0] Mede a escolha da skill e a extração (evals/)
+│   ├── nova_skill.py, validar_skills.py # [SK6] Cria e valida skills
+│   ├── indexar_biblioteca.py            # [SKP] Indexa a biblioteca de contexto
+│   ├── testar_skp.py, testar_claude_assinatura.py  # [SKP] Conferem o Claude (API e assinatura)
+│   ├── configurar_telegram.py           # [SK8] Descobre o número do chat do bot
 │   └── validate_vector_database.py      # Testes automatizados de busca semântica
-├── tests/                               # [NOVO V4] Testes automatizados (ProjectAnalyzer e orquestrador)
+├── tests/                               # Testes automatizados (231 em 23/11/2026), com dados de referência em tests/dados/
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py                    # Interface com a API Gemini (nuvem) — fallback
 │   ├── audio_service.py                 # Captura de microfone com RMS e bips
 │   ├── backup_service.py                # [M11] Cópia diária do SQLite e do ChromaDB
+│   ├── biblioteca_service.py            # [SKP] Biblioteca de contexto no ChromaDB (documentação e ideias)
+│   ├── claude_service.py                # [SKP] Claude pela API (disponibilidade, reteste, limite mensal)
+│   ├── claude_assinatura_service.py     # [SK8] Claude pela assinatura (claude -p, sem ferramentas)
+│   ├── esquemas.py                      # [M03] JSON Schema da extração de compras
+│   ├── ideias_service.py                # [SK8] Ideias: salvar, fila de análise, .md e comandos do bot
+│   ├── telegram_service.py              # [SK8] Bot do Telegram (long polling, chats permitidos)
 │   ├── db_service.py                    # Persistência SQLite com migrações de schema
-│   ├── gemma_service.py                 # Orquestrador local via Ollama/Gemma 4 e:4b
-│   ├── intent_router.py                 # [NOVO V4] Roteamento por regras, sem LLM
+│   ├── gemma_service.py                 # Orquestrador pelo catálogo de skills e assistente local (Gemma 4 E4B)
+│   ├── intent_router.py                 # [NOVO V4] Roteamento por regras: aplica os gatilhos das skills
 │   ├── inventory_assistant.py           # Controle preditivo de estoque (Regex + Gemma)
 │   ├── llm_provider.py                  # Abstração de provedores LLM (Local/Nuvem)
 │   ├── logger_service.py                # [M26] Eventos em JSON, requisição e etapas
@@ -62,7 +80,9 @@ assistente-domestico/
 │       ├── semantic_search_service.py   # Busca Semântica Híbrida (Vector + SQLite)
 │       └── context_retrieval_service.py # Montador de Contexto RAG para prompts
 ├── Sobre a Versão/                      # Documentação técnica da versão atual
-├── .env                                 # Variáveis de ambiente (GEMINI_API_KEY, EMBEDDING_MODEL_NAME)
+├── .env                                 # Variáveis de ambiente (chaves, CLAUDE_MODO, TELEGRAM_*, EMBEDDING_*); modelo em .env.example
+├── iniciar-assistente.bat               # [V4.1] Abre o Ollama se preciso e inicia o app
+├── instalar-claude-code.bat, testar-claude-assinatura.bat, configurar-telegram.bat  # [V4.1] Configuração no PC
 ├── .gitignore                           # Regras de exclusão do Git (ignora .db, chroma_db, Logs, __pycache__, node_modules)
 ├── index.html                           # [NOVO V4] Interface HTML do Electron (chat + controles)
 ├── index.css                            # [NOVO V4] Estilos da interface desktop
@@ -96,15 +116,16 @@ assistente-domestico/
 
 #### B.1. Runtime Principal (`app/main.py`)
 **Responsabilidade:** Classe `AssistenteRuntime` — núcleo do sistema. Implementa:
-- **Inicialização em 2 fases:** Fase 1 (essencial): `DatabaseService`, `VectorStoreService`, `MemoryService`, `ContextRetrievalService`, `AIService`, `LocalLLMProvider`, `CloudLLMProvider`, `InventoryAssistant`, `ShoppingAssistant`, `VoiceService`, `AudioService`. Fase 2 (sob demanda): ativação de hardware de voz via `_ativar_modo_voz()`.
-- **Event Loop:** Baseado em `queue.Queue` com 3 threads: `_leitor_stdin()` (leitura de comandos do Electron), `_loop_microfone()` (captura contínua condicional) e `_varredura_background()` (estoque).
+- **Inicialização em 2 fases:** Fase 1 (essencial): `DatabaseService`, `VectorStoreService`, `MemoryService`, `ContextRetrievalService`, `AIService`, Claude (`_criar_claude`: assinatura ou API, por `CLAUDE_MODO`), `BibliotecaService`, `IdeiasService`, `LocalLLMProvider`, `CloudLLMProvider`, `InventoryAssistant`, `ShoppingAssistant`, `VoiceService`, `AudioService`. Fase 2 (sob demanda): ativação de hardware de voz via `_ativar_modo_voz()`.
+- **Event Loop:** Baseado em `queue.Queue`, com linhas de execução para `_leitor_stdin()` (comandos do Electron), `_loop_microfone()` (captura condicional), varredura de estoque, verificação do Ollama, cópia de segurança do dia (M11), fila de análise das ideias e bot do Telegram (V4.1).
 - **Protocolo IPC:** Função `emitir_electron()` padroniza saída JSON para stdout.
 - **Estados do sistema:** `STARTING`, `INITIALIZING`, `READY`, `WAITING_INPUT`, `PROCESSING`, `STOPPING`, `ERROR`.
-- **Processamento:** `_processar_solicitacao()` implementa o pipeline Orquestração → Roteamento → Execução → Resposta.
-- **Memória semântica:** `_enriquecer_com_memoria()` anexa o contexto do `ContextRetrievalService` às instruções do assistente local genérico e do Gemini (não em `compras`/`agenda`, que geram JSON). `_registrar_memoria()` salva a fala do usuário no `MemoryService` (exceto `compras`, já vetorizadas pelo ShoppingAssistant, e `inventario`). Falhas no ChromaDB não interrompem o pipeline.
+- **Processamento:** `_processar_solicitacao()` implementa o pipeline: pendência de confirmação de uma skill → comandos do modo Qwen → comando de projeto → gatilhos das skills → orquestrador pelo catálogo → roteiro da skill (ou conversa geral, local ou Gemini) → resposta. Desde a V4.1, um roteiro pode devolver o pedido à conversa geral (`Resposta.encaminhar`).
+- **Serviços das skills:** `_contexto_skill(skill)` entrega a cada roteiro só o que ele pode usar (banco, assistentes, `llm_local`, `ideias`). O Claude só vai às skills com `privacidade: claude` listadas em `CLAUDE_SKILLS`.
+- **Memória semântica:** `_enriquecer_com_memoria()` anexa o contexto do `ContextRetrievalService` às instruções do assistente local genérico e do Gemini (só na conversa geral). `_registrar_memoria()` salva a fala do usuário no `MemoryService`, exceto nos contextos de `CONTEXTOS_SEM_MEMORIA` (`compras`, `inventario`, `agenda`, `projetos`, `ideias`), que já têm registro próprio. Falhas no ChromaDB não interrompem o pipeline.
 
 #### B.2. Orquestrador Local (`services/gemma_service.py`)
-**Responsabilidade:** Encapsula chamadas ao Gemma 4 e:4b via Ollama. Fornece `orquestrar_requisicao()` com validação de schema (`_validar_schema_orquestrador`) e sanitização JSON (`_sanitizar_resposta_json`). Fornece `executar_assistente_local()` para fluxos genéricos.
+**Responsabilidade:** Encapsula chamadas ao Gemma 4 E4B via Ollama. `orquestrar_requisicao()` escolhe a skill pelo catálogo (prompt fixo e JSON Schema de `core/skills/seletor.py`, raciocínio desligado) e valida a decisão; os contextos aceitos vêm do catálogo (`valores_permitidos()`). `executar_assistente_local()` responde a conversa geral. O orquestrador por contextos fixos foi removido no SK5.
 
 #### B.3. Abstração LLM (`services/llm_provider.py`)
 **Responsabilidade:** `BaseLLMProvider` (abstrata) → `LocalLLMProvider` (Ollama, `timeout=120.0`) e `CloudLLMProvider` (Gemini via AIService). **Atualizado na V4:** mantém o modelo ativo em memória (`MODO_QWEN_ATIVO`), alterna Gemma e Qwen e libera a VRAM com `keep_alive=0`. O `CloudLLMProvider` é criado no runtime, mas não é usado por nenhum assistente.
@@ -139,6 +160,26 @@ assistente-domestico/
 
 ---
 
+#### B.12. Catálogo e motor de skills (`core/skills/`) — V4.1
+**Responsabilidade:** `catalogo.py` lê `skills/*/SKILL.md` (cabeçalho YAML validado: contextos, estado, privacidade, entradas, saídas, execução, gatilhos com prioridade única) e ignora pastas que começam com `_` ou `.`. `seletor.py` monta o prompt e o JSON Schema da decisão `{skill, acao, dificuldade}`. `motor.py` carrega o `roteiro.py` de cada skill e executa `executar(ctx, texto, decisao)` e `responder_pendencia(...)`, devolvendo `Resposta(texto, fala, pendencia, encaminhar)`.
+
+#### B.13. Claude (`services/claude_service.py`, `services/claude_assinatura_service.py`) — V4.1
+**Responsabilidade:** Mesma interface nos dois modos (`configurado`, `verificar_disponibilidade`, `gerar_texto`).
+- **API:** cota esgotada, problema de cobrança ou chave recusada deixam o Claude indisponível até a primeira solicitação depois das 8h; com `retry-after`, até o horário indicado. Limite mensal estimado pelos tokens.
+- **Assinatura:** chama `claude -p --output-format json` sem ferramentas, sem MCP, numa pasta temporária e sem a chave de API no ambiente. Limite do plano: reteste depois de `CLAUDE_ASSINATURA_RETESTE_MIN`; sem login: na manhã seguinte. Acha o `claude.exe` também em `~/.local/bin`.
+- **Estado:** em `core/database/estado_claude*.json`, fora do Git.
+
+#### B.14. Ideias (`services/ideias_service.py`) — V4.1
+**Responsabilidade:** Tabela `ideias` (título, texto, origem, situação, análise). `salvar()` grava na hora. A fila em segundo plano manda as pendentes ao Claude (prompt `skills/ideias/prompts/analise.md`) e grava a análise no banco e em `Ideias/ideia-NNNN-*.md`, depois atualiza a biblioteca. Sem Claude, a ideia continua pendente e é tentada de novo a cada `IDEIAS_RETESTE_MIN`. Também responde aos comandos do bot e separa pergunta de ideia (`parece_pergunta`, `pede_para_salvar`).
+
+#### B.15. Bot do Telegram (`services/telegram_service.py`) — V4.1
+**Responsabilidade:** Long polling com `getUpdates` (o PC não fica exposto), só para os chats de `TELEGRAM_CHAT_IDS`. Outros chats são ignorados e registrados só pelo número. Grava o offset antes de responder, para nunca processar duas vezes. Divide mensagens longas e nunca registra o token nos logs.
+
+#### B.16. Biblioteca de contexto (`services/biblioteca_service.py`) — V4.1
+**Responsabilidade:** Indexação incremental no ChromaDB (coleção `biblioteca_projeto`, separada das memórias). Fontes: README, CHANGELOG, `Sobre a Versão/`, `SKILL.md`, documentação gerada e a pasta extra `Ideias/`. A pasta de planejamento fica de fora. Devolve só os trechos mais próximos da pergunta.
+
+---
+
 ### C. Pacote Vetorial (`services/vector/`) — NOVO na V4
 
 #### C.1. `embedding_service.py`
@@ -158,7 +199,19 @@ assistente-domestico/
 
 ### D. Skill ProjectAnalyzer (`services/project_analyzer/`) — NOVO na V4
 
-**Responsabilidade:** Analisar um diretório de projeto (somente leitura) e gerar documentação Markdown na pasta `PROJECT_ANALYZER_OUTPUT_DIR`, usando Python para extração/indexação e o LLM local (`qwen2.5-coder:7b`) apenas para interpretação. Acionada pelo comando `analisar projeto <caminho>` (contexto `projetos`), sem fallback para a nuvem. Detalhes em `07 - Skill ProjectAnalyzer.md`.
+**Responsabilidade:** Analisar um diretório de projeto (somente leitura) e gerar documentação Markdown na pasta `PROJECT_ANALYZER_OUTPUT_DIR`, usando Python para extração/indexação e o LLM local (`qwen2.5-coder:7b`) apenas para interpretação. Acionada pelo comando `analisar projeto <caminho>` (contexto `projetos`) ou pela skill `documentar-projeto`, sem fallback para a nuvem. Detalhes em `07 - Skill ProjectAnalyzer.md`.
+
+### E. Skills (`skills/`) — V4.1
+
+| Skill | Contexto | Privacidade | Execução | O que faz |
+| :--- | :--- | :--- | :--- | :--- |
+| `compras` | compras | local | roteiro | Registra, consulta e desfaz compras; uma chamada ao modelo por compra |
+| `estoque` | inventario | local | roteiro | Consulta o estoque (somente leitura) |
+| `agenda` | agenda | local | roteiro | Anota, consulta e cancela compromissos (tabela `compromissos`) |
+| `ideias` | ideias | claude | roteiro | Salva e consulta ideias de projetos; encaminha à conversa o que não é ideia salva |
+| `programacao` | programacao | claude | roteiro | Claude como principal; Qwen + biblioteca como reserva |
+| `documentar-projeto` | projetos | local | roteiro | ProjectAnalyzer a partir de um caminho |
+| `conversa-geral` | geral, outro | nuvem-permitida | nucleo | Assistente local; Gemini nas difíceis |
 
 ---
 
@@ -200,25 +253,25 @@ assistente-domestico/
          │     ▼
          │   _processar_solicitacao(texto)
          │     │
-         │     ├── [PASSO 1: Orquestração Gemma 4]
-         │     │   execute_with_retry(orquestrar_requisicao)
-         │     │   → Gemma 4 local classifica {dificuldade, contexto, ação}
+         │     ├── [Pendência de uma skill?] → responder_pendencia (ex.: "sim" de uma compra)
+         │     ├── [Comandos do modo Qwen e "analisar projeto <caminho>"]
          │     │
-         │     ├── [INTERCEPTAÇÃO: resposta_direta]
-         │     │   → Retorna imediatamente sem roteamento
+         │     ├── [PASSO 1: Gatilhos das skills (sem IA)]
+         │     │   → senão, orquestrar_requisicao: Gemma 4 escolhe {skill, ação, dificuldade} pelo catálogo
          │     │
-         │     ├── [INTERCEPTAÇÃO: contexto="projetos"]
-         │     │   → ProjectAnalyzer (Qwen local) → Documentacao_Gerada
-         │     │
-         │     ├── [PASSO 2: Roteamento]
-         │     │   ├── [compras] → preparar_compra → confirmação se houver dúvida → SQLite + ChromaDB
-         │     │   ├── [facil + inventario] → consultar_estoque (criar/corrigir: informa limitação)
-         │     │   ├── [facil + outro] → executar_assistente_local → Gemma 4 (com contexto RAG)
-         │     │   └── [geral/outro difícil ou falha 3x] → Gemini API (nuvem, com RAG restrito)
+         │     ├── [PASSO 2: Execução]
+         │     │   ├── [skill com roteiro] → skills/<nome>/roteiro.py
+         │     │   │     compras · estoque · agenda · ideias · programacao · documentar-projeto
+         │     │   │     (o roteiro pode pedir confirmação ou encaminhar à conversa geral)
+         │     │   ├── [conversa-geral, fácil] → executar_assistente_local → Gemma 4 (com contexto RAG)
+         │     │   └── [conversa-geral difícil ou falha local] → Gemini API (nuvem, com RAG restrito)
          │     │
          │     └── [PASSO 3: Resposta]
          │         → emitir_electron("assistant_message")
          │         → VoiceService.falar() (se modo voz ativo e não mutado)
+         │
+         ├── [Linha de execução: fila de ideias] → Claude → banco + Ideias/*.md → biblioteca → aviso no Telegram
+         ├── [Linha de execução: bot do Telegram] → IdeiasService.responder_mensagem
          │
          ├── [type="voice_input"]
          │     → Mesmo pipeline de _processar_solicitacao()
@@ -257,6 +310,7 @@ assistente-domestico/
    - `InventoryAssistant`, `ShoppingAssistant`
    - `VectorStoreService`, `MemoryService`, `ContextRetrievalService`
    - `gemma_service.orquestrar_requisicao`, `gemma_service.executar_assistente_local`
+   - `core.skills` (catálogo e motor), `ClaudeService`/`ClaudeAssinaturaService`, `BibliotecaService`, `IdeiasService`, `TelegramService`, `BackupService`
    - `resilience_service.execute_with_retry`
    - `logger_service`
 
@@ -300,7 +354,7 @@ assistente-domestico/
 
 14. **`gemma_service`** acopla-se a:
     - `llm_provider` (o SDK `ollama` é acessado por meio dele)
-    - `project_analyzer.command_parser`
+    - `core.skills` (catálogo e seletor)
     - `resilience_service.InvalidOrchestratorOutputException`
     - `logger_service`
 
@@ -312,3 +366,14 @@ assistente-domestico/
     - `sqlite3`
     - `core/config.DB_PATH`
     - `logger_service`
+
+17. **Roteiros das skills (`skills/*/roteiro.py`)** acoplam-se só a:
+    - `core.skills` (`Resposta`, `obter_catalogo`) e aos serviços entregues pelo `Contexto` (`ctx.servico(...)`)
+    - Exceção: `skills/ideias/roteiro.py` importa as funções de texto de `services/ideias_service.py`
+
+18. **`IdeiasService`** acopla-se a:
+    - `DatabaseService`, Claude (qualquer dos dois modos), `BibliotecaService`, `logger_service`
+
+19. **`TelegramService`** acopla-se a:
+    - `requests` e a uma função `ao_receber(chat, texto)` dada pelo runtime (hoje, `IdeiasService.responder_mensagem`)
+

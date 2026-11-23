@@ -30,7 +30,14 @@ A segunda parte, a **fase das skills** (SK0 a SK8 e SKP, concluída em 23/11/202
 | **Reconstrução dos embeddings (P13)** | Apagava as memórias `mem_*` | Faz cópia, exporta e regrava as memórias | Corrigido |
 | **Conexões SQLite (P22)** | Ficavam abertas após o `with` | Fechadas ao sair do bloco | Corrigido |
 | **Skills (SK1)** | Prompts dentro do Python e regex no `intent_router.py` | Uma pasta por capacidade em `skills/` (instruções, prompts e gatilhos), lida por `core/skills/` | Novo |
-| **Conjunto de avaliação (SK0)** | 8 frases do orquestrador e 6 compras dentro de um script | `evals/` (48 frases por skill, 15 de capacidades futuras, e 8 compras) e `scripts/avaliar.py` | Novo |
+| **Conjunto de avaliação (SK0)** | 8 frases do orquestrador e 6 compras dentro de um script | `evals/` (53 frases por skill, com capacidades futuras, e 8 compras) e `scripts/avaliar.py` (também por skill: `--skill`) | Novo |
+| **Orquestrador (SK2/SK5)** | Prompt de ≈ 250 linhas com contextos fixos | Escolha da skill pelo catálogo (prompt fixo, JSON Schema com o nome das skills); o antigo foi removido | Reestruturado |
+| **Roteiros (SK3)** | `if contexto ==` no `app/main.py` | Cada skill executa o próprio `roteiro.py`; confirmação genérica (`pendencia`); encaminhamento à conversa geral | Reestruturado |
+| **`app/main.py` (SK5)** | 974 linhas | 788 linhas + `app/ipc.py`, `app/sessao.py`, `app/voz.py` | Dividido |
+| **Fábrica de skills (SK6)** | — | `skills/_modelo`, `scripts/nova_skill.py`, `scripts/validar_skills.py` (na integração contínua) | Novo |
+| **Agenda (SK7)** | Respondia "ainda não está disponível" | Anota, consulta e cancela compromissos (tabela `compromissos`), feita só com `skills/agenda/` | Novo |
+| **Programação (SKP)** | Qwen sem contexto, fora do orquestrador (P10) | Claude (assinatura ou API) como principal; Qwen + biblioteca de contexto como reserva | Novo |
+| **Ideias e Telegram (SK8)** | — | Skill `ideias`, fila de análise pelo Claude, `Ideias/*.md` na biblioteca, bot do Telegram | Novo |
 | **Testes** | 70 | 231 | Expandido |
 | **Medições** | Só pelos logs | Scripts que medem o app real (`medir_v41.py`, `medir_m17.py`) e resumem o tempo por etapa (`ver_logs.py`) | Novo |
 
@@ -44,7 +51,12 @@ A segunda parte, a **fase das skills** (SK0 a SK8 e SKP, concluída em 23/11/202
 | Serviços | `services/esquemas.py`, `services/backup_service.py` |
 | Scripts | `scripts/medir_v41.py`, `scripts/medir_m17.py`, `scripts/fazer_backup.py`, `scripts/ver_logs.py` |
 | Testes | `tests/test_v41.py`, `tests/test_m17.py`, `tests/test_m11.py`, `tests/test_m26.py`, `tests/test_skills.py`, `tests/test_sk0.py`, `tests/dados/roteador_referencia.json` |
-| Skills | `skills/` (6 skills e `README.md`), `core/skills/` (`catalogo.py`, `seletor.py`), `evals/`, `scripts/avaliar.py` |
+| Skills | `skills/` (7 skills, `_modelo` e `README.md`), `core/skills/` (`catalogo.py`, `seletor.py`, `motor.py`), `evals/`, `scripts/avaliar.py`, `scripts/nova_skill.py`, `scripts/validar_skills.py` |
+| Claude, ideias e Telegram | `services/claude_service.py`, `services/claude_assinatura_service.py`, `services/biblioteca_service.py`, `services/ideias_service.py`, `services/telegram_service.py` |
+| App dividido (SK5) | `app/ipc.py`, `app/sessao.py`, `app/voz.py` |
+| Scripts de configuração | `scripts/indexar_biblioteca.py`, `scripts/testar_skp.py`, `scripts/testar_claude_assinatura.py`, `scripts/configurar_telegram.py`, `scripts/conferir_chaves.py` |
+| Arquivos `.bat` | `iniciar-assistente.bat`, `instalar-claude-code.bat`, `testar-claude-assinatura.bat`, `configurar-telegram.bat`, `testar-skp.bat`, `rodar-medicao-sk0.bat`, `verificar-sk2.bat`, `conferir-chaves.bat` |
+| Testes da fase | `tests/test_sk2.py`, `test_sk3.py`, `test_skp.py`, `test_sk6.py`, `test_sk7.py`, `test_ideias.py` |
 
 Arquivos alterados: `app/main.py`, `core/config.py`, `services/llm_provider.py`, `services/gemma_service.py`, `services/shopping_assistant.py`, `services/resilience_service.py`, `services/logger_service.py` (reescrito), `services/db_service.py`, `services/vector/embedding_service.py`, `services/vector/vector_store_service.py`, `services/vector/memory_service.py`, `services/ai_service.py`, `services/inventory_assistant.py`, `scripts/rebuild_embeddings.py`, `renderer.js`, `index.css`, `requirements.txt`, `.env.example`, `tests/test_fase1.py`.
 
@@ -92,6 +104,15 @@ Feitas no PC do usuário em 17/11/2026 (`scripts/medir_v41.py` e `scripts/medir_
 | Resposta com o Ollama fechado | ≥ 6 s, sem explicação | 2,4 s, com botão "Tentar de novo" |
 
 Cópia de segurança, em 22/11/2026, com os dados reais copiados para uma pasta temporária: 12 ms, com contagens iguais à origem e `integrity_check` ok.
+
+Fase das skills, em 23/11/2026, no PC do usuário (`scripts/avaliar.py`, relatórios em `Planejamento/medicoes/`):
+
+| Medida | Antes | Depois |
+| :--- | :--- | :--- |
+| Escolha da skill (48 frases) | 43/48 em 1,39 s (prompt por contextos) | 44/48 em 0,87 s (catálogo, contando a ação) |
+| Tokens lidos / gerados na escolha | 1.624 / 36 | 325 / 8 (SK0, Gemma no catálogo) |
+| Troca de modelo Gemma ↔ Qwen | — | 13 a 15 s; os dois não cabem juntos na VRAM |
+| Claude pela assinatura | — | resposta curta em 5,5 s; análise de ideia em cerca de 20 s |
 
 ---
 

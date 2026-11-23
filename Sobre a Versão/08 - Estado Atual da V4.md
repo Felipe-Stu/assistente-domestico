@@ -2,7 +2,7 @@
 
 Retrato técnico da **Versão 4 (V4)** do **Assistente Doméstico Inteligente** em **03/11/2026**, na branch `V4`, a partir do commit `c754a6a`, incluindo as correções da seção 6 e a Fase 1. Este documento registra o que funciona de fato, o que existe apenas no código e o que ainda não foi construído.
 
-**Atualizações da V4.1:** seção 11 (17/11/2026), seção 12 (22/11/2026) e seção 13 (23/11/2026, skills). O histórico da versão está em `06 - Evolução da V4 para a V4.1.md`.
+**Atualizações da V4.1:** seção 11 (17/11/2026), seção 12 (22/11/2026), seção 13 (23/11/2026, skills) e seção 14 (23/11/2026, encerramento da fase das skills). As seções 1, 2, 6 e 10 foram ajustadas ao estado de 23/11/2026; as demais mantêm o retrato de 03/11/2026. O histórico da versão está em `06 - Evolução da V4 para a V4.1.md`.
 
 > [!IMPORTANT]
 > Quando houver conflito entre este documento e descrições mais antigas, vale o que está aqui: ele foi escrito a partir do código e de testes executados. Havendo novas alterações de código, confira novamente.
@@ -15,15 +15,15 @@ Retrato técnico da **Versão 4 (V4)** do **Assistente Doméstico Inteligente** 
 
 A V4 é um assistente doméstico desktop: Electron na interface, Python no back-end, Ollama como IA local e Gemini como contingência na nuvem. A base está organizada e o back-end inicia e encerra corretamente, inclusive sem a chave do Gemini. O **registro de compras** e a **Skill ProjectAnalyzer** são os fluxos mais completos.
 
-A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras, compras têm validação e gravação segura, e somente perguntas gerais podem ir à nuvem. A gestão preditiva de estoque **ainda não funciona de ponta a ponta**, pois as compras gravadas não chegam à tabela de estoque (Fase 4).
+A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras, compras têm validação e gravação segura, e somente perguntas gerais podem ir à nuvem. A V4.1 organizou o sistema em skills escolhidas por catálogo e acrescentou agenda, programação com o Claude e ideias de projetos recebidas pelo Telegram (seções 13 e 14). A gestão preditiva de estoque **ainda não funciona de ponta a ponta**, pois as compras gravadas não chegam à tabela de estoque (Fase 4).
 
 | Indicador | Valor |
 |---|---|
-| Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 198 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, SK2, SK3, SKP e SK6, já sem os 5 do orquestrador antigo); ver seções 11 a 13 |
+| Código versionado (Python, JS, HTML, CSS) | ≈ 15.600 linhas em 23/11/2026, com os testes (≈ 8.070 em 03/11) |
+| Testes automatizados | 231 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
-| Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
-| Problemas abertos | 10 (1 alto, 5 médios, 4 baixos); 12 resolvidos (P21 em 17/11, P13 e P22 em 22/11, P10 em 23/11) |
+| Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`**; 3 ideias analisadas (23/11) |
+| Problemas abertos | 9 (1 alto, 4 médios, 4 baixos); 14 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P9, P10 e P23 em 23/11) |
 
 ---
 
@@ -37,11 +37,15 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Interface Electron com chat, modo voz, mudo e terminal de debug | Contrato IPC revisado; janela não aberta nesta análise | `CÓDIGO` |
 | Registro de compras por LLM local, com gravação no SQLite e vetorização | Extração testada com o Gemma real; preço por embalagem e datas conferidos | `TESTADO` |
 | Confirmação de compras em caso de dúvida e comando "desfazer última compra" | Desfazer vale para o último registro da sessão | `TESTADO` |
-| Roteamento por regras, com o orquestrador apenas para casos ambíguos | 9 de 10 frases medidas foram roteadas sem IA, em menos de 0,1 s | `TESTADO` |
+| Roteamento por regras, com o orquestrador apenas para casos ambíguos | 9 de 10 frases medidas foram roteadas sem IA, em menos de 0,1 s. Desde a V4.1, as regras são os gatilhos das skills, e o orquestrador escolhe pelo catálogo (44/48 em 0,87 s no PC) | `TESTADO` + `MEDIDO` |
 | Política da nuvem | Só `geral` e `outro` vão ao Gemini, fora do Modo Qwen e sem histórico ou memórias restritos | `TESTADO` |
 | Skill ProjectAnalyzer sem LLM | Analisou este projeto em 0,2 s | `TESTADO` |
 | Memória semântica no ChromaDB e contexto RAG no assistente genérico e no Gemini | Funciona, com filtro permissivo (P19) | `CÓDIGO` + `DADOS` |
 | Modo Qwen por comando de texto ou voz | Ativação, desativação e retorno por inatividade testados com troca de modelo simulada | `TESTADO` |
+| Agenda (V4.1) | Anota, consulta e cancela compromissos; falta o aviso na hora e o Google Agenda (V7) | `TESTADO` |
+| Programação com o Claude (V4.1) | Claude pela assinatura (`claude -p`) ou pela API; sem Claude, Qwen com biblioteca de contexto | `TESTADO` no PC (resposta em 5,5 s) |
+| Ideias de projetos e bot do Telegram (V4.1) | Ideia salva na hora, análise do Claude em segundo plano, `.md` na biblioteca, resposta local sobre a ideia | `TESTADO` no PC (análise em cerca de 20 s) |
+| Cópia de segurança diária e registro de eventos (V4.1) | M11 e M26 | `TESTADO` |
 
 ### Parcial
 
@@ -49,9 +53,9 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 |---|---|---|
 | Consulta de estoque por texto | A lógica existe, mas a tabela consultada nunca é preenchida | P1 |
 | Consultas de gastos e preços | São reconhecidas, mas respondem que a função ainda não existe (Fase 3) | — |
-| Modo Qwen como assistente de programação | Não libera a VRAM por completo, não usa de forma garantida o prompt de programação e não executa ferramentas | P7, P10 |
-| Agenda | Anota, consulta e cancela compromissos (SK7); falta o aviso na hora e o Google Agenda (V7) | — |
+| Modo Qwen manual (`ativar qwen`) | Não libera a VRAM por completo e não executa ferramentas. A programação pela skill `programacao` (Claude ou Qwen) resolveu o P10 | P7 |
 | Modo voz | Código presente; depende de microfone, Google Speech e Edge TTS | `NÃO TESTADO` |
+| Bot do Telegram | Só guarda ideias; ainda não conversa com o assistente inteiro. Separa pergunta de ideia por regra simples | — |
 
 ### Existe no código, mas não está ligado ao fluxo
 
@@ -189,7 +193,6 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P18 | Erros aparecem apenas no terminal interno, não no chat. | `renderer.js:282` | `CÓDIGO` |
 | P19 | Toda frase com 4 ou mais palavras vira memória de longo prazo. | `services/vector/memory_service.py:48` | `CÓDIGO` |
 | P20 | Heurística confunde respostas: "sim, mas sobraram dois" e "assim que abri acabou" viram `CONFIRMACAO`. Efeito futuro, pois o fluxo está inativo. | `services/inventory_assistant.py:175` | `TESTADO` |
-| P21 | Chat só ficava disponível depois da carga do modelo de embeddings (15 a 50 s nos logs). **Resolvido em 17/11/2026:** chat pronto em 3,5 s e memória em 13,0 s, em segundo plano (seção 11). | `services/vector/embedding_service.py`, `app/main.py` | `MEDIDO` |
 
 ### Resolvidos em 23/11/2026
 
@@ -198,6 +201,12 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P10 | `programacao` (e `projetos`) não estavam entre as opções do orquestrador | O orquestrador escolhe entre todas as skills do catálogo (SK2) | `tests/test_sk2.py` (`TESTADO`) |
 | P23 | Pedido de sugestões com a palavra "ideias" ia para a skill `ideias`; no Telegram, perguntas viravam ideias | A skill só consulta quando o pedido se refere a uma ideia salva e encaminha o resto à conversa geral (`Resposta.encaminhar`). No Telegram, perguntas e pedidos não são salvos; "ideia: ..." ou "/ideia ..." salvam sempre | `tests/test_ideias.py` (`TestP23`, `TestP23NoApp`) (`TESTADO`) |
 | P9 | Agenda não persistia dados | Skill `agenda` com roteiro e tabela `compromissos` (SK7) | `tests/test_sk7.py` (`TESTADO`) |
+
+### Resolvidos em 17/11/2026
+
+| ID | Problema | Correção | Validação |
+|---|---|---|---|
+| P21 | Chat só ficava disponível depois da carga do modelo de embeddings (15 a 50 s nos logs) | Embeddings carregados em segundo plano: chat pronto em 3,5 s e memória em 13,0 s (seção 11) | `MEDIDO` |
 
 ### Resolvidos em 22/11/2026
 
@@ -226,9 +235,8 @@ A verificação de inatividade ocorre na solicitação seguinte, não em segundo
 ## 7. Código sem uso e dívida técnica
 
 - **Sem chamadas no projeto:** `parse_json_com_fallback`, `classificar_intencao_usuario`, `enviar_prompt_json`, `salvar_compra_da_ia`, `obter_itens_expirados_para_validacao`, `obter_dados_produto_por_nome`, `atualizar_recompra_e_ritmo`, `zerar_estoque_item`, `zerar_estoque_por_nome`, `pre_carregar_modelo` e os callbacks de áudio e voz.
-- **Duplicado:** `_sanitizar_resposta_json` em `gemma_service.py` (sem uso) e nos dois provedores de LLM.
+- **Duplicado:** `_sanitizar_resposta_json` nos dois provedores de LLM (a cópia sem uso do `gemma_service.py` saiu no SK5).
 - **Configurações sem uso:** `SAMPLE_RATE`, `CHANNELS`, `CHUNK_SIZE`, `RECORD_SECONDS` e `GEMINI_API_KEY` em `core/config.py`.
-- **Dependência sem uso direto:** `requests`.
 - **Estado de interface sem origem:** o back-end nunca emite `RESPONDING`.
 - **Cobertura:** roteamento, compras, política da nuvem e parte do runtime têm testes. Faltam estoque, serviços vetoriais reais, voz e IPC.
 
@@ -272,7 +280,15 @@ Ordem aprovada em 03/11/2026:
 4. **Fase 4, estoque (P1):** catálogo de produtos, itens recorrentes, conversão de unidades e ritmo de consumo.
 5. **Fase 5, lista e previsões:** lista de compras e comparação entre mercados.
 
-Pendências paralelas: concluir o modo Qwen (P7, P10, botão e troca por intenção), definir o envio de arquivos pelo chat e a agenda, publicar a branch `V4` e atualizar `README.md`.
+Pendências paralelas: concluir o modo Qwen (P7, botão e troca por intenção), definir o envio de arquivos pelo chat, publicar a branch `V4` e atualizar `README.md`.
+
+**Atualização de 23/11/2026:** a agenda, a programação com o Claude (P10) e o README foram resolvidos na V4.1. Próximos itens do roadmap do sistema, por impacto:
+1. **M06:** compras alimentam o estoque (P1).
+2. **M19:** consultas de gastos sem SQL livre (Fase 3).
+3. **M07:** catálogo de produtos e categorias fechadas.
+4. **M29/M30:** transcrição local e palavra de ativação.
+
+Também está pendente o envio dos commits da `v4.1` ao GitHub e o PR para a `V4`.
 
 ---
 
@@ -359,3 +375,18 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 **O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
 
 **Validação:** 226 de 226 testes aprovados, nas mesmas condições da seção 12.
+
+## 14. Encerramento da fase das skills (23/11/2026)
+
+| Item | Situação | Evidência |
+|---|---|---|
+| Etapas SK0 a SK3, SK5 a SK8 e SKP | Concluídas; SK4 ficou de fora por decisão | `Planejamento/09-roadmap-skills.md` |
+| Claude pela assinatura | `CLAUDE_MODO=assinatura` (padrão), Claude Code instalado e logado no plano; resposta curta em 5,5 s | `TESTADO` no PC (`testar-claude-assinatura.bat`) |
+| Ideias pelo Telegram | Três ideias recebidas, analisadas em cerca de 20 s cada e devolvidas ao chat; `.md` gravados em `Ideias/` | `TESTADO` no PC |
+| P23 | Pedido de sugestões encaminhado à conversa geral; perguntas no Telegram não viram ideia | `TESTADO` (4 testes) |
+| Suíte | 231 de 231 testes aprovados (ambiente com bibliotecas externas simuladas) | `TESTADO` |
+
+**Dados que saem da máquina, em resumo:** perguntas gerais (Gemini, se configurado), texto das ideias e pedidos de programação (Claude), mensagens ao bot (Telegram) e, no modo voz, áudio (Google Speech) e texto (Edge TTS). Compras, estoque e agenda não saem.
+
+**Pendente:** testar com o modelo real a escolha das 4 frases novas de `evals/casos.jsonl` (r50, r52 e r53 dependem do modelo); enviar os commits ao GitHub.
+
