@@ -189,6 +189,9 @@ class TestIdeiasService(BaseIdeias):
         self.assertIn("voltou para a fila", ideias.responder_mensagem("/reanalisar 1", "telegram:1"))
         self.assertIn("Não encontrei", ideias.responder_mensagem("/ver 9", "telegram:1"))
         self.assertIn("desconhecido", ideias.responder_mensagem("/apagar", "telegram:1"))
+        for curta in ("oi", "'oi'", "Bom dia!", "tudo bem?"):
+            self.assertIn("Estou ligado", ideias.responder_mensagem(curta, "telegram:1"))
+        self.assertEqual(len(ideias.listar()), 1)
 
     def test_titulo_da_analise(self):
         self.assertEqual(separar_titulo("# Título\n\ncorpo"), ("Título", "corpo"))

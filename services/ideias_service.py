@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS ideias (
 COLUNAS = ("id", "titulo", "texto", "origem", "criado_em", "situacao", "analise", "analisado_em", "motivo")
 SITUACOES = {"pendente": "aguardando análise", "analisando": "em análise", "analisada": "analisada"}
 TAMANHO_MAXIMO = 8000
+# Mensagem curta demais não vira ideia (cumprimentos, testes): o bot responde com a ajuda
+MINIMO_PALAVRAS = 4
 
 
 def titulo_provisorio(texto: str) -> str:
@@ -238,9 +240,10 @@ class IdeiasService:
         """Bot do Telegram: comandos simples; qualquer outro texto é uma ideia nova."""
         comando = (texto or "").strip()
         minusculo = comando.lower()
+        ajuda = ("Mande a ideia em texto, com pelo menos algumas palavras, que eu salvo no assistente e o Claude analisa.\n"
+                 "/ideias — últimas ideias\n/ver 3 — análise da ideia 3\n/reanalisar 3 — analisar de novo")
         if minusculo in ("/start", "/ajuda", "ajuda", "/help"):
-            return ("Mande a ideia em texto que eu salvo no assistente e o Claude analisa.\n"
-                    "/ideias — últimas ideias\n/ver 3 — análise da ideia 3\n/reanalisar 3 — analisar de novo")
+            return ajuda
         if minusculo in ("/ideias", "ideias", "/lista"):
             return self.resumo_lista()
         numero = re.match(r"^/?(ver|reanalisar)\s*#?(\d+)$", minusculo)
@@ -254,4 +257,6 @@ class IdeiasService:
             return self.detalhe(ideia)
         if minusculo.startswith("/"):
             return "Comando desconhecido. Mande /ajuda."
+        if len(re.findall(r"\w+", comando)) < MINIMO_PALAVRAS:
+            return "Oi! Estou ligado. " + ajuda
         return self.confirmacao(self.salvar(comando, origem))
