@@ -286,7 +286,7 @@ class TestMigracao(BaseBanco):
             db = DatabaseService()
             DatabaseService()  # A segunda inicialização deve ser inofensiva
 
-        self.assertEqual(db.executar_consulta_uma_linha("PRAGMA user_version")[0], 2)
+        self.assertEqual(db.executar_consulta_uma_linha("PRAGMA user_version")[0], 3)  # v3: entradas (M09)
         self.assertEqual(db.executar_consulta_uma_linha("SELECT produto, embalagem_quantidade FROM itens_compra"), ("leite", None))
 
 

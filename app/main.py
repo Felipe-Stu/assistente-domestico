@@ -334,7 +334,8 @@ class AssistenteRuntime(ModoVoz):
     def compra_pendente(self):
         """Compras aguardando confirmação (leitura; o estado fica em self.pendencia)."""
         if self.pendencia and self.pendencia[0] == "compras":
-            return self.pendencia[1]
+            dados = self.pendencia[1]
+            return dados["compras"] if isinstance(dados, dict) else dados
         return None
 
     def _repetir(self, func, args=(), mensagem_espera_voz=None, nome_servico="Skill"):
@@ -405,6 +406,7 @@ class AssistenteRuntime(ModoVoz):
             "project_analyzer": getattr(self, "project_analyzer", None),
             "progresso": lambda mensagem: emitir_electron("debug_log", {"message": mensagem}),
             "ideias": getattr(self, "ideias", None),
+            "canal": getattr(self, "_canal_atual", "chat"),
             # Modelo local residente, para qualquer skill (SK6): uma skill nova não precisa mudar o núcleo
             "llm_local": LocalLLMProvider(temperatura=0.1),
         }
@@ -458,9 +460,9 @@ class AssistenteRuntime(ModoVoz):
         self._set_estado("WAITING_INPUT")
         return resposta_texto
 
-    def _processar_solicitacao(self, transcricao: str):
-        """Abre uma requisição no registro de eventos (M26) e executa o pipeline."""
-        canal = "voz" if self.voice_mode_active else "texto"
+    def _processar_solicitacao(self, transcricao: str, canal: str = "chat"):
+        """Abre uma requisição no registro de eventos (M26) e executa o pipeline. canal: 'chat' ou 'voz' (M09)."""
+        self._canal_atual = canal
         with custom_logger.requisicao(canal=canal, caracteres=len(transcricao or "")):
             return self._executar_pipeline(transcricao)
 
@@ -792,7 +794,7 @@ class AssistenteRuntime(ModoVoz):
                     self.audio_service.abortar_captura()
 
                 try:
-                    self._processar_solicitacao(text)
+                    self._processar_solicitacao(text, canal="voz")
                 except TokenExhaustedException as e:
                     logger.warning(f"AVISO DE TOKENS: {e}")
                     self._falar_se_permitido("Limite de cota atingido para processamento na nuvem.")

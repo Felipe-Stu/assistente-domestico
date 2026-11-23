@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 from core.config import DB_PATH
 from services.logger_service import logger as custom_logger
@@ -21,6 +22,25 @@ class _ConexaoQueFecha(sqlite3.Connection):
             return super().__exit__(tipo, valor, rastro)
         finally:
             self.close()
+
+# M09: origem de cada registro. Uma linha por pedido de compra extraído pelo modelo, gravado ou não,
+# com o texto original e a resposta do modelo: permite auditar, reprocessar e alimentar as avaliações (M13).
+TABELA_ENTRADAS = """
+CREATE TABLE IF NOT EXISTS entradas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    criado_em TEXT NOT NULL,
+    tipo TEXT NOT NULL,              -- 'compra' (outras skills podem usar depois)
+    canal TEXT NOT NULL,             -- 'chat', 'voz' ou 'telegram'
+    texto TEXT NOT NULL,             -- o que a pessoa escreveu ou falou
+    anexo TEXT,                      -- caminho de um arquivo enviado (futuro: PDF, imagem)
+    resposta_json TEXT,              -- o que o modelo devolveu, antes da validação
+    modelo TEXT,
+    versao_prompt TEXT,              -- 8 primeiros caracteres do SHA-1 do prompt usado
+    duracao_ms INTEGER,
+    situacao TEXT NOT NULL           -- 'gravada', 'descartada' ou 'desfeita'
+)
+"""
+
 
 class DatabaseService:
     """
@@ -54,7 +74,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 2
+        SCHEMA_VERSION = 3
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -164,6 +184,17 @@ class DatabaseService:
                     if "embalagem_unidade" not in colunas:
                         cursor.execute("ALTER TABLE itens_compra ADD COLUMN embalagem_unidade TEXT;")
 
+                    cursor.execute("PRAGMA user_version = 2;")
+                    atual_version = 2
+
+                if atual_version < 3:
+                    msg_migracao = "Aplicando migração v3 (M09): tabela 'entradas' e coluna compras.entrada_id."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute(TABELA_ENTRADAS)
+                    cursor.execute("PRAGMA table_info(compras);")
+                    if "entrada_id" not in [coluna[1] for coluna in cursor.fetchall()]:
+                        cursor.execute("ALTER TABLE compras ADD COLUMN entrada_id INTEGER REFERENCES entradas(id);")
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -230,7 +261,30 @@ class DatabaseService:
     # PERSISTÊNCIA DE COMPRAS
     # =========================================================================
 
-    def _inserir_compra(self, cursor: sqlite3.Cursor, dados_ia: Dict[str, Any]) -> int:
+    @staticmethod
+    def _inserir_entrada(cursor: sqlite3.Cursor, entrada: Dict[str, Any], situacao: str) -> int:
+        cursor.execute(
+            """
+            INSERT INTO entradas (criado_em, tipo, canal, texto, anexo, resposta_json, modelo, versao_prompt, duracao_ms, situacao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entrada.get("criado_em") or datetime.now().isoformat(timespec="seconds"),
+                entrada.get("tipo", "compra"), entrada.get("canal", "chat"), entrada.get("texto", ""),
+                entrada.get("anexo"), entrada.get("resposta_json"), entrada.get("modelo"),
+                entrada.get("versao_prompt"), entrada.get("duracao_ms"), situacao,
+            ),
+        )
+        return cursor.lastrowid
+
+    def registrar_entrada(self, entrada: Dict[str, Any], situacao: str) -> int:
+        """Registra uma entrada sem compra gravada (ex.: compra descartada pelo usuário)."""
+        with self.get_connection() as conn:
+            entrada_id = self._inserir_entrada(conn.cursor(), entrada, situacao)
+            conn.commit()
+        return entrada_id
+
+    def _inserir_compra(self, cursor: sqlite3.Cursor, dados_ia: Dict[str, Any], entrada_id: Optional[int] = None) -> int:
         """Insere uma compra e seus itens na transação do cursor recebido."""
         # Extração de cabeçalho da compra com fallbacks de chave
         data_compra = dados_ia.get("data_compra") or dados_ia.get("data")
@@ -239,10 +293,10 @@ class DatabaseService:
 
         cursor.execute(
             """
-            INSERT INTO compras (data_compra, nome_comercio, total_gasto)
-            VALUES (?, ?, ?)
+            INSERT INTO compras (data_compra, nome_comercio, total_gasto, entrada_id)
+            VALUES (?, ?, ?, ?)
             """,
-            (data_compra, nome_comercio, total_gasto)
+            (data_compra, nome_comercio, total_gasto, entrada_id)
         )
         compra_id = cursor.lastrowid
 
@@ -288,9 +342,10 @@ class DatabaseService:
 
         return compra_id
 
-    def salvar_compras_da_ia(self, compras: List[Dict[str, Any]]) -> List[int]:
+    def salvar_compras_da_ia(self, compras: List[Dict[str, Any]], entrada: Optional[Dict[str, Any]] = None) -> List[int]:
         """
         Grava todas as compras em uma única transação: ou todas são salvas, ou nenhuma.
+        Com `entrada` (M09), a origem é gravada na mesma transação e ligada a cada compra.
 
         :param compras: Lista de compras validadas
         :return: IDs das compras geradas, na mesma ordem
@@ -299,7 +354,8 @@ class DatabaseService:
         try:
             with custom_logger.etapa("banco", componente=NOME_ASSISTENTE, operacao="gravar_compras", compras=len(compras)):
                 cursor = conn.cursor()
-                ids = [self._inserir_compra(cursor, compra) for compra in compras]
+                entrada_id = self._inserir_entrada(cursor, entrada, "gravada") if entrada else None
+                ids = [self._inserir_compra(cursor, compra, entrada_id) for compra in compras]
                 conn.commit()
 
             total_itens = sum(len(compra.get("itens", [])) for compra in compras)
@@ -342,6 +398,12 @@ class DatabaseService:
                 cursor = conn.cursor()
                 cursor.execute(f"SELECT id FROM itens_compra WHERE compra_id IN ({marcadores})", tuple(compra_ids))
                 itens_ids = [linha[0] for linha in cursor.fetchall()]
+                # A origem fica, marcada como desfeita (M09): o histórico do que foi pedido não se perde
+                cursor.execute(
+                    f"UPDATE entradas SET situacao = 'desfeita' WHERE id IN "
+                    f"(SELECT entrada_id FROM compras WHERE id IN ({marcadores}) AND entrada_id IS NOT NULL)",
+                    tuple(compra_ids),
+                )
                 cursor.execute(f"DELETE FROM compras WHERE id IN ({marcadores})", tuple(compra_ids))
                 conn.commit()
             custom_logger.log_assistente(NOME_ASSISTENTE, f"Compras {compra_ids} removidas ({len(itens_ids)} itens).")

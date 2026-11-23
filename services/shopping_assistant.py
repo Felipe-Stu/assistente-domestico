@@ -1,6 +1,9 @@
 from datetime import date, datetime, timedelta
+import hashlib
+import json
 import logging
 import re
+import time
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.esquemas import ESQUEMA_COMPRAS
@@ -281,12 +284,13 @@ class ShoppingAssistant:
                 )
         return "\n".join(linhas)
 
-    def preparar_compra(self, texto_transcrito: str) -> Dict[str, Any]:
+    def preparar_compra(self, texto_transcrito: str, canal: str = "chat") -> Dict[str, Any]:
         """
         Gera o prompt especializado em parsing de compras (multi-mercados), solicita a
         estruturação ao llm_provider e valida o resultado. Não grava nada: pode ser
         repetida com segurança pelo retry.
-        Retorna {"compras": [...], "duvidas": [...]}.
+        Retorna {"compras": [...], "duvidas": [...], "origem": {...}}; a origem (M09) é gravada
+        junto com a compra em registrar_compras, ou como descartada em descartar.
         """
         custom_logger.log_assistente(NOME_ASSISTENTE, f"Áudio recebido: '{custom_logger.conteudo(texto_transcrito)}'")
 
@@ -303,11 +307,24 @@ class ShoppingAssistant:
         custom_logger.log_assistente(NOME_ASSISTENTE, "Solicitando extração de compras em JSON ao LLMProvider.")
 
         # Solicita a estrutura JSON através do provedor de LLM configurado (Local ou Nuvem)
+        inicio = time.monotonic()
         resposta_json = self.llm_provider.gerar_json(
             prompt_sistema=prompt_sistema,
             mensagem_usuario=texto_transcrito,
             esquema=ESQUEMA_COMPRAS
         )
+        origem = {
+            "tipo": "compra",
+            "canal": canal,
+            "texto": texto_transcrito,
+            "resposta_json": json.dumps(resposta_json, ensure_ascii=False, default=str)[:20000],
+            "modelo": getattr(self.llm_provider, "modelo", None),
+            # Versão do prompt: hash do modelo de prompt (com a data fixa, para não mudar a cada dia)
+            "versao_prompt": hashlib.sha1(
+                obter_catalogo().skill("compras").prompt("extracao", data_atual="AAAA-MM-DD").encode("utf-8")
+            ).hexdigest()[:8],
+            "duracao_ms": int((time.monotonic() - inicio) * 1000),
+        }
         custom_logger.log_assistente(NOME_ASSISTENTE, "Estrutura JSON retornada pelo LLMProvider com sucesso.")
 
         listagem_compras = []
@@ -333,11 +350,20 @@ class ShoppingAssistant:
             NOME_ASSISTENTE,
             f"Compras preparadas: {len(compras_validadas)}. Dúvidas: {duvidas or 'nenhuma'}."
         )
-        return {"compras": compras_validadas, "duvidas": duvidas}
+        return {"compras": compras_validadas, "duvidas": duvidas, "origem": origem}
 
-    def registrar_compras(self, compras: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Grava as compras em uma única transação e vetoriza os itens. Não deve ser repetida."""
-        compra_ids = self.db_service.salvar_compras_da_ia(compras)
+    def descartar(self, origem: Optional[Dict[str, Any]]) -> None:
+        """Compra recusada pelo usuário: guarda só a origem, como descartada (M09)."""
+        if not origem:
+            return
+        try:
+            self.db_service.registrar_entrada(origem, "descartada")
+        except Exception as erro:  # o registro da origem nunca impede a resposta
+            logging_logger.warning(f"Não foi possível registrar a origem descartada: {erro}")
+
+    def registrar_compras(self, compras: List[Dict[str, Any]], origem: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Grava as compras (e a origem, M09) em uma única transação e vetoriza os itens. Não deve ser repetida."""
+        compra_ids = self.db_service.salvar_compras_da_ia(compras, entrada=origem)
 
         for compra_id, dados_validados in zip(compra_ids, compras):
             logging_logger.info("Compra gravada com sucesso pelo ShoppingAssistant! ID: %s", compra_id)

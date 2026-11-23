@@ -30,12 +30,14 @@ def executar(ctx, texto, decisao):
 
     preparada = ctx.repetir(
         custom_logger.cronometrado("extracao_compras", compras.preparar_compra),
-        (texto,),
+        (texto, ctx.servicos.get("canal") or "chat"),
         mensagem_espera_voz="Estou tentando entender sua compra novamente.",
         nome_servico="ShoppingAssistant",
     )
 
+    origem = preparada.get("origem")
     if not preparada["compras"]:
+        compras.descartar(origem)
         return Resposta("Não identifiquei itens de compra nessa mensagem. Nada foi registrado.")
 
     if preparada["duvidas"]:
@@ -45,20 +47,24 @@ def executar(ctx, texto, decisao):
             f"Antes de gravar, confira esta compra:\n{resumo}\n\nPontos de dúvida:\n{duvidas}\n\n"
             "Responda \"sim\" para gravar ou \"não\" para descartar.",
             fala="Tenho uma dúvida sobre esta compra. Confira no chat e responda sim ou não.",
-            pendencia=preparada["compras"],
+            pendencia={"compras": preparada["compras"], "origem": origem},
         )
 
-    return Resposta(compras.registrar_compras(preparada["compras"])["mensagem"])
+    return Resposta(compras.registrar_compras(preparada["compras"], origem)["mensagem"])
 
 
-def responder_pendencia(ctx, texto, compras_pendentes):
+def responder_pendencia(ctx, texto, pendente):
     """Resposta do usuário a uma compra aguardando confirmação."""
+    # Formato antigo (lista de compras) continua aceito
+    compras_pendentes, origem = (pendente["compras"], pendente.get("origem")) if isinstance(pendente, dict) else (pendente, None)
+    servico = ctx.servico("shopping_assistant")
     resposta = normalizar_texto(texto).strip(" .,!")
     if resposta in RESPOSTAS_CONFIRMAR:
-        return Resposta(ctx.servico("shopping_assistant").registrar_compras(compras_pendentes)["mensagem"])
+        return Resposta(servico.registrar_compras(compras_pendentes, origem)["mensagem"])
     if resposta in RESPOSTAS_CANCELAR:
+        servico.descartar(origem)
         return Resposta("Compra descartada. Nada foi gravado.")
     return Resposta(
         "Ainda há uma compra aguardando confirmação. Responda \"sim\" para gravar ou \"não\" para descartar.",
-        pendencia=compras_pendentes,
+        pendencia=pendente,
     )
