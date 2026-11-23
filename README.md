@@ -54,8 +54,9 @@ graph TD
 |---|---|---|
 | Registro de compras por texto, com confirmação e desfazer | Consulta de estoque (a tabela de consumo ainda não é alimentada pelas compras) | Gestão preditiva de estoque de ponta a ponta |
 | Roteamento por regras e política de nuvem | Modo Qwen como assistente de programação (sem execução de ferramentas) | Consultas de gastos e preços |
-| Memória semântica e RAG | Modo voz (depende de microfone e serviços externos) | Agenda |
+| Memória semântica e RAG | Modo voz (depende de microfone e serviços externos) | Aviso na hora dos compromissos e Google Agenda |
 | ProjectAnalyzer | | |
+| Agenda: anotar, consultar e cancelar compromissos | | |
 
 O retrato completo, com evidências e problemas abertos, está em [`Sobre a Versão/08 - Estado Atual da V4.md`](Sobre%20a%20Vers%C3%A3o/08%20-%20Estado%20Atual%20da%20V4.md).
 

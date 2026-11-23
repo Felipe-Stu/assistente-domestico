@@ -490,7 +490,8 @@ class TestRuntime(BaseBanco):
 
     def test_agenda_nao_exibe_json(self):
         resposta = self.responder("Me lembre de pagar a conta de luz amanhã")
-        self.assertIn("agenda ainda não está disponível", resposta)
+        self.assertNotIn("{", resposta)
+        self.assertNotIn('"titulo"', resposta)
 
     def test_documentacao_sem_caminho_pede_a_pasta(self):
         resposta = self.responder("Escreva a documentação do sistema de inventário do MOBA")

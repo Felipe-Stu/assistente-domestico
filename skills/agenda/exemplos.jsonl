@@ -1,0 +1,7 @@
+{"frase": "Marquei dentista pra quinta às 14h", "acao": "criar"}
+{"frase": "Me lembre de pagar a conta de luz amanhã", "acao": "criar"}
+{"frase": "Agende a revisão da moto para sábado de manhã", "acao": "criar"}
+{"frase": "Que horas é meu dentista amanhã?", "acao": "consultar"}
+{"frase": "O que tenho na agenda esta semana?", "acao": "consultar"}
+{"frase": "Bom dia! O que tenho pra hoje?", "acao": "consultar"}
+{"frase": "Cancela o último compromisso", "acao": "corrigir"}

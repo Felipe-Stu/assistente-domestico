@@ -64,7 +64,7 @@ Uma skill com `execucao: roteiro` é escolhida pelo orquestrador e executada sem
 |---|---|---|---|---|---|
 | `compras` | compras | ativa | local | 4 (com pesquisa de preço) | roteiro |
 | `estoque` | inventario | ativa | local | 2 | roteiro |
-| `agenda` | agenda | planejada | local | 2 | roteiro |
+| `agenda` | agenda | ativa | local | 3 | roteiro |
 | `documentar-projeto` | projetos | ativa | local | 1 | roteiro |
 | `programacao` | programacao | ativa | claude | 0 | roteiro (Claude → Qwen) |
 | `conversa-geral` | geral, outro | ativa | nuvem-permitida | 0 | núcleo |

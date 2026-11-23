@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [V4.1] — SK7: agenda (2026-11-23)
+
+### Adicionado
+- Agenda funcional, feita só com `skills/agenda/` (sem alteração em `core/` ou `app/`), no SQLite local (tabela `compromissos`, criada pela skill).
+  - Anotar: o modelo local extrai título, data e hora (`prompts/extracao.md`, com a data de hoje); o código valida; sem data, pergunta "para quando?" e a resposta completa o pedido.
+  - Consultar: sem modelo; hoje, amanhã, dia da semana, data (26/11), mês; padrão: próximos 7 dias.
+  - Cancelar o último compromisso, com confirmação.
+- Gatilhos novos: "o que tenho hoje/amanhã/na semana", "na agenda" e "cancelar compromisso".
+- `skills/agenda/exemplos.jsonl` e `tests/test_sk7.py` (8 testes). Suíte: 206 testes.
+
+### Corrigido
+- P9: a agenda grava e consulta compromissos.
+
+### Limitações
+- Sem aviso na hora do compromisso (precisa de agendador no núcleo) e sem Google Agenda: ficam para a V7.
+
 ## [V4.1] — SK6: fábrica de skills (2026-11-23)
 
 ### Adicionado

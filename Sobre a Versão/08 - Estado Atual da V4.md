@@ -50,7 +50,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Consulta de estoque por texto | A lógica existe, mas a tabela consultada nunca é preenchida | P1 |
 | Consultas de gastos e preços | São reconhecidas, mas respondem que a função ainda não existe (Fase 3) | — |
 | Modo Qwen como assistente de programação | Não libera a VRAM por completo, não usa de forma garantida o prompt de programação e não executa ferramentas | P7, P10 |
-| Agenda | Reconhece o pedido e informa que a função ainda não existe; nada é gravado | P9 |
+| Agenda | Anota, consulta e cancela compromissos (SK7); falta o aviso na hora e o Google Agenda (V7) | — |
 | Modo voz | Código presente; depende de microfone, Google Speech e Edge TTS | `NÃO TESTADO` |
 
 ### Existe no código, mas não está ligado ao fluxo
@@ -84,7 +84,7 @@ graph TD
     ORQ -->|"Regra: projeto"| PA["ProjectAnalyzer<br>sem nuvem"]
     ORQ -->|"compras"| SH["ShoppingAssistant"]
     ORQ -->|"inventario"| INV["consultar_estoque<br>somente leitura"]
-    ORQ -->|"agenda"| AG["Aviso: ainda indisponível"]
+    ORQ -->|"agenda"| AG["skills/agenda<br>compromissos no SQLite"]
     ORQ -->|"geral, outro, programacao"| LOCAL["executar_assistente_local"]
     ORQ -->|"geral ou outro, se difícil"| NUVEM["Gemini"]
     LOCAL -->|"falha em geral ou outro"| NUVEM
@@ -178,7 +178,6 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 |---|---|---|---|---|
 | P7 | Assistentes usam Gemma fixo mesmo no modo Qwen. | `app/main.py:170` | Os dois modelos podem ocupar a VRAM ao mesmo tempo | `CÓDIGO` |
 | P8 | A varredura roda só no início, com o modo voz ainda desligado, e `validacao_pendente` nunca vira pergunta. | `app/main.py:691`, `services/inventory_assistant.py:307` | Validação por voz inalcançável | `CÓDIGO` |
-| P9 | Agenda não persiste dados. | `app/main.py` (rota `agenda`) | Nenhum compromisso salvo; o usuário recebe esse aviso | `CÓDIGO` |
 | P12 | Vetores de compras em tempo real não têm `entity_id`, e a busca híbrida não está ligada ao fluxo. | `services/shopping_assistant.py:500` | Sem hidratação de valores exatos do SQLite | `CÓDIGO` |
 | P14 | Migração e fluxo em tempo real usam IDs diferentes para o mesmo item. | `scripts/migrate_vector_database.py:58`, `services/shopping_assistant.py:491` | Itens duplicados no ChromaDB | `CÓDIGO` |
 
@@ -197,6 +196,7 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | ID | Problema | Correção | Validação |
 |---|---|---|---|
 | P10 | `programacao` (e `projetos`) não estavam entre as opções do orquestrador | O orquestrador escolhe entre todas as skills do catálogo (SK2) | `tests/test_sk2.py` (`TESTADO`) |
+| P9 | Agenda não persistia dados | Skill `agenda` com roteiro e tabela `compromissos` (SK7) | `tests/test_sk7.py` (`TESTADO`) |
 
 ### Resolvidos em 22/11/2026
 
@@ -351,6 +351,8 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 | Fábrica de skills (SK6) | `scripts/nova_skill.py` a partir de `skills/_modelo`; `scripts/validar_skills.py` na integração contínua; `llm_local` para toda skill | `TESTADO` (7 testes) |
 
+| Agenda (SK7) | Anotar, consultar e cancelar compromissos, feita só em `skills/agenda/`; resolve o P9 | `TESTADO` (8 testes); no PC com o modelo real `NÃO TESTADO` |
+
 **O que ainda não muda:** a conversa geral continua no `app/main.py`, porque a política de nuvem (Gemini) é do núcleo.
 
-**Validação:** 198 de 198 testes aprovados, nas mesmas condições da seção 12.
+**Validação:** 206 de 206 testes aprovados, nas mesmas condições da seção 12.

@@ -34,8 +34,9 @@ class TestRoteirosDoProjeto(unittest.TestCase):
         ctx = Contexto(servicos={"inventory_assistant": inventario})
         self.assertEqual(motor.executar(estoque, ctx, "tem leite?", {"acao": "consultar"}).texto, "Você tem 2 litros de leite.")
         self.assertIn("apenas consultar", motor.executar(estoque, ctx, "acabou o leite", {"acao": "corrigir"}).texto)
-        agenda = motor.executar(obter_catalogo().skill("agenda"), Contexto(), "me lembre", {"acao": "criar"})
-        self.assertIn("agenda ainda não está disponível", agenda.texto)
+        # SK7: a agenda virou skill ativa e pede os serviços que usa (detalhes em test_sk7)
+        with self.assertRaisesRegex(KeyError, "llm_local"):
+            motor.executar(obter_catalogo().skill("agenda"), Contexto(), "me lembre", {"acao": "criar"})
 
 
 class TestMotor(unittest.TestCase):
