@@ -14,7 +14,10 @@ Estado: **SK2** do roadmap das skills. Quando nenhum gatilho casa, o orquestrado
 skills/<nome>/
   SKILL.md          cabeçalho YAML + instruções (o que a skill faz, regras, limitações)
   prompts/<x>.md    textos enviados ao modelo; {{marcador}} é preenchido pelo código
+  roteiro.py        passos em ordem fixa, quando execucao: roteiro (SK3)
 ```
+
+`roteiro.py` define `executar(ctx, texto, decisao)` e, se a skill pede confirmação, `responder_pendencia(ctx, texto, dados)`. Os dois devolvem `Resposta(texto, fala=None, pendencia=None)`; com `pendencia`, a próxima mensagem do usuário volta para a skill. `ctx.servico(nome)` entrega os serviços do núcleo e `ctx.repetir(func, args, ...)` aplica a política de repetição.
 
 ## Cabeçalho
 
@@ -28,6 +31,7 @@ privacidade: local                  # local | nuvem-permitida
 entradas: [texto, voz]              # texto, voz, pdf, imagem, audio
 saidas: [texto]                     # texto, relatorio, acao
 versao: 1
+execucao: roteiro                   # roteiro (roteiro.py) | nucleo (ainda no app/main.py; padrão)
 gatilhos:                           # opcional: frases resolvidas sem modelo
   - acao: criar                     # criar | corrigir | consultar | delegar | chavear_modo
     prioridade: 30                  # menor primeiro; única em todo o catálogo
@@ -47,15 +51,15 @@ gatilhos:                           # opcional: frases resolvidas sem modelo
 3. Rode `python -m unittest tests.test_skills`. Erros de formato apontam o arquivo e o campo.
 4. Se mudou um gatilho, `tests/dados/roteador_referencia.json` aponta qualquer decisão que mudou.
 
-Uma skill nova já pode ser escolhida pelo orquestrador, mas ainda precisa de uma linha de roteamento em `app/main.py` para ser executada. O SK3 tira essa necessidade.
+Uma skill nova com `execucao: roteiro` é escolhida pelo orquestrador e executada sem nenhuma alteração no núcleo.
 
 ## Skills atuais
 
-| Skill | Contextos | Estado | Privacidade | Gatilhos |
-|---|---|---|---|---|
-| `compras` | compras | ativa | local | 4 (com pesquisa de preço) |
-| `estoque` | inventario | ativa | local | 2 |
-| `agenda` | agenda | planejada | local | 2 |
-| `documentar-projeto` | projetos | ativa | local | 1 |
-| `programacao` | programacao | ativa | local | 0 |
-| `conversa-geral` | geral, outro | ativa | nuvem-permitida | 0 |
+| Skill | Contextos | Estado | Privacidade | Gatilhos | Execução |
+|---|---|---|---|---|---|
+| `compras` | compras | ativa | local | 4 (com pesquisa de preço) | roteiro |
+| `estoque` | inventario | ativa | local | 2 | roteiro |
+| `agenda` | agenda | planejada | local | 2 | roteiro |
+| `documentar-projeto` | projetos | ativa | local | 1 | núcleo |
+| `programacao` | programacao | ativa | local | 0 | núcleo |
+| `conversa-geral` | geral, outro | ativa | nuvem-permitida | 0 | núcleo |

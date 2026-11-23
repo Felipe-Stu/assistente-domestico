@@ -20,7 +20,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 170 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0 e 10 do SK2); ver seções 11 a 13 |
+| Testes automatizados | 177 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11, 13 do M26, 13 das skills, 10 do SK0, 10 do SK2 e 7 do SK3); ver seções 11 a 13 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
 | Problemas abertos | 10 (1 alto, 5 médios, 4 baixos); 12 resolvidos (P21 em 17/11, P13 e P22 em 22/11, P10 em 23/11) |
@@ -343,6 +343,8 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Orquestrador (SK2) | Escolhe a skill pelo catálogo, com prompt fixo; `ORQUESTRADOR_MODO=contextos` volta ao anterior; resolve o P10 | `TESTADO` (10 testes) e `MEDIDO` no PC: 44/48 em 0,87 s (antes 43/48 em 1,39 s) |
 | Privacidade | Pesquisa de preço entre mercados passa por gatilho de `compras` (antes podia cair na conversa geral) | `TESTADO` |
 
-**O que ainda não muda:** uma skill nova ainda precisa de um ramo em `app/main.py` para ser executada (SK3).
+| Roteiros (SK3) | Compras, estoque e agenda executam `skills/<nome>/roteiro.py`; confirmação de compra virou pendência genérica de qualquer skill | `TESTADO` (7 testes) |
 
-**Validação:** 170 de 170 testes aprovados, nas mesmas condições da seção 12.
+**O que ainda não muda:** conversa geral, programação e documentação ainda são executadas pelo `app/main.py` (SK5 e SKP).
+
+**Validação:** 177 de 177 testes aprovados, nas mesmas condições da seção 12.

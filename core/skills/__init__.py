@@ -10,3 +10,4 @@ from core.skills.catalogo import (  # noqa: F401
     obter_catalogo,
     recarregar_catalogo,
 )
+from core.skills.motor import Contexto, Resposta  # noqa: F401,E402

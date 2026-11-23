@@ -48,7 +48,8 @@ sys.path.append(str(ROOT_DIR))
 from services.ai_service import AIService, ServiceUnavailableException, TokenExhaustedException
 from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
-from services.intent_router import normalizar_texto
+from core.skills import Contexto, obter_catalogo
+from core.skills import motor as motor_skills
 from services.inventory_assistant import InventoryAssistant
 from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
 import services.llm_provider as llm_provider_estado
@@ -97,8 +98,6 @@ MSG_OLLAMA_FORA = (
     "O Ollama não está em execução, então a IA local não pode responder. "
     "Nada foi gravado nem enviado à nuvem. Abra o Ollama e use \"Tentar de novo\"."
 )
-RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar", "gravar", "salvar", "grava", "salva"}
-RESPOSTAS_CANCELAR = {"nao", "n", "cancela", "cancelar", "descarta", "descartar", "nao grava", "nao gravar", "nao salve"}
 
 
 # =============================================================================
@@ -152,7 +151,8 @@ class AssistenteRuntime:
         self.deve_encerrar = False
         self.fila = queue.Queue()
         self.sessao = GerenciadorDeSessao()
-        self.compra_pendente = None
+        # (nome da skill, dados) aguardando confirmação: a próxima mensagem volta para essa skill
+        self.pendencia = None
 
         # Serviços essenciais (inicializados na Fase 1)
         self.db_service = None
@@ -429,57 +429,45 @@ class AssistenteRuntime:
     # Compras
     # -------------------------------------------------------------------------
 
-    def _processar_compras(self, texto: str, acao: str, parametros: dict) -> tuple:
-        """Roteia pedidos de compras. Retorna (texto do chat, texto para voz ou None)."""
-        if parametros.get("operacao") == "desfazer":
-            return self.shopping_assistant.desfazer_ultimo_registro(), None
+    @property
+    def compra_pendente(self):
+        """Compras aguardando confirmação (leitura; o estado fica em self.pendencia)."""
+        if self.pendencia and self.pendencia[0] == "compras":
+            return self.pendencia[1]
+        return None
 
-        if acao == "corrigir":
-            return "Ainda não consigo editar compras. Use \"desfazer última compra\" e registre novamente.", None
-
-        if acao != "criar":
-            return "As consultas de gastos e preços ainda não estão disponíveis. Nada foi registrado.", None
-
-        preparada = execute_with_retry(
-            func=custom_logger.cronometrado("extracao_compras", self.shopping_assistant.preparar_compra),
-            args=(texto,),
+    def _repetir(self, func, args=(), mensagem_espera_voz=None, nome_servico="Skill"):
+        """Política de repetição do núcleo, entregue às skills: Ollama fora é fatal, o resto é repetido."""
+        return execute_with_retry(
+            func=func,
+            args=args,
             max_tentativas=MAX_TENTATIVAS,
             tempo_espera=TEMPO_RETRY,
             voice_service=self.voice_service if self.voice_mode_active else None,
-            mensagem_espera_voz="Estou tentando entender sua compra novamente.",
+            mensagem_espera_voz=mensagem_espera_voz,
             excecoes_fatais=(OllamaIndisponivelException,),
-            nome_servico="ShoppingAssistant"
+            nome_servico=nome_servico,
         )
 
-        if not preparada["compras"]:
-            return "Não identifiquei itens de compra nessa mensagem. Nada foi registrado.", None
+    def _contexto_skill(self) -> Contexto:
+        """O que as skills podem usar: serviços e a política de repetição. Nada de runtime, IPC ou nuvem."""
+        return Contexto(
+            servicos={
+                "shopping_assistant": self.shopping_assistant,
+                "inventory_assistant": self.inventory_assistant,
+                "db_service": self.db_service,
+            },
+            repetir=self._repetir,
+        )
 
-        if preparada["duvidas"]:
-            self.compra_pendente = preparada["compras"]
-            duvidas = "\n".join(f"- {d}" for d in preparada["duvidas"])
-            resumo = self.shopping_assistant.formatar_resumo(preparada["compras"])
-            return (
-                f"Antes de gravar, confira esta compra:\n{resumo}\n\nPontos de dúvida:\n{duvidas}\n\n"
-                "Responda \"sim\" para gravar ou \"não\" para descartar.",
-                "Tenho uma dúvida sobre esta compra. Confira no chat e responda sim ou não."
-            )
-
-        return self.shopping_assistant.registrar_compras(preparada["compras"])["mensagem"], None
-
-    def _responder_confirmacao_compra(self, texto: str):
-        """Trata a resposta do usuário a uma compra aguardando confirmação."""
-        resposta = normalizar_texto(texto).strip(" .,!")
-
-        if resposta in RESPOSTAS_CONFIRMAR:
-            compras, self.compra_pendente = self.compra_pendente, None
-            resposta_texto = self.shopping_assistant.registrar_compras(compras)["mensagem"]
-        elif resposta in RESPOSTAS_CANCELAR:
-            self.compra_pendente = None
-            resposta_texto = "Compra descartada. Nada foi gravado."
-        else:
-            resposta_texto = "Ainda há uma compra aguardando confirmação. Responda \"sim\" para gravar ou \"não\" para descartar."
-
-        return self._entregar_resposta(resposta_texto)
+    def _responder_pendencia(self, texto: str):
+        """Encaminha a resposta do usuário à skill que pediu confirmação."""
+        nome, dados = self.pendencia
+        self.pendencia = None
+        resposta = motor_skills.responder_pendencia(obter_catalogo().skill(nome), self._contexto_skill(), texto, dados)
+        if resposta.pendencia is not None:
+            self.pendencia = (nome, resposta.pendencia)
+        return self._entregar_resposta(resposta.texto, resposta.fala)
 
     # -------------------------------------------------------------------------
     # Processamento de Solicitação (Orquestração)
@@ -525,8 +513,8 @@ class AssistenteRuntime:
 
         self._set_estado("PROCESSING")
 
-        if self.compra_pendente is not None:
-            return self._responder_confirmacao_compra(solicitacao_original)
+        if self.pendencia is not None:
+            return self._responder_pendencia(solicitacao_original)
 
         # =====================================================================
         # PASSO 1: Orquestração Gemma 4
@@ -563,7 +551,6 @@ class AssistenteRuntime:
         dificuldade = decisao.get("dificuldade", "medio_dificil")
         contexto = decisao.get("contexto", "outro")
         mudanca_contexto = decisao.get("mudanca_de_contexto", False)
-        acao = decisao.get("acao", "")
         parametros = decisao.get("parametros") or {}
 
         # =====================================================================
@@ -604,22 +591,13 @@ class AssistenteRuntime:
             logger.info("⚡ Processando LOCALMENTE...")
 
             try:
-                if contexto == "compras":
-                    resposta_texto, fala_texto = self._processar_compras(solicitacao_original, acao, parametros)
-
-                elif contexto == "agenda":
-                    resposta_texto = "A agenda ainda não está disponível: não consigo salvar nem consultar compromissos."
-
-                elif contexto == "inventario":
-                    if acao in ("criar", "corrigir"):
-                        # Alteração de estoque por texto ainda não implementada (depende de diálogo por chat)
-                        resposta_texto = (
-                            "Por enquanto consigo apenas consultar o estoque por texto. "
-                            "Alterações de estoque ainda não estão disponíveis neste modo."
-                        )
-                    else:
-                        with custom_logger.etapa("consulta_estoque"):
-                            resposta_texto = self.inventory_assistant.consultar_estoque(solicitacao_original)
+                skill = obter_catalogo().por_contexto(contexto)
+                if skill is not None and skill.execucao == "roteiro":
+                    # SK3: compras, estoque e agenda executam o roteiro da própria skill
+                    resposta = motor_skills.executar(skill, self._contexto_skill(), solicitacao_original, decisao)
+                    resposta_texto, fala_texto = resposta.texto, resposta.fala
+                    if resposta.pendencia is not None:
+                        self.pendencia = (skill.nome, resposta.pendencia)
 
                 else:
                     resposta_texto = execute_with_retry(

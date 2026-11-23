@@ -22,6 +22,8 @@ import yaml
 PASTA_SKILLS = Path(__file__).resolve().parent.parent.parent / "skills"
 
 ESTADOS = {"ativa", "planejada"}
+# roteiro: passos em skills/<nome>/roteiro.py, em ordem fixa (SK3); nucleo: ainda executada por app/main.py
+EXECUCOES = {"roteiro", "nucleo"}
 PRIVACIDADES = {"local", "nuvem-permitida"}
 # Entradas e saídas previstas: o roadmap traz voz local, leitura de PDF, imagens e relatórios
 ENTRADAS = {"texto", "voz", "pdf", "imagem", "audio"}
@@ -64,11 +66,16 @@ class Skill:
     gatilhos: Tuple[Gatilho, ...]
     instrucoes: str
     pasta: Path
+    execucao: str = "nucleo"
 
     @property
     def contexto(self) -> str:
         """Contexto principal no formato atual do orquestrador."""
         return self.contextos[0]
+
+    @property
+    def caminho_roteiro(self) -> Path:
+        return self.pasta / "roteiro.py"
 
     def caminho_prompt(self, nome: str) -> Path:
         return self.pasta / "prompts" / f"{nome}.md"
@@ -188,6 +195,11 @@ def carregar_skill(pasta: Path) -> Skill:
         raise SkillInvalidaError(f"{arquivo}: 'privacidade' deve ser um de {sorted(PRIVACIDADES)}")
     if not isinstance(dados["versao"], int):
         raise SkillInvalidaError(f"{arquivo}: 'versao' deve ser um número inteiro")
+    execucao = dados.get("execucao", "nucleo")
+    if execucao not in EXECUCOES:
+        raise SkillInvalidaError(f"{arquivo}: 'execucao' deve ser um de {sorted(EXECUCOES)}")
+    if execucao == "roteiro" and not (pasta / "roteiro.py").is_file():
+        raise SkillInvalidaError(f"{arquivo}: 'execucao: roteiro' exige o arquivo roteiro.py na pasta da skill")
     entradas = _lista(dados.get("entradas", ["texto"]), "entradas", arquivo)
     saidas = _lista(dados.get("saidas", ["texto"]), "saidas", arquivo)
     for valor, permitidos, campo in ((entradas, ENTRADAS, "entradas"), (saidas, SAIDAS, "saidas")):
@@ -205,6 +217,7 @@ def carregar_skill(pasta: Path) -> Skill:
         gatilhos=_ler_gatilhos(dados, nome, arquivo),
         instrucoes=corpo,
         pasta=pasta,
+        execucao=execucao,
     )
 
 

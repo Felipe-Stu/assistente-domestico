@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [V4.1] — SK3: compras, estoque e agenda executam o roteiro da própria skill (2026-11-23)
+
+### Adicionado
+- `core/skills/motor.py`: carrega `skills/<nome>/roteiro.py` e executa `executar(ctx, texto, decisao)`; `responder_pendencia(ctx, texto, dados)` trata a resposta a um pedido de confirmação. O roteiro recebe só os serviços e a política de repetição do núcleo (`Contexto`), sem acesso ao runtime, ao Electron ou à política de nuvem.
+- Campo `execucao` no cabeçalho das skills: `roteiro` (passos em `roteiro.py`, em ordem fixa) ou `nucleo` (ainda executada por `app/main.py`).
+- `skills/compras/roteiro.py`, `skills/estoque/roteiro.py` e `skills/agenda/roteiro.py`, com a lógica e os textos que estavam no `main.py`.
+- `tests/test_sk3.py` (7 testes), entre eles: uma compra registrada usa **uma** chamada ao modelo; uma skill nova com confirmação funciona sem mudar o núcleo. Suíte: 177 testes.
+
+### Alterado
+- `app/main.py`: os ramos de compras, estoque e agenda foram substituídos por uma chamada ao roteiro da skill do contexto; `_processar_compras` e `_responder_confirmacao_compra` saíram do arquivo.
+- A compra aguardando confirmação virou uma pendência genérica (`self.pendencia = (skill, dados)`): a próxima mensagem vai para a skill que perguntou, sem passar pelo orquestrador. `compra_pendente` continua disponível para leitura.
+
+### Testes
+- 177 de 177 aprovados (Python 3.10, dependências externas simuladas). O texto enviado ao modelo e a extração não mudaram; a medição do SK0 continua valendo.
+
 ## [V4.1] — SK2: o orquestrador escolhe a skill pelo catálogo (2026-11-23)
 
 ### Medição que motivou (SK0, 23/11/2026, PC do usuário)

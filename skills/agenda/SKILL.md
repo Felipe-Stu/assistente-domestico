@@ -7,6 +7,7 @@ privacidade: local
 entradas: [texto, voz]
 saidas: [texto]
 versao: 1
+execucao: roteiro
 gatilhos:
   - acao: consultar
     prioridade: 70
