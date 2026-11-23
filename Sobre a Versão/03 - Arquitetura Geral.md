@@ -20,38 +20,28 @@ assistente-domestico/
 │   │   └── chroma_db/                   # [NOVO V4] Banco vetorial ChromaDB (persistência local)
 │   ├── __init__.py
 │   └── config.py                        # Configurações globais, caminhos SQLite e ChromaDB, modelo de embedding
-├── Logs/                                # Logs persistentes em disco (gerados automaticamente)
-│   ├── main/
-│   │   └── main_log.txt
-│   ├── ai_service/
-│   │   └── log.txt
-│   ├── audio_service/
-│   │   └── log.txt
-│   ├── db_service/
-│   │   └── log.txt
-│   ├── inventory_assistant/
-│   │   └── log.txt
-│   ├── shopping_assistant/
-│   │   └── log.txt
-│   └── voice_service/
-│       └── log.txt
+├── Logs/                                # Gerados automaticamente (ignorados pelo Git)
+│   └── eventos-AAAA-MM-DD.jsonl         # [M26] Uma linha JSON por evento; 30 dias de retenção
 ├── node_modules/                        # [NOVO V4] Dependências do Electron (npm)
 ├── scripts/                             # [NOVO V4] Scripts de gestão do banco vetorial
 │   ├── inspect_vector_database.py       # CLI interativa para inspeção do ChromaDB
 │   ├── migrate_vector_database.py       # Migração idempotente SQLite → ChromaDB
-│   ├── rebuild_embeddings.py            # Reconstrução completa dos embeddings
+│   ├── rebuild_embeddings.py            # Reconstrução dos embeddings, preservando as memórias (P13)
+│   ├── fazer_backup.py                  # [M11] Cópia de segurança manual
+│   ├── ver_logs.py                      # [M26] Leitura dos eventos e tempo por etapa
 │   └── validate_vector_database.py      # Testes automatizados de busca semântica
 ├── tests/                               # [NOVO V4] Testes automatizados (ProjectAnalyzer e orquestrador)
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py                    # Interface com a API Gemini (nuvem) — fallback
 │   ├── audio_service.py                 # Captura de microfone com RMS e bips
+│   ├── backup_service.py                # [M11] Cópia diária do SQLite e do ChromaDB
 │   ├── db_service.py                    # Persistência SQLite com migrações de schema
 │   ├── gemma_service.py                 # Orquestrador local via Ollama/Gemma 4 e:4b
 │   ├── intent_router.py                 # [NOVO V4] Roteamento por regras, sem LLM
 │   ├── inventory_assistant.py           # Controle preditivo de estoque (Regex + Gemma)
 │   ├── llm_provider.py                  # Abstração de provedores LLM (Local/Nuvem)
-│   ├── logger_service.py                # CustomLogger transversal
+│   ├── logger_service.py                # [M26] Eventos em JSON, requisição e etapas
 │   ├── resilience_service.py            # Retry centralizado e parametrizável
 │   ├── shopping_assistant.py            # Compras via LLM + SQLite + ChromaDB
 │   ├── voice_service.py                 # Síntese neural (Edge TTS) + pygame
@@ -134,7 +124,10 @@ assistente-domestico/
 - **`audio_service.py`:** Captura de microfone com RMS. Inicialização lazy na V4.
 
 #### B.10. Log (`services/logger_service.py`)
-**Responsabilidade:** Logger transversal. Sem alterações.
+**Responsabilidade:** Logger transversal. Desde 22/11/2026 (M26), grava uma linha JSON por evento em `Logs/eventos-AAAA-MM-DD.jsonl`. `requisicao()` dá um identificador a todos os eventos de uma solicitação; `etapa()` e `cronometrado()` medem roteamento, extração, banco, voz e memória. A API antiga (`log_geral`, `log_assistente`) continua disponível.
+
+#### B.11. Cópia de segurança (`services/backup_service.py`)
+**Responsabilidade:** Cópia diária do SQLite (`VACUUM INTO` + `integrity_check`) e do ChromaDB (zip) em `core/database/backups/auto/AAAA-MM-DD/`, com manifesto e retenção de 7 diárias e 4 semanais. Iniciada em segundo plano pelo runtime (M11).
 
 ---
 

@@ -2,6 +2,8 @@
 
 Retrato técnico da **Versão 4 (V4)** do **Assistente Doméstico Inteligente** em **03/11/2026**, na branch `V4`, a partir do commit `c754a6a`, incluindo as correções da seção 6 e a Fase 1. Este documento registra o que funciona de fato, o que existe apenas no código e o que ainda não foi construído.
 
+**Atualizações da V4.1:** seção 11 (17/11/2026) e seção 12 (22/11/2026). O histórico da versão está em `06 - Evolução da V4 para a V4.1.md`.
+
 > [!IMPORTANT]
 > Quando houver conflito entre este documento e descrições mais antigas, vale o que está aqui: ele foi escrito a partir do código e de testes executados. Havendo novas alterações de código, confira novamente.
 
@@ -18,10 +20,10 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 8.070 linhas |
-| Testes automatizados | 70 (22 do ProjectAnalyzer, 7 do orquestrador e 41 da Fase 1); **70 aprovados** |
+| Testes automatizados | 137 (22 do ProjectAnalyzer, 7 do orquestrador, 45 da Fase 1, 25 da V4.1, 7 do M17, 18 do M11 e 13 do M26); ver seções 11 e 12 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`** |
-| Problemas abertos | 14 (1 alto, 7 médios, 6 baixos); 8 resolvidos |
+| Problemas abertos | 11 (1 alto, 6 médios, 4 baixos); 11 resolvidos (P21 em 17/11, P13 e P22 em 22/11) |
 
 ---
 
@@ -179,7 +181,6 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P9 | Agenda não persiste dados. | `app/main.py` (rota `agenda`) | Nenhum compromisso salvo; o usuário recebe esse aviso | `CÓDIGO` |
 | P10 | `programacao` não está entre os contextos oferecidos ao orquestrador. | `services/gemma_service.py:388` | `PROMPT_PROGRAMACAO` só é usado se o modelo devolver esse valor por conta própria | `CÓDIGO` |
 | P12 | Vetores de compras em tempo real não têm `entity_id`, e a busca híbrida não está ligada ao fluxo. | `services/shopping_assistant.py:500` | Sem hidratação de valores exatos do SQLite | `CÓDIGO` |
-| P13 | `rebuild_embeddings.py` apaga a coleção inteira, mas só recria dados vindos do SQLite. | `scripts/rebuild_embeddings.py:25` | **Perda definitiva das memórias `mem_*`** | `CÓDIGO` |
 | P14 | Migração e fluxo em tempo real usam IDs diferentes para o mesmo item. | `scripts/migrate_vector_database.py:58`, `services/shopping_assistant.py:491` | Itens duplicados no ChromaDB | `CÓDIGO` |
 
 ### Gravidade baixa
@@ -190,8 +191,14 @@ O achado de gravidade alta do ProjectAnalyzer é um **falso positivo**: trata-se
 | P18 | Erros aparecem apenas no terminal interno, não no chat. | `renderer.js:282` | `CÓDIGO` |
 | P19 | Toda frase com 4 ou mais palavras vira memória de longo prazo. | `services/vector/memory_service.py:48` | `CÓDIGO` |
 | P20 | Heurística confunde respostas: "sim, mas sobraram dois" e "assim que abri acabou" viram `CONFIRMACAO`. Efeito futuro, pois o fluxo está inativo. | `services/inventory_assistant.py:175` | `TESTADO` |
-| P21 | Chat só fica disponível depois da carga do modelo de embeddings (15 a 50 s nos logs). Mensagens enviadas antes aguardam, sem aviso. | `app/main.py:154` | `DADOS` |
-| P22 | `with get_connection()` confirma a transação, mas não fecha a conexão SQLite; os testes emitem `ResourceWarning`. | `services/db_service.py` | `TESTADO` |
+| P21 | Chat só ficava disponível depois da carga do modelo de embeddings (15 a 50 s nos logs). **Resolvido em 17/11/2026:** chat pronto em 3,5 s e memória em 13,0 s, em segundo plano (seção 11). | `services/vector/embedding_service.py`, `app/main.py` | `MEDIDO` |
+
+### Resolvidos em 22/11/2026
+
+| ID | Problema | Correção | Validação |
+|---|---|---|---|
+| P13 | `rebuild_embeddings.py` apagava a coleção inteira e só recriava dados vindos do SQLite: perda definitiva das memórias `mem_*` | Cópia de segurança, exportação das memórias para JSON, reindexação e regravação das memórias; nada é apagado se a leitura falhar | `tests/test_m11.py` (`TESTADO`) |
+| P22 | `with get_connection()` confirmava, mas não fechava a conexão SQLite (`ResourceWarning` nos testes) | Conexão criada com `_ConexaoQueFecha`, que fecha ao sair do `with`, inclusive com erro | `tests/test_m11.py`; suíte sem `ResourceWarning` do SQLite (`TESTADO`) |
 
 ### Resolvidos em 03/11/2026
 
@@ -244,7 +251,7 @@ A verificação de inatividade ocorre na solicitação seguinte, não em segundo
 | `01` a `05` nesta pasta | Atualizados para a V4 nesta revisão |
 | `06 - Evolução da V3 para a V4.md` | Criado nesta revisão |
 | `07 - Skill ProjectAnalyzer.md` | Correto |
-| `README.md` | **Desatualizado:** descreve a V3 e omite Electron e `npm start` |
+| `README.md` | Reescrito para a V4 em 16/11/2026; selo de testes e contagem atualizados em 17/11/2026 |
 | `CHANGELOG.md` | Atualizado com as correções de 03/11/2026; a lista completa de problemas está neste documento |
 
 ---
@@ -260,3 +267,60 @@ Ordem aprovada em 03/11/2026:
 5. **Fase 5, lista e previsões:** lista de compras e comparação entre mercados.
 
 Pendências paralelas: concluir o modo Qwen (P7, P10, botão e troca por intenção), definir o envio de arquivos pelo chat e a agenda, publicar a branch `V4` e atualizar `README.md`.
+
+---
+
+## 11. Atualização V4.1 (17/11/2026)
+
+Alterações feitas depois do retrato de 03/11/2026. As seções anteriores não foram reescritas; onde houver conflito, vale esta.
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Integração contínua | Fluxo `Testes` no GitHub Actions: sintaxe Python e JavaScript, suíte completa e linter informativo | `CÓDIGO`; execução no GitHub `NÃO TESTADO` |
+| Saída estruturada | Orquestrador e extração de compras enviam JSON Schema no `format` do Ollama; recaída para `format="json"` com biblioteca antiga; opção `OLLAMA_SAIDA_ESTRUTURADA` | `MEDIDO`: 100% de respostas válidas, acerto igual ao JSON simples |
+| Início do sistema (P21) | Modelo de embeddings carregado em segundo plano; busca semântica ignorada durante a carga; memória gravada depois da resposta | `MEDIDO`: chat em 3,5 s, memória em 13,0 s |
+| Leitura dos comandos do Electron | Pipe lido por descritor privado (`ENTRADA_IPC`); entrada padrão trocada por `os.devnull`. Sem isso, a carga dos embeddings travava até a mensagem seguinte | `MEDIDO`: antes não ficava pronta em 150 s |
+| Embeddings | `EMBEDDING_DEVICE` (padrão `cpu`; antes ia para `cuda:0`) e carga só do cache local, sem as ≈ 30 consultas ao Hugging Face por início | `MEDIDO` |
+| Orquestrador | Raciocínio (`think`) desligado no Gemma 4; opção `OLLAMA_RACIOCINIO` no `.env` | `MEDIDO`: 8,1 s → 1,2 s por decisão, 16/16 acertos |
+| Ollama fechado (M17) | Verificação de saúde de 2 s antes de chamar o modelo; erro de conexão sem repetição; mensagem com botão "Tentar de novo"; aviso no início | `MEDIDO`: resposta em 2,38 s com o Ollama fechado (antes, no mínimo 6 s) |
+| Banco vetorial | `upsert_documents` cancela a gravação quando não há embeddings | `TESTADO` |
+
+**Validação:** `python -m unittest discover -s tests` com 105 de 105 aprovados em Python 3.10, com `ollama`, `python-dotenv` e `google-genai` substituídos por módulos simulados (os testes não chamam esses serviços). Compilação de `app`, `core`, `services`, `scripts` e `tests` com `SyntaxWarning` como erro, sem ocorrências. `node --check` nos três arquivos do Electron, sem erros.
+
+**Comportamento a observar no uso real:**
+- Uma compra registrada nos primeiros segundos após abrir o aplicativo aguarda o fim da carga dos embeddings antes de confirmar, pois a vetorização ocorre antes da resposta.
+- A primeira extração de compras com esquema deve ser conferida com frases reais (as quatro do teste da seção 5). Se a qualidade cair, `OLLAMA_SAIDA_ESTRUTURADA=0` restaura o comportamento anterior.
+- O esquema exige servidor Ollama e biblioteca `ollama` compatíveis com saída estruturada (`pip install -U ollama`).
+
+### Medições no PC do usuário (17/11/2026)
+
+Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medicoes`.
+
+| Orquestrador (16 chamadas, modo esquema) | Acertos | Mediana | Tokens gerados |
+|---|---|---|---|
+| Gemma 4 E4B com raciocínio (anterior) | 16/16 | 8,1 s | 448 |
+| **Gemma 4 E4B sem raciocínio (adotado)** | **16/16** | **1,2 s** | 36 |
+| Qwen 2.5 Coder 7B | 16/16 | 1,5 s | 42 |
+
+- O Gemma 4 E4B continua como orquestrador: acerta o mesmo que o Qwen, responde mais rápido e ocupa menos VRAM.
+- O gargalo era o raciocínio ligado por padrão no Ollama, não a capacidade do modelo: de 1.200 a 2.700 caracteres de raciocínio por decisão.
+- A extração de compras ainda roda com o raciocínio no padrão (6/6 acertos, mediana de 10,8 s com esquema). Desligar depende de nova medição.
+- Amostra pequena: 8 frases com 2 repetições cada. Um conjunto de avaliação maior (M13) segue recomendado.
+
+## 12. Atualização V4.1 (22/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Cópia de segurança (M11) | Uma cópia por dia ao abrir o app (e a cada hora, se continuar aberto) em `core/database/backups/auto/AAAA-MM-DD/`: banco por `VACUUM INTO` com `integrity_check`, ChromaDB em `chroma_db.zip`, `manifesto.json` com SHA-256. Retenção de 7 diárias e 4 semanais. `scripts/fazer_backup.py` para cópia manual | `TESTADO` (18 testes); cópia dos dados reais em pasta temporária: 12 ms, contagens iguais à origem |
+| Registro de eventos (M26) | `Logs/eventos-AAAA-MM-DD.jsonl`, uma linha JSON por evento, identificador por requisição e tempo por etapa; retenção de 30 dias; `LOG_CONTEUDO=0` omite o texto do usuário; `scripts/ver_logs.py` para leitura e resumo por etapa | `TESTADO` (13 testes e 1 de integração com o pipeline) |
+| Reconstrução dos embeddings (P13) | Preserva as memórias `mem_*` | `TESTADO` |
+| Conexões SQLite (P22) | Fechadas ao sair do `with` | `TESTADO` |
+
+**Validação:** `python -m unittest discover -s tests` com 137 de 137 aprovados em Python 3.10, com `ollama`, `python-dotenv` e `google-genai` simulados. Compilação com `SyntaxWarning` como erro e `node --check` sem ocorrências.
+
+**Restaurar uma cópia:** com o app fechado, copie `assistente_casa.db` da pasta do dia para `core/database/` e extraia `chroma_db.zip` em `core/database/chroma_db/` (pasta vazia). O `manifesto.json` traz o SHA-256 de cada arquivo para conferência.
+
+**Observações:**
+- Os arquivos `Logs/<módulo>/log.txt` deixaram de receber linhas; ficam como histórico até serem apagados manualmente.
+- Alguns testes antigos (`test_gemma_service.py` e parte de `test_fase1.py`) não redirecionam os logs e escrevem no `Logs/` real ao rodar a suíte. Já acontecia com os arquivos `.txt`.
+- O único `ResourceWarning` restante na suíte vem de `_isolar_entrada_ipc` (`app/main.py`), que deixa o `os.devnull` aberto de propósito durante toda a execução.

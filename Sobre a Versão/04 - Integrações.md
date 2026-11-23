@@ -140,11 +140,16 @@ O `main.js` converte os nomes de `snake_case` para `kebab-case` ao repassá-los 
 
 ### A. Logs Persistentes
 *   **Origem:** Todos os módulos de serviço via `logger_service.py`.
-*   **Destino:** `Logs/{nome_modulo}/log.txt`.
+*   **Destino:** `Logs/eventos-AAAA-MM-DD.jsonl`, uma linha JSON por evento com o módulo no campo `componente` (até 21/11/2026: `Logs/{nome_modulo}/log.txt`).
+*   **Retenção:** arquivos com mais de `LOG_RETENCAO_DIAS` (30) são apagados.
+
+### A.1. Cópias de Segurança
+*   **Origem:** `services/backup_service.py`, iniciado pelo runtime.
+*   **Destino:** `core/database/backups/auto/AAAA-MM-DD/` (`assistente_casa.db`, `chroma_db.zip`, `manifesto.json`).
 
 ### B. Arquivo de Configuração (`.env`)
 *   **Origem:** `core/config.py` via `python-dotenv`.
-*   **Variáveis:** `GEMINI_API_KEY`, `EMBEDDING_MODEL_NAME`, `PROJECT_ANALYZER_OUTPUT_DIR`, `PROJECT_ANALYZER_MODEL`, `AUDIO_SAMPLE_RATE`, `AUDIO_CHANNELS`, `AUDIO_CHUNK_SIZE`, `AUDIO_RECORD_SECONDS`.
+*   **Variáveis:** `GEMINI_API_KEY`, `EMBEDDING_MODEL_NAME`, `PROJECT_ANALYZER_OUTPUT_DIR`, `PROJECT_ANALYZER_MODEL`, `AUDIO_SAMPLE_RATE`, `AUDIO_CHANNELS`, `AUDIO_CHUNK_SIZE`, `AUDIO_RECORD_SECONDS`, `LOGS_DIR`, `LOG_CONTEUDO`, `LOG_RETENCAO_DIAS`, `BACKUP_ATIVO`, `BACKUP_DIR`, `BACKUP_DIARIOS`, `BACKUP_SEMANAIS`.
 *   **Observação:** O arquivo é opcional quando as variáveis já estão definidas no sistema.
 
 ### C. Arquivos Temporários de Voz

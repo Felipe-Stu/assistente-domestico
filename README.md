@@ -1,5 +1,7 @@
 # Assistente Doméstico Inteligente (V4)
 
+[![Testes](https://github.com/Felipe-Stu/assistente-domestico/actions/workflows/testes.yml/badge.svg?branch=V4)](https://github.com/Felipe-Stu/assistente-domestico/actions/workflows/testes.yml)
+
 Assistente desktop que registra compras e responde perguntas por linguagem natural, em texto ou voz, usando **LLMs executados localmente**. A nuvem (Gemini) é usada apenas como contingência para perguntas gerais, e os dados da casa não saem da máquina.
 
 Projeto pessoal, desenvolvido em versões incrementais (V1 → V4) com apoio de ferramentas de IA (AntiGravity IDE e Claude).
@@ -20,7 +22,7 @@ Projeto pessoal, desenvolvido em versões incrementais (V1 → V4) com apoio de 
 | **Compras confiáveis** | Extração estruturada em JSON, validação de total × quantidade × preço, confirmação em caso de dúvida e "desfazer última compra" |
 | **Memória semântica (RAG)** | ChromaDB com embeddings multilíngues na CPU; só fatos relevantes são memorizados e reinjetados no contexto |
 | **ProjectAnalyzer** | Analisa repositórios (AST, grafo de dependências, inconsistências) e gera documentação técnica 100% local, ocultando segredos |
-| **Qualidade** | ~8.000 linhas, **70 testes automatizados** aprovados e documentação de cada versão, incluindo o que ainda não funciona |
+| **Qualidade** | ~8.000 linhas, **137 testes automatizados** executados a cada push, cópia de segurança diária com verificação de integridade, registro de eventos em JSON com tempo por etapa e documentação de cada versão, incluindo o que ainda não funciona |
 
 ## Arquitetura
 
@@ -43,7 +45,8 @@ graph TD
 
 - **Electron** cuida da interface e inicia o back-end Python como processo filho, conversando por mensagens JSON.
 - **Inicialização Text-First:** o chat fica disponível sem microfone; a voz (Google Speech + Edge TTS) é ativada sob demanda.
-- **Persistência híbrida:** SQLite para dados exatos e ChromaDB para busca semântica e memória.
+- **Persistência híbrida:** SQLite para dados exatos e ChromaDB para busca semântica e memória, com cópia de segurança automática dos dois uma vez por dia.
+- **Observabilidade:** cada solicitação recebe um identificador; roteamento, extração, banco e voz são medidos e gravados como JSON (`scripts/ver_logs.py --etapas`).
 
 ## Estado atual
 
@@ -76,7 +79,7 @@ npm start
 
 Somente o back-end, sem interface: `python app/main.py`
 
-Testes: `python -m unittest discover -s tests -v`
+Testes: `python -m unittest discover -s tests -v` (em uma máquina sem as dependências completas, `pip install -r requirements-ci.txt` basta para a suíte)
 
 ## Estrutura
 
@@ -86,8 +89,8 @@ app/main.py                        AssistenteRuntime: inicialização, filas e r
 services/                          Assistentes, provedores de LLM, voz, áudio, banco e logs
 services/vector/                   Embeddings, ChromaDB, memória, busca semântica e RAG
 services/project_analyzer/         Skill de análise de projetos e documentação
-scripts/                           Migração, validação e inspeção do banco vetorial
-tests/                             70 testes automatizados (LLM simulado)
+scripts/                           Banco vetorial, cópia de segurança, leitura dos logs e medições
+tests/                             137 testes automatizados (LLM, ChromaDB e embeddings simulados)
 Sobre a Versão/                    Documentação técnica e evolução V1 → V4
 ```
 
@@ -97,4 +100,6 @@ Sobre a Versão/                    Documentação técnica e evolução V1 → 
 - [Arquitetura geral](Sobre%20a%20Vers%C3%A3o/03%20-%20Arquitetura%20Geral.md)
 - [Skill ProjectAnalyzer](Sobre%20a%20Vers%C3%A3o/07%20-%20Skill%20ProjectAnalyzer.md)
 - [Evolução da V3 para a V4](Sobre%20a%20Vers%C3%A3o/06%20-%20Evolu%C3%A7%C3%A3o%20da%20V3%20para%20a%20V4.md)
+- [Evolução da V4 para a V4.1](Sobre%20a%20Vers%C3%A3o/06%20-%20Evolu%C3%A7%C3%A3o%20da%20V4%20para%20a%20V4.1.md)
+- [Estado atual](Sobre%20a%20Vers%C3%A3o/08%20-%20Estado%20Atual%20da%20V4.md)
 - [CHANGELOG](CHANGELOG.md)

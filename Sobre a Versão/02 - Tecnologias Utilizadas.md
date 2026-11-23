@@ -25,7 +25,7 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
         1.  **Orquestrador de Intenções** (`gemma_service.py`)
         2.  **Extrator de Dados de Compras** (via `LocalLLMProvider` no `ShoppingAssistant`)
         3.  **Classificador de Intenções de Inventário** (via `LocalLLMProvider` no `InventoryAssistant`)
-    *   **Formato de comunicação:** JSON estruturado via `format="json"` do Ollama SDK.
+    *   **Formato de comunicação:** JSON Schema enviado no parâmetro `format` do Ollama (V4.1, `services/esquemas.py`); com biblioteca antiga, recai para `format="json"`. No orquestrador, o raciocínio (`think`) é desligado.
     *   **Introduzido em:** V3. Mantido na V4.
 
 *   **Modelo Qwen 2.5-Coder 7B (`qwen2.5-coder:7b`)**
@@ -110,7 +110,9 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 *   **`io`:** Configuração de codificação UTF-8 dos fluxos stdin/stdout. **(NOVO na V4)**
 *   **`uuid`:** Geração de identificadores únicos para documentos vetoriais. **(NOVO na V4)**
 *   **`requests` (>= 2.31.0):** Declarado em `requirements.txt`, sem import direto no código da V4. (V3)
-*   **`unittest`:** Suíte de testes em `tests/`. **(NOVO na V4)**
+*   **`unittest`:** Suíte de testes em `tests/` (137 testes na V4.1). **(NOVO na V4)**
+*   **`logging` e `contextvars`:** Registro de eventos em JSON com identificador de requisição. **(NOVO na V4.1)**
+*   **`zipfile` e API de backup do `sqlite3`:** Cópia de segurança diária. **(NOVO na V4.1)**
 *   **`ast`, `hashlib`:** Extração de fatos e índice incremental do ProjectAnalyzer. **(NOVO na V4)**
 
 ---
@@ -184,13 +186,27 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
     *   **Finalidade:** Migra idempotentemente o histórico de compras do SQLite para o ChromaDB.
 
 *   **`scripts/rebuild_embeddings.py` — Script de Reconstrução**
-    *   **Finalidade:** Reseta coleções e recria todos os embeddings do zero.
+    *   **Finalidade:** Recria todos os embeddings do zero. Desde 22/11/2026 faz uma cópia de segurança antes e preserva as memórias `mem_*` (P13).
 
 *   **`scripts/validate_vector_database.py` — Suíte de Validação**
     *   **Finalidade:** Testes automatizados de busca semântica e busca híbrida.
 
 *   **`scripts/inspect_vector_database.py` — Inspetor CLI**
     *   **Finalidade:** CLI interativa para visualizar registros no banco vetorial.
+
+---
+
+## 2.1. Tecnologias Adicionadas na V4.1
+
+*   **GitHub Actions**
+    *   **Finalidade:** Integração contínua: sintaxe Python e JavaScript, suíte completa e linter (`ruff`, informativo) a cada push na `V4` e a cada pull request.
+    *   **Onde é utilizada:** `.github/workflows/testes.yml`, com as dependências mínimas em `requirements-ci.txt`.
+    *   **Introduzido em:** **V4.1**.
+
+*   **JSON Schema (saída estruturada do Ollama)**
+    *   **Finalidade:** Restringir a resposta do modelo aos campos e valores permitidos, em vez de validar só depois.
+    *   **Onde é utilizada:** `services/esquemas.py`, passado por `LocalLLMProvider.gerar_json(esquema=...)`. Requer `ollama>=0.4.0`.
+    *   **Introduzido em:** **V4.1**.
 
 ---
 

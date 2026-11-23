@@ -39,7 +39,8 @@ O objetivo central do sistema na **Versão 4** permanece: **gerenciar de forma a
 *   **Motor de Gestão Preditiva de Estoque (sem dados):** Varredura automática em background na inicialização para identificar itens com autonomia estimada esgotada. Sem registros em `controle_consumo`, não há itens a avaliar.
 *   **Árvore de Decisão Conversacional de Estoque (4 cenários — não ligada ao fluxo):** Confirmação, Negativa Zerado, Negativa Sem Consumo, Divergência de Quantidade. O código existe, mas `processar_estoque_nova_compra` não tem chamadas.
 *   **Baixa Direta e Voluntária de Itens (não ligada ao fluxo):** Zeramento manual de estoque com resolução de ambiguidade. O código existe, mas `registrar_fim_estoque_direto` não tem chamadas.
-*   **Sistema de Log Estruturado:** Logs persistentes em disco, segmentados por módulo, com cabeçalhos diários e tags semânticas (`[EMBEDDING]`, `[VECTOR_STORE]`, `[SEMANTIC_SEARCH]`, `[MEMORY]`, `[RAG]`).
+*   **Registro de Eventos Estruturado (M26, 22/11/2026):** uma linha JSON por evento em `Logs/eventos-AAAA-MM-DD.jsonl`, com identificador da requisição, tempo por etapa e retenção de 30 dias. As tags semânticas (`[EMBEDDING]`, `[VECTOR_STORE]`, `[MEMORY]`...) continuam no texto das mensagens.
+*   **Cópia de Segurança Automática (M11, 22/11/2026):** SQLite e ChromaDB copiados uma vez por dia, com verificação de integridade e retenção de 7 diárias e 4 semanais.
 
 ---
 
@@ -59,7 +60,8 @@ O objetivo central do sistema na **Versão 4** permanece: **gerenciar de forma a
 *   **Serviço de Banco de Dados (`services/db_service.py`):** Persistência relacional via SQLite com migrações por `PRAGMA user_version`.
 *   **Serviço de Áudio (`services/audio_service.py`):** Captura de microfone com RMS, bips e controle de silêncio.
 *   **Serviço de Voz (`services/voice_service.py`):** Síntese neural via Edge TTS e reprodução com `pygame.mixer`.
-*   **Serviço de Logging (`services/logger_service.py`):** Logger transversal com arquivos segmentados por módulo e cabeçalhos diários.
+*   **Serviço de Logging (`services/logger_service.py`):** Logger transversal sobre o `logging` padrão: JSON por linha, identificador de requisição, etapas medidas e opção de omitir o texto do usuário.
+*   **Serviço de Cópia de Segurança (`services/backup_service.py`):** Cópia diária do banco e do banco vetorial, com manifesto e retenção.
 
 ---
 

@@ -90,7 +90,10 @@ flowchart TD
     C --> FIM
     B -- Analisar projeto --> D[ProjectAnalyzer<br>local, sem nuvem]
     D --> FIM
-    B -- Não --> E[execute_with_retry<br>orquestrar_requisicao]
+    B -- Não --> H{Ollama responde<br>em 2 s?}
+    H -- Não --> HX[Avisa: Ollama fechado<br>botão Tentar de novo]
+    HX --> FIM
+    H -- Sim --> E[execute_with_retry<br>orquestrar_requisicao]
     B -- Regra conhecida --> J{Contexto}
     E -- Falha após 3x --> X[Avisa: IA local indisponível<br>nada vai à nuvem]
     E -- Classificado --> J
@@ -189,7 +192,7 @@ sequenceDiagram
     Main->>Retry: execute_with_retry(preparar_compra)
     Retry->>Shopping: preparar_compra(texto)
     Shopping->>LocalLLM: gerar_json(prompt_sistema, texto)
-    LocalLLM->>Ollama: POST /api/chat [format=json]
+    LocalLLM->>Ollama: POST /api/chat [format=JSON Schema]
     Note over Ollama: Inferência JSON compras
     Ollama-->>LocalLLM: {"compras":[{"estabelecimento":"Moreschi","itens":[...]}]}
     LocalLLM-->>Shopping: dados dict
@@ -263,3 +266,8 @@ flowchart TD
 | **Singleton** | `EmbeddingService`, `VectorStoreService` | Evita recarregar o modelo e reabrir o cliente ChromaDB |
 | **Fachada** | `ProjectAnalyzer` | Coordena varredura, extração, LLM local e documentação |
 | **Índice Incremental** | `index_cache.py` | Reanalisa apenas arquivos com hash alterado |
+| **Fail Fast** (V4.1) | `llm_provider.garantir_ollama_disponivel` | Verificação de saúde de 2 s; erro de conexão não entra na repetição |
+| **Saída Estruturada** (V4.1) | `services/esquemas.py` | O contrato do orquestrador e da extração vai ao modelo, não só à validação |
+| **Identificador de Correlação** (V4.1) | `logger_service.requisicao()` | Todos os eventos de uma solicitação levam o mesmo `req`, com o tempo de cada etapa |
+| **Escrita Atômica por Renomeação** (V4.1) | `BackupService.fazer_backup` | A cópia é montada em `.parcial` e só recebe o nome final quando termina |
+| **Retenção Avô-Pai-Filho** (V4.1) | `BackupService.aplicar_retencao` | 7 cópias diárias e a mais nova de cada uma de 4 semanas |
