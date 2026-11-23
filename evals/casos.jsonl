@@ -50,3 +50,4 @@
 {"id": "r50", "frase": "Pensei num sistema para dividir as tarefas da casa, guarda isso pra mim", "skill": "ideias", "acoes": ["criar"], "grupo": "atual", "nota": "sem a palavra ideia: depende do modelo"}
 {"id": "r51", "frase": "Quais são minhas ideias?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual"}
 {"id": "r52", "frase": "Quais os próximos passos do projeto de receitas que eu salvei?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual", "nota": "sem gatilho: depende do modelo"}
+{"id": "r53", "frase": "Me dê ideias de melhorias para a documentação de sistemas", "skill": "conversa-geral", "grupo": "atual", "nota": "P23: pede sugestões, não ideia salva"}
