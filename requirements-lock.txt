@@ -1,0 +1,13 @@
+# Versões exatas instaladas em 23/11/2026 (Python 3.13.5).
+# Gerado por scripts/fixar_versoes.py a partir de requirements.txt. Não edite à mão.
+google-genai==2.10.0
+python-dotenv==1.2.1
+SpeechRecognition==3.17.0
+PyAudio==0.2.14
+ollama==0.6.3
+requests==2.34.2
+chromadb==1.5.9
+sentence-transformers==6.0.1
+edge-tts==7.2.8
+pygame==2.6.1
+PyYAML==6.0.3
