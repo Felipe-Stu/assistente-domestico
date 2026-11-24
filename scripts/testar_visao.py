@@ -17,6 +17,47 @@ from core import config  # noqa: E402
 SAIDA = RAIZ.parent / "Planejamento" / "medicoes" / "visao-ultima.txt"
 
 
+def _imagem_controle():
+    try:
+        import io
+        from PIL import Image, ImageDraw, ImageFont
+        try:
+            fonte = ImageFont.truetype("arial.ttf", 56)
+        except OSError:
+            try:
+                fonte = ImageFont.load_default(size=56)
+            except TypeError:
+                fonte = ImageFont.load_default()
+        im = Image.new("RGB", (896, 448), "white")
+        desenho = ImageDraw.Draw(im)
+        desenho.text((40, 80), "NOTA TESTE 123", fill="black", font=fonte)
+        desenho.text((40, 220), "ARROZ  R$ 25,90", fill="black", font=fonte)
+        saida = io.BytesIO()
+        im.save(saida, "PNG")
+        return saida.getvalue()
+    except Exception:
+        return None
+
+
+def _imagem_quadrada(caminho: Path):
+    try:
+        import io
+        from PIL import Image, ImageChops
+        with Image.open(caminho) as im:
+            im = im.convert("RGB")
+            caixa = ImageChops.difference(im, Image.new("RGB", im.size, "white")).getbbox()
+            if caixa:
+                im = im.crop(caixa)
+            lado = max(im.size)
+            quadrado = Image.new("RGB", (lado, lado), "white")
+            quadrado.paste(im, ((lado - im.width) // 2, (lado - im.height) // 2))
+            saida = io.BytesIO()
+            quadrado.save(saida, "PNG")
+            return saida.getvalue()
+    except Exception:
+        return None
+
+
 def main() -> int:
     if len(sys.argv) >= 2 and Path(sys.argv[1]).is_file():
         imagem = Path(sys.argv[1])
@@ -47,24 +88,36 @@ def main() -> int:
     from core.skills.catalogo import obter_catalogo
     from services.esquemas import ESQUEMA_COMPRAS
     prompt = obter_catalogo().skill("compras").prompt("foto_cupom", data_atual=date.today().isoformat())
-    perguntas = [
-        ("Descrição livre", "Descreva em português o que está escrito nesta imagem, linha por linha.", None),
-        ("Leitura da nota (JSON)", "Leia este cupom de compra.", ESQUEMA_COMPRAS),
-    ]
     cliente = ollama.Client(timeout=config.OLLAMA_TIMEOUT * 2)
-    for titulo, pergunta, esquema in perguntas:
+
+    def perguntar(titulo, dados_imagem, pergunta, esquema=None):
         inicio = time.monotonic()
         try:
             resposta = cliente.chat(
                 model=config.OLLAMA_MODELO_VISAO,
                 messages=[{"role": "system", "content": prompt if esquema else "Você lê imagens com atenção."},
-                          {"role": "user", "content": pergunta, "images": [str(imagem)]}],
+                          {"role": "user", "content": pergunta, "images": [dados_imagem]}],
                 options={"temperature": 0.1}, keep_alive=config.OLLAMA_KEEP_ALIVE,
                 **({"format": esquema} if esquema else {}))
             texto = resposta["message"]["content"]
         except Exception as erro:
             texto = f"ERRO {type(erro).__name__}: {erro}"
-        linhas += ["", f"== {titulo} ({time.monotonic() - inicio:.1f} s) ==", texto[:6000]]
+        linhas.extend(["", f"== {titulo} ({time.monotonic() - inicio:.1f} s) ==", texto[:3000]])
+
+    descrever = "Transcreva o texto que aparece nesta imagem, linha por linha."
+    # 1. Controle: imagem simples gerada aqui. Se nem esta for lida, o recurso de imagem do modelo não está funcionando.
+    controle = _imagem_controle()
+    if controle:
+        perguntar("1. Imagem de controle (texto grande gerado pelo teste)", controle, descrever)
+    # 2. A nota, enviada como bytes (não como caminho)
+    perguntar("2. Nota original (bytes)", imagem.read_bytes(), descrever)
+    # 3. A nota recortada e centralizada num quadrado branco (o modelo reduz a imagem para um quadrado)
+    ajustada = _imagem_quadrada(imagem)
+    if ajustada:
+        perguntar("3. Nota recortada em quadrado", ajustada, descrever)
+        perguntar("4. Nota recortada em quadrado: leitura em JSON", ajustada, "Leia este cupom de compra.", ESQUEMA_COMPRAS)
+    else:
+        perguntar("4. Nota original: leitura em JSON", imagem.read_bytes(), "Leia este cupom de compra.", ESQUEMA_COMPRAS)
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
     SAIDA.write_text("\n".join(linhas), encoding="utf-8")
     print("\n".join(linhas))
