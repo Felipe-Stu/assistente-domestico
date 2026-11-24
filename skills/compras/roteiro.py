@@ -101,11 +101,13 @@ def responder_pendencia(ctx, texto, pendente):
             return Resposta("Ajustei:\n" + "\n".join(f"- {linha}" for linha in linhas)
                             + f"\n\nFicou assim:\n{servico.formatar_resumo(compras_pendentes)}\n\n{seguinte}",
                             fala="Ajustei a compra. Confira no chat.", pendencia=novo)
+    # Em pergunta de conferência ("Li a loja como X. Está certo?"), "sim" mantém o valor e segue para a próxima
+    conferindo = bool(perguntas) and perguntas_compra.e_conferencia(perguntas[0]) and resposta in RESPOSTAS_CONFIRMAR
     # "sim" no meio das perguntas grava como está; "não" descarta; qualquer outra resposta preenche o campo
-    if perguntas and resposta not in RESPOSTAS_CANCELAR and resposta not in RESPOSTAS_CONFIRMAR:
+    if perguntas and resposta not in RESPOSTAS_CANCELAR and (conferindo or resposta not in RESPOSTAS_CONFIRMAR):
         # Ainda falta um dado (loja ou nome cortado): a resposta preenche o campo da pergunta atual
         atual = perguntas.pop(0)
-        if resposta not in perguntas_compra.RESPOSTAS_PULAR:
+        if resposta not in perguntas_compra.RESPOSTAS_PULAR and not conferindo:
             perguntas_compra.aplicar_resposta(compras_pendentes, atual, texto)
         novo = dict(pendente, compras=compras_pendentes, perguntas=perguntas)
         if perguntas:

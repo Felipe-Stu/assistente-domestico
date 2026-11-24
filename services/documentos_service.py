@@ -13,6 +13,7 @@ entradas (M09); a chave de acesso da nota evita registrar a mesma nota duas veze
 """
 import hashlib
 import json
+import re
 import shutil
 import time
 from datetime import date, datetime, timedelta
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from core.skills import obter_catalogo
-from services import nfce_service
+from services import imagem_service, nfce_service
 from services.dinheiro import formatar_reais, para_centavos
 from services.esquemas import ESQUEMA_COMPRAS
 from services.logger_service import logger as custom_logger
@@ -46,6 +47,24 @@ class DocumentoError(Exception):
 
 def tipo_do_arquivo(caminho: Path) -> Optional[str]:
     return EXTENSOES.get(Path(caminho).suffix.lower())
+
+
+_RE_REPETICAO = re.compile(r"(.{1,6}?)\1{12,}", re.S)
+
+
+def limpar_transcricao(texto: str) -> str:
+    """Tira o laço de repetição ("C/C/C/...") e linhas vazias em excesso."""
+    texto = _RE_REPETICAO.sub(r"\1", str(texto or ""))
+    return re.sub(r"\n{3,}", "\n\n", texto).strip()
+
+
+def data_suspeita(data_iso, hoje: date) -> bool:
+    """Data no futuro ou com mais de um ano: modelo de imagem costuma errar o ano."""
+    try:
+        dia = date.fromisoformat(str(data_iso)[:10])
+    except ValueError:
+        return True
+    return dia > hoje or (hoje - dia).days > 365
 
 
 class DocumentosService:
@@ -236,8 +255,61 @@ class DocumentosService:
         return arquivos
 
     def _importar_imagem(self, *anexos: Path) -> Dict:
+        """M34: o modelo de imagem só transcreve; a compra sai da transcrição (leitor exato da NFC-e/NF-e ou o
+        modelo de texto, melhor com estrutura). Sem transcrição útil, cai na leitura direta em JSON."""
         if self.llm_visao is None:
             raise DocumentoError("Nenhum modelo para ler imagens está configurado (OLLAMA_MODELO_VISAO).")
+        transcricao = self._transcrever([parte for anexo in anexos for parte in imagem_service.preparar(anexo)])
+        preparada = self._compra_da_transcricao(transcricao) if transcricao else None
+        if not preparada or not preparada.get("compras"):
+            preparada = self._leitura_direta(anexos)
+        compra = preparada["compras"][0]
+        conferir = ["loja"] if compra.get("estabelecimento") not in (None, "", "Não informado") else []
+        if data_suspeita(compra.get("data_compra"), self._agora().date()):
+            conferir.append("data")
+        compra["_conferir"] = conferir
+        preparada.setdefault("duvidas", []).insert(0, "Lido de uma foto: confira cada item e valor antes de gravar.")
+        origem = preparada.setdefault("origem", {})
+        origem["modelo"] = f"{getattr(self.llm_visao, 'modelo', None)} + {origem.get('modelo') or 'leitor'}"
+        origem["texto"] = ("Transcrição da foto:\n" + transcricao[:18000]) if transcricao else origem.get("texto")
+        return preparada
+
+    def _transcrever(self, partes: List[bytes]) -> str:
+        prompt = ("Você transcreve cupons e notas fiscais. Copie fielmente todo o texto desta imagem, linha por linha, "
+                  "como está escrito, mantendo números, vírgulas e datas. Não resuma, não traduza e não invente: "
+                  "o que estiver ilegível vira [ilegível].")
+        textos = []
+        for n, parte in enumerate(partes, start=1):
+            try:
+                texto = self.llm_visao.gerar_texto_imagem(prompt, f"Transcreva o texto (parte {n} de {len(partes)}).", [parte])
+            except AttributeError:   # provedor sem transcrição: só a leitura direta
+                return ""
+            except Exception as erro:
+                raise DocumentoError(f"Não consegui ler a foto ({type(erro).__name__}). Confira se o Ollama está aberto "
+                                     "e se o modelo de imagem está instalado.") from None
+            textos.append(limpar_transcricao(texto))
+        return "\n".join(t for t in textos if t).strip()
+
+    def _compra_da_transcricao(self, texto: str) -> Optional[Dict]:
+        for parece, ler in ((nfce_service.parece_nfce_texto, nfce_service.ler_nfce_texto),
+                            (nfce_service.parece_nfe_texto, nfce_service.ler_nfe_texto)):
+            if parece(texto):
+                try:
+                    preparada = self._preparar_nota(ler(texto))
+                    preparada["origem"]["versao_prompt"] = "foto-transcricao-nota-v1"
+                    return preparada
+                except (nfce_service.NotaInvalidaError, DocumentoError):
+                    pass
+        try:
+            preparada = self.compras.preparar_compra(texto[:8000], "chat")
+        except Exception as erro:
+            custom_logger.evento(COMPONENTE, "transcricao_sem_extracao", erro=type(erro).__name__, nivel="WARNING")
+            return None
+        if preparada.get("compras"):
+            preparada.setdefault("origem", {})["versao_prompt"] = "foto-transcricao-v1"
+        return preparada
+
+    def _leitura_direta(self, anexos) -> Dict:
         prompt = obter_catalogo().skill("compras").prompt("foto_cupom", data_atual=date.today().isoformat())
         try:
             resposta = self.llm_visao.gerar_json_imagem(prompt, "Leia este cupom de compra.", [str(a) for a in anexos], ESQUEMA_COMPRAS)
@@ -256,6 +328,6 @@ class DocumentosService:
                                  resposta=json.dumps(resposta, ensure_ascii=False)[:2000])
             raise DocumentoError("o modelo de imagem não reconheceu itens. Para nota aberta no site da Sefaz, "
                                  "salve a página (Ctrl+S) e mande o arquivo HTML: a leitura é exata.")
-        return {"compras": compras[:1], "duvidas": ["Lido de uma foto: confira cada item e valor antes de gravar."],
+        return {"compras": compras[:1], "duvidas": [],
                 "origem": {"resposta_json": json.dumps(resposta, ensure_ascii=False)[:20000],
-                           "modelo": getattr(self.llm_visao, "modelo", None), "versao_prompt": "foto-v1"}}
+                           "modelo": None, "versao_prompt": "foto-v1"}}

@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [V4.3, parte 7] — M34: foto de nota em duas etapas, com conferência (2026-11-24)
+
+### Adicionado
+- `services/imagem_service.py`: recorta as margens brancas, divide cupom comprido em faixas com sobreposição (até 6) e amplia imagem pequena antes de enviar ao modelo.
+- `LocalLLMProvider.gerar_texto_imagem`: transcrição com limite de tokens e penalidade de repetição (o gemma3:4b entrou em laço "C/C/C…" na nota da moto).
+- **Duas etapas** em `DocumentosService._importar_imagem`:
+  1. o modelo de imagem só transcreve o texto (faixa por faixa);
+  2. a transcrição passa pelos leitores exatos de NFC-e/NF-e, quando reconhecida, ou pelo modelo de texto (gemma4), que é melhor com estrutura. Sem transcrição útil, cai na leitura direta em JSON de antes.
+  - A transcrição fica guardada na origem do registro (`entradas.texto`).
+- **Conferência antes do "sim"** para compras lidas de foto: "Li a loja como X. Está certo?" e, quando a data parece errada (no futuro ou com mais de um ano), "Qual é a data certa?". Nessas perguntas, "sim" mantém o valor e segue.
+- `testar_visao.py --modelos a,b` e `comparar-modelos-visao.bat` (gemma3:4b × qwen2.5vl:7b, com download opcional).
+- `tests/test_m34.py` (7 testes). Suíte: 335 testes.
+
 ## [V4.3, parte 6] — Observações e ajustes inteligentes nas compras (2026-11-24)
 
 ### Adicionado

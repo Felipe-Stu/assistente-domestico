@@ -479,3 +479,12 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 **Dado real pendente:** a compra #9 repete a #8 (moto). A decisão de desfazê-la é do usuário.
 
+## 22. M34 — foto em duas etapas (24/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Preparo da imagem | Recorte, faixas para cupom comprido, ampliação | `TESTADO` |
+| Transcrição + leitura | Modelo de imagem só transcreve; leitor exato ou gemma4 monta a compra; leitura direta como reserva | `TESTADO` com modelos simulados |
+| Conferência | Loja lida sempre conferida em foto; data suspeita perguntada | `TESTADO` (fluxo até a gravação) |
+| Qualidade real | gemma3:4b na nota da moto: valor e dia/mês certos; ano, CNPJ e loja errados; laço de repetição | `MEDIDO` (24/11, antes das mudanças); depois das mudanças `NÃO TESTADO` |
+

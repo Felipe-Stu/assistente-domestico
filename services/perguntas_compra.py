@@ -28,8 +28,13 @@ def nome_cortado(item: Dict) -> bool:
 def perguntas_faltando(compras: List[Dict]) -> List[Dict]:
     perguntas = []
     for c, compra in enumerate(compras):
+        conferir = compra.get("_conferir") or []
         if compra.get("estabelecimento") in LOJA_AUSENTE:
             perguntas.append({"campo": "loja", "compra": c})
+        elif "loja" in conferir:
+            perguntas.append({"campo": "conferir_loja", "compra": c})
+        if "data" in conferir:
+            perguntas.append({"campo": "conferir_data", "compra": c})
         for i, item in enumerate(compra.get("itens", [])):
             if nome_cortado(item):
                 perguntas.append({"campo": "produto", "compra": c, "item": i})
@@ -38,6 +43,14 @@ def perguntas_faltando(compras: List[Dict]) -> List[Dict]:
 
 def texto_pergunta(pergunta: Dict, compras: List[Dict]) -> str:
     compra = compras[pergunta["compra"]]
+    if pergunta["campo"] == "conferir_loja":
+        return (f"❓ Li a loja como \"{compra.get('estabelecimento')}\". Está certo? "
+                'Responda "sim" se estiver certo, escreva o nome certo, ou "não" para descartar.')
+    if pergunta["campo"] == "conferir_data":
+        data = str(compra.get("data_compra") or "")
+        lida = f"{data[8:10]}/{data[5:7]}/{data[0:4]}" if len(data) >= 10 else "sem data"
+        return (f"❓ Li a data como {lida}, que parece errada. Qual é a data certa (dd/mm/aaaa)? "
+                'Responda "sim" para manter ou "não" para descartar.')
     if pergunta["campo"] == "loja":
         return (f"❓ Em qual loja foi essa compra (total {formatar(compra.get('valor_total_compra') or 0)})? "
                 'Responda com o nome, "pular" para deixar sem loja ou "não" para descartar.')
@@ -52,13 +65,24 @@ def aplicar_resposta(compras: List[Dict], pergunta: Dict, texto: str) -> None:
     if not valor:
         return
     compra = compras[pergunta["compra"]]
-    if pergunta["campo"] == "loja":
+    if pergunta["campo"] in ("loja", "conferir_loja"):
         compra["estabelecimento"] = valor
+        return
+    if pergunta["campo"] == "conferir_data":
+        from services.edicao_compra import ler_data
+        nova = ler_data(valor)
+        if nova:
+            compra["data_compra"] = nova
         return
     item = compra["itens"][pergunta["item"]]
     item["produto"] = valor.lower()
     item["nome_cortado"] = False
     item["categoria"] = inferir_categoria(item["produto"], "outros")
+
+
+def e_conferencia(pergunta: Dict) -> bool:
+    """Pergunta que confere um dado lido (o "sim" mantém o valor), e não um dado que faltou."""
+    return pergunta.get("campo", "").startswith("conferir_")
 
 
 def abrir(cabecalho: str, resumo: str, compras: List[Dict], origem: Optional[Dict],

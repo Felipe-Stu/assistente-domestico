@@ -282,6 +282,25 @@ class LocalLLMProvider(BaseLLMProvider):
             raise _converter_erro_conexao(e) from e
         return response['message']['content'].strip()
 
+    def gerar_texto_imagem(self, prompt_sistema: str, mensagem_usuario: str, imagens: List[Any],
+                           max_tokens: int = 1500) -> str:
+        """Texto livre sobre imagens (bytes ou caminhos). M34: limite de tokens e penalidade de repetição
+        evitam o laço "C/C/C/..." visto no gemma3:4b em letra miúda."""
+        _atualizar_timestamp_atividade()
+        garantir_ollama_disponivel()
+        cliente_ollama = ollama.Client(timeout=OLLAMA_TIMEOUT * 2)
+        try:
+            response = cliente_ollama.chat(
+                model=self.modelo,
+                messages=[{"role": "system", "content": prompt_sistema},
+                          {"role": "user", "content": mensagem_usuario, "images": list(imagens)}],
+                keep_alive=OLLAMA_KEEP_ALIVE,
+                options={"temperature": self.temperatura, "num_predict": max_tokens, "repeat_penalty": 1.15},
+            )
+        except _ERROS_CONEXAO as e:
+            raise _converter_erro_conexao(e) from e
+        return response['message']['content'].strip()
+
     def gerar_json_imagem(self, prompt_sistema: str, mensagem_usuario: str, imagens: List[str],
                           esquema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Como gerar_json, com imagens (caminhos) anexadas à mensagem; o modelo precisa entender imagem."""
