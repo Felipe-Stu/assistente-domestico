@@ -1,6 +1,6 @@
 """
 Mostra o que o modelo local de imagem (OLLAMA_MODELO_VISAO) enxerga numa foto de nota.
-Uso: arraste a imagem sobre testar-visao.bat (ou: python scripts/testar_visao.py caminho.png).
+Uso: dois cliques em testar-visao.bat (usa a imagem mais recente de Anexos/) ou arraste uma imagem sobre ele.
 Grava a resposta crua em Planejamento/medicoes/visao-ultima.txt.
 """
 import json
@@ -18,10 +18,16 @@ SAIDA = RAIZ.parent / "Planejamento" / "medicoes" / "visao-ultima.txt"
 
 
 def main() -> int:
-    if len(sys.argv) < 2 or not Path(sys.argv[1]).is_file():
-        print("Arraste uma imagem (JPG/PNG) sobre testar-visao.bat.")
-        return 1
-    imagem = Path(sys.argv[1])
+    if len(sys.argv) >= 2 and Path(sys.argv[1]).is_file():
+        imagem = Path(sys.argv[1])
+    else:
+        # Sem arquivo arrastado: usa a imagem de nota mais recente guardada em Anexos/
+        imagens = [f for f in Path(config.ANEXOS_DIR).rglob("*") if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+        if not imagens:
+            print("Nenhuma imagem em Anexos/. Arraste uma imagem (JPG/PNG) sobre testar-visao.bat.")
+            return 1
+        imagem = max(imagens, key=lambda f: f.stat().st_mtime)
+        print(f"Usando a imagem mais recente de Anexos: {imagem.name}")
     linhas = [f"Teste do modelo de imagem — {datetime.now():%d/%m/%Y %H:%M}",
               f"Modelo: {config.OLLAMA_MODELO_VISAO}", f"Arquivo: {imagem.name} ({imagem.stat().st_size // 1024} KB)"]
     try:

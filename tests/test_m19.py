@@ -119,6 +119,10 @@ class TestSkill(BaseConsultas):
         texto = self.perguntar("quanto gastei este mês?", erro=ConnectionError("ollama"))
         self.assertIn("R$ 55,00", texto)
 
+    def test_categoria_junto_com_produto_e_ignorada(self):
+        texto = self.perguntar("Qual foi o preço do vinho?", {"tipo": "preco_produto", "categoria": "mercearia", "loja": None, "produto": "vinho"})
+        self.assertIn("2 compra(s)", texto)   # vinho está em bebidas; a categoria errada não esconde as compras
+
     def test_comparar_sem_dois_periodos_vira_total(self):
         texto = self.perguntar("gastei mais em novembro?", {"tipo": "comparar", "categoria": None, "loja": None, "produto": None})
         self.assertIn("Você gastou R$ 55,00 em novembro", texto)

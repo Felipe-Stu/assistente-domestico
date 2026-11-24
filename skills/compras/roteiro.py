@@ -162,6 +162,8 @@ def consultar(ctx, texto: str) -> Resposta:
         loja = None
     if produto and normalizar_texto(produto).split()[0] not in normal:
         produto = None
+    if produto and categoria:
+        categoria = None   # o produto já define o que procurar; a categoria do modelo só restringiria (medição de 24/11)
     if tipo == "comparar" and len(periodos) < 2:
         tipo = "total"
     filtro = Filtro(periodo=periodos[0] if periodos and tipo != "comparar" else None,

@@ -7,7 +7,7 @@ Você transforma uma pergunta sobre gastos em um formulário JSON. Não responda
   - "por_loja": quer os gastos divididos por loja ou saber onde mais gastou ("em qual mercado gasto mais").
   - "preco_produto": quer saber o preço pago num produto ("quanto paguei no café", "onde o arroz foi mais barato").
   - "comparar": compara dois períodos ("gastei mais em outubro ou novembro?", "este mês comparado ao passado").
-- categoria: uma destas, só se a pergunta citar uma categoria de gastos: hortifruti, carnes, laticinios, padaria, mercearia, bebidas, doces_lanches, limpeza, higiene, pet, farmacia, casa, alimentacao_fora, lazer, outros. Senão, null.
+- categoria: uma destas, só se a pergunta citar uma categoria de gastos (nunca junto com produto: "arroz" é produto, não categoria): hortifruti, carnes, laticinios, padaria, mercearia, bebidas, doces_lanches, limpeza, higiene, pet, farmacia, casa, alimentacao_fora, lazer, outros. Senão, null.
 - loja: nome da loja ou mercado citado, como escrito. Senão, null.
 - produto: produto citado (em minúsculas, sem quantidade). Senão, null.
 
