@@ -16,10 +16,14 @@
   - A nota salva ali vira um resumo com "sim/não"; depois o arquivo vai para `processados/` ou `com_erro/`.
 - **Telegram:** arquivos e fotos mandados ao bot vão para a pasta de entrada; o resumo volta ao chat do celular e a confirmação é feita no PC.
 - `LocalLLMProvider.gerar_json_imagem`.
-- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 284 testes.
+- **App (Electron):** botão 📎 no chat e arrastar-e-soltar para enviar HTML da nota, PDF ou foto (JPG, PNG, WEBP).
+  - O arquivo continua onde estava (só os da pasta de entrada são movidos); o original vai para `Anexos/`.
+  - Com uma confirmação já pendente, o app avisa e mostra o resumo depois do "sim" ou "não".
+- **Texto da nota colado no chat:** usa o mesmo leitor exato do HTML (desconto distribuído, confirmação antes de gravar).
+- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 288 testes.
 
 ### Pendente no PC
-- Instalar `pypdf` (`pip install pypdf`) e testar uma nota real pela pasta e pelo Telegram.
+- Testar PDF e foto pelo app e pelo Telegram (pypdf já instalado; texto colado testado e aprovado).
 - Confirmar se o `gemma4:e4b` lê fotos no seu Ollama; se não, definir outro modelo de visão em `OLLAMA_MODELO_VISAO`.
 
 ## [V4.3, parte 1] — Catálogo, centavos e estoque: M07, M08, M06 (2026-11-23)

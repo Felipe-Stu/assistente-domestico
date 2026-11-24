@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 console.log('⚡ [PRELOAD] Script preload.js inicializado.');
 
@@ -14,6 +14,16 @@ contextBridge.exposeInMainWorld('api', {
     sendText: (text) => {
         console.log('📤 [IPC ENVIADO -> send-text]:', text);
         ipcRenderer.send('send-text', text);
+    },
+
+    // Anexos: abre a janela de escolha ou envia os arquivos arrastados.
+    // Devolve os nomes aceitos (formatos: HTML, PDF, JPG, PNG, WEBP).
+    escolherAnexos: () => ipcRenderer.invoke('escolher-anexos'),
+    enviarAnexos: (arquivos) => {
+        const caminhos = Array.from(arquivos || []).map((f) => {
+            try { return webUtils.getPathForFile(f); } catch (e) { return ''; }
+        }).filter(Boolean);
+        return ipcRenderer.invoke('enviar-anexos', caminhos);
     },
 
     // NOVO: Toggle unificado de Modo Voz (microfone + TTS)

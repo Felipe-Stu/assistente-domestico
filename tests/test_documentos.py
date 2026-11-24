@@ -208,6 +208,7 @@ class TestPeloApp(BaseDocs):
         mensagens = []
         for patcher in (mock.patch.object(app_main, "emitir_electron", lambda tipo, p=None: mensagens.append(p)),
                         mock.patch.object(app_main, "TEMPO_RETRY", 0),
+                        mock.patch.object(app_main.config_app, "ENTRADAS_DIR", self.entrada),
                         mock.patch.object(llm_provider, "MODO_QWEN_ATIVO", False)):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -224,6 +225,40 @@ class TestPeloApp(BaseDocs):
         self.assertIn("Compra registrada", runtime._processar_solicitacao("sim"))
         estoque = runtime._processar_solicitacao("ainda tenho limpador?")
         self.assertIn("0,5 litro", estoque)
+
+    def test_anexo_do_app_fica_onde_estava(self):
+        mensagens = []
+        for patcher in (mock.patch.object(app_main, "emitir_electron", lambda tipo, p=None: mensagens.append((tipo, p))),
+                        mock.patch.object(app_main.config_app, "ENTRADAS_DIR", self.entrada)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        runtime = app_main.AssistenteRuntime.__new__(app_main.AssistenteRuntime)
+        runtime.pendencia = None
+        runtime.telegram = None
+        runtime.documentos = self.servico(nomes=LLMNomes())
+        runtime.pasta_entradas = PastaEntradas(self.entrada, lambda *_: None)
+        outra = Path(self._tmp.name) / "Downloads"
+        outra.mkdir()
+        nota = outra / "nota.html"
+        nota.write_bytes(NOTA.read_bytes())
+        texto = runtime._importar_documento(str(nota), "app")
+        self.assertIn("Nota fiscal recebida", texto)
+        self.assertTrue(nota.exists())
+        self.assertFalse((self.entrada / "processados").exists())
+        estados = [p["state"] for tipo, p in mensagens if tipo == "state_changed"]
+        self.assertEqual(estados, ["PROCESSING", "WAITING_INPUT"])
+
+    def test_anexo_com_confirmacao_pendente_avisa_uma_vez(self):
+        mensagens = []
+        with mock.patch.object(app_main, "emitir_electron", lambda tipo, p=None: mensagens.append(p)), \
+                mock.patch.object(app_main.threading, "Timer") as timer:
+            runtime = app_main.AssistenteRuntime.__new__(app_main.AssistenteRuntime)
+            runtime.pendencia = ("compras", {})
+            self.assertIsNone(runtime._importar_documento("x.pdf", "app"))
+            self.assertIsNone(runtime._importar_documento("x.pdf", "app", aguardando=True))
+        self.assertEqual(len(mensagens), 1)
+        self.assertIn("confirmação atual", mensagens[0]["text"])
+        self.assertEqual(timer.call_count, 2)
 
     def test_telegram_baixa_para_a_pasta(self):
         enviados = []

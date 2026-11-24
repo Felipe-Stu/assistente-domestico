@@ -108,6 +108,48 @@ function handleSendMessage() {
 }
 
 sendBtn.addEventListener('click', handleSendMessage);
+
+// =============================================================================
+// Anexos: botão 📎 e arrastar-e-soltar
+// =============================================================================
+const attachBtn = document.getElementById('attach-btn');
+const chatPanel = document.querySelector('.chat-input-area')?.parentElement || document.body;
+
+function mostrarAnexosEnviados(nomes, tentados) {
+    if (nomes.length) {
+        appendMessage('user', `📎 ${nomes.join(', ')}`);
+    }
+    if (tentados > nomes.length) {
+        appendMessage('assistant', 'Alguns arquivos foram ignorados: envio só HTML da nota, PDF ou foto (JPG, PNG, WEBP).');
+    }
+}
+
+if (attachBtn) {
+    attachBtn.addEventListener('click', async () => {
+        const nomes = await window.api.escolherAnexos();
+        mostrarAnexosEnviados(nomes, nomes.length);
+    });
+}
+
+chatPanel.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes('Files')) return;
+    e.preventDefault();
+    chatPanel.classList.add('arrastando');
+});
+chatPanel.addEventListener('dragleave', (e) => {
+    if (!chatPanel.contains(e.relatedTarget)) chatPanel.classList.remove('arrastando');
+});
+chatPanel.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    chatPanel.classList.remove('arrastando');
+    const arquivos = e.dataTransfer ? e.dataTransfer.files : [];
+    if (!arquivos.length) return;
+    const nomes = await window.api.enviarAnexos(arquivos);
+    mostrarAnexosEnviados(nomes, arquivos.length);
+});
+// Arquivo solto fora da área do chat não abre no lugar do aplicativo
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => e.preventDefault());
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         handleSendMessage();

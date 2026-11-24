@@ -423,13 +423,17 @@ class AssistenteRuntime(ModoVoz):
         self.pasta_entradas.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
         emitir_electron("debug_log", {"message": f"✓ Pasta de notas fiscais vigiada: {config_app.ENTRADAS_DIR}"})
 
-    def _importar_documento(self, caminho: str, canal: str = "pasta"):
+    def _importar_documento(self, caminho: str, canal: str = "pasta", aguardando: bool = False):
         """Nota fiscal encontrada na pasta de entrada: vira compra aguardando "sim" ou "não"."""
         arquivo = Path(caminho)
         if self.pendencia is not None:
             # Já há uma confirmação esperando: a nota volta para a fila daqui a pouco
-            threading.Timer(10, lambda: self.fila.put({"type": "documento", "payload": {"caminho": caminho, "canal": canal}})).start()
+            if canal == "app" and not aguardando:
+                emitir_electron("assistant_message", {"text": f"Recebi {arquivo.name}. Mostro o resumo depois que você responder a confirmação atual (sim ou não)."})
+            threading.Timer(10, lambda: self.fila.put({"type": "documento", "payload": {"caminho": caminho, "canal": canal, "aguardando": True}})).start()
             return None
+        if canal == "app":
+            self._set_estado("PROCESSING")
         chat = self._chat_do_arquivo(arquivo)
         ok = False
         try:
@@ -445,13 +449,23 @@ class AssistenteRuntime(ModoVoz):
             logger.error(f"Falha ao importar documento: {erro}")
             texto = f"Não consegui importar {arquivo.name} ({type(erro).__name__})."
         finally:
-            if self.pasta_entradas is not None and arquivo.exists():
+            # Só arquivos da pasta de entrada são movidos; o anexo do app fica onde o usuário o guardou
+            if self.pasta_entradas is not None and arquivo.exists() and self._na_pasta_entradas(arquivo):
                 self.pasta_entradas.mover(arquivo, ok)
+            if canal == "app":
+                self._set_estado("WAITING_INPUT")
         emitir_electron("assistant_message", {"text": texto})
         if chat is not None and self.telegram is not None:
             aviso = texto.replace('Responda "sim" para gravar ou "não" para descartar.', "Confirme no assistente do PC (sim ou não).")
             self.telegram.enviar(chat, aviso)
         return texto
+
+    @staticmethod
+    def _na_pasta_entradas(arquivo: Path) -> bool:
+        try:
+            return Path(arquivo).resolve().parent == Path(config_app.ENTRADAS_DIR).resolve()
+        except OSError:
+            return False
 
     @staticmethod
     def _chat_do_arquivo(arquivo: Path):
@@ -861,7 +875,8 @@ class AssistenteRuntime(ModoVoz):
             # INPUT DE VOZ (vindo da thread do microfone)
             # -----------------------------------------------------------------
             elif tipo == "documento":
-                self._importar_documento(payload.get("caminho", ""), payload.get("canal", "pasta"))
+                self._importar_documento(payload.get("caminho", ""), payload.get("canal", "pasta"),
+                                         bool(payload.get("aguardando")))
 
             elif tipo == "voice_input":
                 text = payload.get("text", "").strip()
