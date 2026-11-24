@@ -77,7 +77,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 8
+        SCHEMA_VERSION = 9
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -273,6 +273,17 @@ class DatabaseService:
                     if "contexto" not in [coluna[1] for coluna in cursor.fetchall()]:
                         cursor.execute("ALTER TABLE historico_conversas ADD COLUMN contexto TEXT;")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_historico_sessao ON historico_conversas (session_id, id);")
+                    cursor.execute("PRAGMA user_version = 8;")
+                    atual_version = 8
+
+                if atual_version < 9:
+                    msg_migracao = "Aplicando migração v9: observações em compras e itens."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    for tabela in ("compras", "itens_compra"):
+                        cursor.execute(f"PRAGMA table_info({tabela});")
+                        if "observacao" not in [coluna[1] for coluna in cursor.fetchall()]:
+                            cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN observacao TEXT;")
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -379,10 +390,11 @@ class DatabaseService:
 
         cursor.execute(
             """
-            INSERT INTO compras (data_compra, nome_comercio, total_gasto, total_centavos, entrada_id)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO compras (data_compra, nome_comercio, total_gasto, total_centavos, entrada_id, observacao)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (data_compra, nome_comercio, total_gasto, para_centavos(total_gasto), entrada_id)
+            (data_compra, nome_comercio, total_gasto, para_centavos(total_gasto), entrada_id,
+             (dados_ia.get("observacao") or None))
         )
         compra_id = cursor.lastrowid
 
@@ -412,9 +424,10 @@ class DatabaseService:
                     embalagem_unidade,
                     produto_id,
                     valor_unitario_centavos,
-                    valor_total_centavos
+                    valor_total_centavos,
+                    observacao
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     compra_id,
@@ -430,6 +443,7 @@ class DatabaseService:
                     produto_id,
                     para_centavos(valor_unitario),
                     para_centavos(valor_total),
+                    item.get("observacao") or None,
                 )
             )
             # M06: a compra alimenta o estoque do produto, na mesma transação
@@ -528,21 +542,21 @@ class DatabaseService:
     def obter_compra(self, compra_id: int) -> Optional[Dict[str, Any]]:
         """Compra com itens, no formato usado no resumo (valores em reais)."""
         cabecalho = self.executar_consulta_uma_linha(
-            "SELECT id, data_compra, nome_comercio, COALESCE(total_centavos, CAST(ROUND(total_gasto * 100) AS INTEGER)) "
-            "FROM compras WHERE id = ?", (compra_id,))
+            "SELECT id, data_compra, nome_comercio, COALESCE(total_centavos, CAST(ROUND(total_gasto * 100) AS INTEGER)), "
+            "observacao FROM compras WHERE id = ?", (compra_id,))
         if not cabecalho:
             return None
         itens = self.executar_consulta(
             "SELECT id, produto, marca, quantidade, unidade, "
             "COALESCE(valor_unitario_centavos, CAST(ROUND(valor_unitario * 100) AS INTEGER)), "
             "COALESCE(valor_total_centavos, CAST(ROUND(valor_total * 100) AS INTEGER)), categoria, "
-            "embalagem_quantidade, embalagem_unidade FROM itens_compra WHERE compra_id = ? ORDER BY id", (compra_id,))
+            "embalagem_quantidade, embalagem_unidade, observacao FROM itens_compra WHERE compra_id = ? ORDER BY id", (compra_id,))
         return {
             "id": cabecalho[0], "data_compra": cabecalho[1], "estabelecimento": cabecalho[2],
-            "valor_total_compra": para_reais(cabecalho[3]),
+            "valor_total_compra": para_reais(cabecalho[3]), "observacao": cabecalho[4],
             "itens": [{"id": i[0], "produto": i[1], "marca": i[2], "quantidade": i[3], "unidade": i[4],
                        "valor_unitario": para_reais(i[5]), "valor_total": para_reais(i[6]), "categoria": i[7],
-                       "embalagem_quantidade": i[8], "embalagem_unidade": i[9]} for i in itens],
+                       "embalagem_quantidade": i[8], "embalagem_unidade": i[9], "observacao": i[10]} for i in itens],
         }
 
     def editar_compra(self, compra_id: int, nova: Dict[str, Any], entrada: Optional[Dict[str, Any]] = None) -> None:
@@ -578,15 +592,17 @@ class DatabaseService:
                     unitario_c, total_c = para_centavos(item["valor_unitario"]), para_centavos(item["valor_total"])
                     cursor.execute(
                         "UPDATE itens_compra SET produto = ?, quantidade = ?, unidade = ?, valor_unitario = ?, valor_total = ?, "
-                        "categoria = ?, produto_id = ?, valor_unitario_centavos = ?, valor_total_centavos = ? WHERE id = ?",
+                        "categoria = ?, produto_id = ?, valor_unitario_centavos = ?, valor_total_centavos = ?, observacao = ? "
+                        "WHERE id = ?",
                         (item["produto"], item["quantidade"], item.get("unidade") or "un", para_reais(unitario_c),
-                         para_reais(total_c), categoria, produto_id, unitario_c, total_c, item["id"]))
+                         para_reais(total_c), categoria, produto_id, unitario_c, total_c, item.get("observacao") or None, item["id"]))
                     total += total_c
                     qtd_base, un_base = estoque_service.quantidade_base(item["quantidade"], item.get("unidade"),
                                                                         item.get("embalagem_quantidade"), item.get("embalagem_unidade"))
                     estoque_service.registrar_entrada(cursor, produto_id, item["produto"], categoria, qtd_base, un_base, data)
-                cursor.execute("UPDATE compras SET data_compra = ?, nome_comercio = ?, total_gasto = ?, total_centavos = ? "
-                               "WHERE id = ?", (data, nova["estabelecimento"], para_reais(total), total, compra_id))
+                cursor.execute("UPDATE compras SET data_compra = ?, nome_comercio = ?, total_gasto = ?, total_centavos = ?, "
+                               "observacao = ? WHERE id = ?",
+                               (data, nova["estabelecimento"], para_reais(total), total, nova.get("observacao") or None, compra_id))
                 if entrada:
                     self._inserir_entrada(cursor, entrada, "gravada")
                 conn.commit()

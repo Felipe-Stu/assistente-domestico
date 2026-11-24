@@ -76,7 +76,7 @@ class TestCorrecao(BaseEdicao):
         self.assertEqual(self.linha("SELECT valor_total_centavos, valor_unitario_centavos FROM itens_compra WHERE produto = 'vinho tinto'"),
                          (3500, 3500))
         entrada = self.linha("SELECT tipo, situacao, versao_prompt, resposta_json FROM entradas WHERE tipo = 'edicao'")
-        self.assertEqual(entrada[:3], ("edicao", "gravada", "edicao-v1"))
+        self.assertEqual(entrada[:3], ("edicao", "gravada", "edicao-v2"))
         self.assertEqual(json.loads(entrada[3])["antes"]["valor_total_compra"], 46.0)
 
     def test_quantidade_acerta_o_estoque(self):

@@ -15,7 +15,9 @@ from services.dinheiro import formatar_reais
 from services.periodos import encontrar_periodos
 from services.produtos_service import _sem_acentos, chave_produto, inferir_categoria
 
-CAMPOS = ("produto", "quantidade", "valor_unitario", "valor_total", "loja", "data", "remover_item")
+CAMPOS = ("produto", "quantidade", "valor_unitario", "valor_total", "loja", "data", "remover_item", "observacao")
+MODOS_OBSERVACAO = ("acrescentar", "substituir", "apagar")
+TODOS_OS_ITENS = {"*", "todos", "todos os itens", "cada item", "itens", "todos itens"}
 _RE_NUMERO_COMPRA = re.compile(r"\bcompra\s+(?:n(?:umero|º|o|°|\.)?\s*)?(\d{1,6})\b")
 _RE_VALOR = re.compile(r"(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)")
 
@@ -125,6 +127,9 @@ def aplicar(compra: Dict, mudancas: List[Dict], hoje: Optional[date] = None) -> 
             linhas.append(f"loja: {nova['estabelecimento']} → {texto_valor}")
             nova["estabelecimento"] = texto_valor[:80]
             continue
+        if campo == "observacao":
+            linhas.extend(_aplicar_observacao(nova, m, texto_valor))
+            continue
         if campo == "data":
             nova_data = ler_data(texto_valor, hoje)
             if not nova_data:
@@ -169,6 +174,32 @@ def aplicar(compra: Dict, mudancas: List[Dict], hoje: Optional[date] = None) -> 
     return nova, linhas
 
 
+def _juntar_observacao(atual: Optional[str], texto: str, modo: str) -> Optional[str]:
+    if modo == "apagar":
+        return None
+    if modo == "substituir" or not atual:
+        return texto[:300]
+    return f"{atual}; {texto}"[:300]
+
+
+def _aplicar_observacao(compra: Dict, m: Dict, texto: str) -> List[str]:
+    """Observação na compra (sem item) ou em itens: acrescenta (padrão), substitui ou apaga."""
+    modo = m.get("modo") if m.get("modo") in MODOS_OBSERVACAO else "acrescentar"
+    if modo != "apagar" and not texto:
+        raise EdicaoError("Qual é o texto da observação?")
+    nome = (m.get("item") or "").strip()
+    if not nome:
+        compra["observacao"] = _juntar_observacao(compra.get("observacao"), texto, modo)
+        return [f"observação da compra: {compra['observacao'] or '(apagada)'}"]
+    alvos = ([i for i in compra["itens"] if not i.get("remover")] if _norm(nome) in TODOS_OS_ITENS
+             else [_achar_item(compra, nome)])
+    linhas = []
+    for item in alvos:
+        item["observacao"] = _juntar_observacao(item.get("observacao"), texto, modo)
+        linhas.append(f"observação de {item['produto']}: {item['observacao'] or '(apagada)'}")
+    return linhas
+
+
 def _data_br(iso: Optional[str]) -> str:
     return f"{iso[8:10]}/{iso[5:7]}/{iso[0:4]}" if iso and len(iso) >= 10 else (iso or "?")
 
@@ -188,7 +219,32 @@ _REGRAS = [
 ]
 
 
+_RE_OBS_ASPAS = re.compile(r"observa\w*.*?[\"“”«](?P<valor>[^\"“”»]+)[\"“”»]", re.I | re.S)
+_RE_OBS_DOIS_PONTOS = re.compile(r"\b(?:obs|observa\w*)\s*[:\-]\s*(?P<valor>.+)$", re.I | re.S)
+_RE_OBS_APAGAR = re.compile(r"\b(?:apague|apaga|remova|remove|tire|tira|limpe|limpa)\s+(?:a\s+)?observa", re.I)
+_RE_OBS_ITEM = re.compile(r"\b(?:no|na|ao|do|da)\s+item\s+(?P<item>.+?)(?=\s*(?:[,:\"“]|\ba\s+observa|\bobserva|"
+                          r"\b(?:d[aoe]s?|n[ao]s?|para)\s+(?:ultima\s+)?compra\b|$))", re.I)
+
+
+def observacao_por_regra(texto: str) -> List[Dict]:
+    """Pedidos de observação, lidos no texto original (o texto da observação mantém maiúsculas e acentos)."""
+    if not re.search(r"\b(?:obs|observa\w*)\b", _norm(texto)):
+        return []
+    item = _RE_OBS_ITEM.search(texto)
+    nome_item = item.group("item").strip() if item else None
+    if _RE_OBS_APAGAR.search(texto):
+        return [{"campo": "observacao", "item": nome_item, "valor": None, "modo": "apagar"}]
+    achado = _RE_OBS_ASPAS.search(texto) or _RE_OBS_DOIS_PONTOS.search(texto)
+    if not achado:
+        return []
+    modo = "substituir" if re.search(r"\b(?:troque|troca|substitua|mude|altere)\b", _norm(texto)) else "acrescentar"
+    return [{"campo": "observacao", "item": nome_item, "valor": achado.group("valor").strip(), "modo": modo}]
+
+
 def mudancas_por_regra(texto: str) -> List[Dict]:
+    observacao = observacao_por_regra(texto)
+    if observacao:
+        return observacao
     normal = _norm(texto).strip(" .!?")
     normal = re.sub(r"^(?:na verdade|corrija|corrigir|corrige|edite|editar|altere|alterar)[,:]?\s+", "", normal)
     normal = re.sub(r"^(?:na|da)\s+(?:ultima\s+)?compra(?:\s+(?:n(?:umero|o)?\s*)?\d+|\s+d[oa]\s+\S+)?[,:]?\s+", "", normal)

@@ -274,6 +274,8 @@ class ShoppingAssistant:
                 f"{compra.get('estabelecimento') or 'Não informado'}, {_formatar_data(compra.get('data_compra'))}, "
                 f"total {_formatar_moeda(compra.get('valor_total_compra', 0.0))}"
             )
+            if compra.get("observacao"):
+                linhas.append(f"  📝 {compra['observacao']}")
             for item in compra.get("itens", []):
                 marca = item.get("marca") or ""
                 nome = item["produto"]
@@ -284,6 +286,7 @@ class ShoppingAssistant:
                 linhas.append(
                     f"- {nome}: {_formatar_numero(item['quantidade'])} {item.get('unidade') or 'un'} × "
                     f"{_formatar_moeda(item['valor_unitario'])} = {_formatar_moeda(item['valor_total'])}"
+                    + (f" 📝 {item['observacao']}" if item.get("observacao") else "")
                 )
         return "\n".join(linhas)
 

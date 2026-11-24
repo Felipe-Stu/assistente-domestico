@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [V4.3, parte 6] — Observações e ajustes inteligentes nas compras (2026-11-24)
+
+### Adicionado
+- **Observações** (migração v9: `compras.observacao`, `itens_compra.observacao`):
+  - na compra inteira ("adicione uma observação nessa compra: \"JAVEP | Royal Enfield | Classic 650\"") ou num item ("no vinho anote \"presente da Ana\""), ou em todos os itens;
+  - acrescentar (padrão), trocar ou apagar;
+  - aparecem com 📝 nos resumos e na lista de compras das consultas.
+  - Texto da observação que não está na frase é descartado (o modelo não inventa); sem modelo, regras leem o texto entre aspas ou depois de "obs:".
+- **Ajustes somados antes do "sim":**
+  - com uma correção esperando confirmação, outro pedido ("e adicione a observação…") entra na mesma proposta;
+  - com uma compra nova esperando confirmação (nota, foto, texto), pedidos de ajuste (observação, nome, valor, data, loja, tirar item) são aplicados a ela, mesmo no meio das perguntas de loja ou nome cortado.
+- **Aviso de compra repetida:** nota sem chave de acesso (foto, PDF digitalizado) com o mesmo valor de uma compra dos últimos 120 dias recebe o aviso "Pode ser repetida: a compra #N…".
+- `tests/test_observacoes.py` (7 testes). Suíte: 328 testes.
+
+### Alterado
+- Gatilho "observação/obs" leva à correção de compras. Registro de correção passa a `edicao-v2` (guarda todos os pedidos somados).
+
+### Contexto
+- No PC, a foto da nota da moto (lida pelo `gemma3:4b`) gravou a compra #9, repetida da #8, com loja e produto mal lidos ("VAGA MOTORS SERVIÇOS", "C.C. 1000") e data de hoje. O aviso de repetida teria apontado a #8.
+
 ## [V4.3, parte 5] — M20: histórico persistente com janela (2026-11-24)
 
 ### Adicionado

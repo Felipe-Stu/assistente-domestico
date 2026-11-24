@@ -46,6 +46,8 @@ class Item:
     unidade: str
     unitario_centavos: int
     total_centavos: int
+    obs_compra: Optional[str] = None
+    obs_item: Optional[str] = None
 
 
 @dataclass
@@ -83,7 +85,8 @@ class ConsultasGastos:
                "COALESCE(p.categoria, i.categoria, 'outros'), "
                "i.quantidade, COALESCE(i.unidade, 'un'), "
                "COALESCE(i.valor_unitario_centavos, CAST(ROUND(i.valor_unitario * 100) AS INTEGER)), "
-               "COALESCE(i.valor_total_centavos, CAST(ROUND(i.valor_total * 100) AS INTEGER)) "
+               "COALESCE(i.valor_total_centavos, CAST(ROUND(i.valor_total * 100) AS INTEGER)), "
+               "c.observacao, i.observacao "
                "FROM itens_compra i JOIN compras c ON c.id = i.compra_id LEFT JOIN produtos p ON p.id = i.produto_id")
         params = []
         if filtro.periodo:
@@ -114,7 +117,8 @@ class ConsultasGastos:
         """Agrupa os itens por compra (o total é a soma dos itens que passaram no filtro)."""
         compras: Dict[int, Dict] = {}
         for i in itens:
-            c = compras.setdefault(i.compra_id, {"id": i.compra_id, "data": i.data, "loja": i.loja, "centavos": 0, "itens": 0})
+            c = compras.setdefault(i.compra_id, {"id": i.compra_id, "data": i.data, "loja": i.loja, "centavos": 0, "itens": 0,
+                                                 "obs": i.obs_compra})
             c["centavos"] += i.total_centavos
             c["itens"] += 1
         return list(compras.values())
@@ -129,7 +133,8 @@ class ConsultasGastos:
         recentes = sorted(compras, key=lambda c: (c["data"], c["id"]), reverse=True)
         linhas = [f"{len(compras)} compra(s) {filtro.descricao()}, total {formatar(total)}:"]
         for c in recentes[:LIMITE_LISTA]:
-            linhas.append(f"- {_data_br(c['data'])} · {c['loja']}: {formatar(c['centavos'])} ({c['itens']} item(ns))")
+            linhas.append(f"- {_data_br(c['data'])} · {c['loja']}: {formatar(c['centavos'])} ({c['itens']} item(ns))"
+                          + (f" 📝 {c['obs']}" if c.get("obs") else ""))
         if len(compras) > LIMITE_LISTA:
             linhas.append(f"… e mais {len(compras) - LIMITE_LISTA} compra(s) mais antigas.")
         return Resultado("\n".join(linhas), {"compras": compras, "total_centavos": total})

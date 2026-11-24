@@ -22,6 +22,9 @@ from services.logger_service import logger as custom_logger
 
 RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar",
                        "gravar", "salvar", "grava", "salva"}
+# Mensagem que pede um ajuste (e não responde à pergunta da vez)
+_RE_PARECE_AJUSTE = re.compile(r"\b(?:observa\w*|obs|anot\w*|adicion\w*|acrescent\w*|corrij\w*|corrig\w*|alter\w*|"
+                               r"renomei\w*|tire|tira|remova|troqu\w*|mude|custou|custaram|a data|a loja)\b")
 RESPOSTAS_CANCELAR = {"nao", "n", "cancela", "cancelar", "descarta", "descartar", "nao grava", "nao gravar", "nao salve"}
 
 
@@ -84,6 +87,20 @@ def responder_pendencia(ctx, texto, pendente):
     servico = ctx.servico("shopping_assistant")
     resposta = normalizar_texto(texto).strip(" .,!")
     perguntas = list(pendente.get("perguntas") or []) if isinstance(pendente, dict) else []
+    # Pedido de ajuste ("adicione a observação…", "a data foi 06/11") vale a qualquer momento antes do "sim"
+    if resposta not in RESPOSTAS_CANCELAR and resposta not in RESPOSTAS_CONFIRMAR and _RE_PARECE_AJUSTE.search(resposta):
+        try:
+            ajuste = ajustar_compra_pendente(ctx, texto, compras_pendentes)
+        except edicao_compra.EdicaoError as erro:
+            return Resposta(f"{erro} A compra continua aguardando confirmação.", pendencia=pendente)
+        if ajuste:
+            compras_pendentes, linhas = ajuste
+            novo = dict(pendente, compras=compras_pendentes) if isinstance(pendente, dict) else {"compras": compras_pendentes}
+            seguinte = (perguntas_compra.texto_pergunta(perguntas[0], compras_pendentes) if perguntas
+                        else perguntas_compra.PEDIR_CONFIRMACAO)
+            return Resposta("Ajustei:\n" + "\n".join(f"- {linha}" for linha in linhas)
+                            + f"\n\nFicou assim:\n{servico.formatar_resumo(compras_pendentes)}\n\n{seguinte}",
+                            fala="Ajustei a compra. Confira no chat.", pendencia=novo)
     # "sim" no meio das perguntas grava como está; "não" descarta; qualquer outra resposta preenche o campo
     if perguntas and resposta not in RESPOSTAS_CANCELAR and resposta not in RESPOSTAS_CONFIRMAR:
         # Ainda falta um dado (loja ou nome cortado): a resposta preenche o campo da pergunta atual
@@ -204,16 +221,32 @@ def _formulario_edicao(ctx, texto: str) -> dict:
 
 
 def _mudancas_validas(form: dict, texto: str) -> list:
-    """Descarta o que o modelo inventou: número que não está na frase, campo desconhecido."""
+    """Descarta o que o modelo inventou: número ou observação que não estão na frase, campo desconhecido."""
     numeros_da_frase = re.findall(r"\d+", texto)
+    frase = normalizar_texto(texto)
     validas = []
     for m in form.get("alteracoes") or []:
         if not isinstance(m, dict) or m.get("campo") not in edicao_compra.CAMPOS:
             continue
-        if m["campo"] in _CAMPOS_NUMERICOS and not any(d in numeros_da_frase for d in re.findall(r"\d+", str(m.get("valor") or ""))):
+        valor = m.get("valor")
+        if m["campo"] in _CAMPOS_NUMERICOS and not any(d in numeros_da_frase for d in re.findall(r"\d+", str(valor or ""))):
             continue
-        validas.append({"campo": m["campo"], "item": m.get("item") or None, "valor": m.get("valor")})
+        if m["campo"] == "observacao" and m.get("modo") != "apagar" and normalizar_texto(str(valor or "")) not in frase:
+            continue
+        validas.append({"campo": m["campo"], "item": m.get("item") or None, "valor": valor, "modo": m.get("modo")})
     return validas
+
+
+def _mudancas(ctx, texto: str):
+    """O que mudar, pelo modelo (validado) ou pelas regras. Devolve (mudanças, formulário, origem)."""
+    form = _formulario_edicao(ctx, texto)
+    validas = _mudancas_validas(form, texto)
+    if validas:
+        return validas, form, "modelo"
+    return edicao_compra.mudancas_por_regra(texto), form, "regra"
+
+
+_RE_LOJA_CITADA = re.compile(r"\bcompra\s+(?:do|da|no|na)\s+(?!dia\b|mes\b|semana\b)([a-z0-9][a-z0-9 ]{1,30}?)(?=[,.:!?]|\s+(?:foi|era|e|com|de|para|a|o)\b|$)")
 
 
 def _nome_modelo(ctx):
@@ -225,13 +258,28 @@ def _rotulo_compra(compra: dict) -> str:
     return f"{edicao_compra._data_br(compra['data_compra'])} · {compra['estabelecimento']}"
 
 
+def _proposta(compra_antes: dict, nova: dict, linhas: list, dados: dict) -> Resposta:
+    from services.shopping_assistant import ShoppingAssistant
+    visivel = dict(nova, itens=[i for i in nova["itens"] if not i.get("remover")])
+    return Resposta(
+        f"✏️ Correção da compra de {_rotulo_compra(compra_antes)}:\n" + "\n".join(f"- {linha}" for linha in linhas)
+        + f"\n\nFica assim:\n{ShoppingAssistant.formatar_resumo([visivel])}\n\n"
+          "Responda \"sim\" para gravar a correção, \"não\" para manter como está, ou peça outra correção.",
+        fala="Preparei a correção. Confira no chat e responda sim ou não.",
+        pendencia={"edicao": dict(dados, nova=nova, linhas=linhas)},
+    )
+
+
 def editar(ctx, texto: str) -> Resposta:
     db = ctx.servico("db_service")
-    form = _formulario_edicao(ctx, texto)
-    mudancas = _mudancas_validas(form, texto) or edicao_compra.mudancas_por_regra(texto)
+    mudancas, form, origem = _mudancas(ctx, texto)
     if not mudancas:
         return Resposta(AJUDA_EDICAO + " Nada foi alterado.")
-    compra_id = edicao_compra.localizar_compra(db, texto, mudancas, form.get("loja_da_compra"))
+    loja = form.get("loja_da_compra")
+    if not loja:
+        citada = _RE_LOJA_CITADA.search(normalizar_texto(texto))
+        loja = citada.group(1).strip() if citada else None
+    compra_id = edicao_compra.localizar_compra(db, texto, mudancas, loja)
     if compra_id is None:
         return Resposta("Não achei a compra para corrigir. Diga a loja, a data ou o número da compra. Nada foi alterado.")
     compra = db.obter_compra(compra_id)
@@ -239,18 +287,9 @@ def editar(ctx, texto: str) -> Resposta:
         nova, linhas = edicao_compra.aplicar(compra, mudancas)
     except edicao_compra.EdicaoError as erro:
         return Resposta(f"{erro} Nada foi alterado.")
-    from services.shopping_assistant import ShoppingAssistant
-    visivel = dict(nova, itens=[i for i in nova["itens"] if not i.get("remover")])
-    custom_logger.evento("compras", "edicao_proposta", compra=compra_id, campos=[m["campo"] for m in mudancas],
-                         origem="modelo" if form.get("alteracoes") else "regra")
-    return Resposta(
-        f"✏️ Correção da compra de {_rotulo_compra(compra)}:\n" + "\n".join(f"- {linha}" for linha in linhas)
-        + f"\n\nFica assim:\n{ShoppingAssistant.formatar_resumo([visivel])}\n\n"
-          "Responda \"sim\" para gravar a correção ou \"não\" para manter como está.",
-        fala="Preparei a correção. Confira no chat e responda sim ou não.",
-        pendencia={"edicao": {"compra_id": compra_id, "antes": compra, "nova": nova, "texto": texto,
-                              "modelo": _nome_modelo(ctx) if form.get("alteracoes") else None}},
-    )
+    custom_logger.evento("compras", "edicao_proposta", compra=compra_id, campos=[m["campo"] for m in mudancas], origem=origem)
+    return _proposta(compra, nova, linhas, {"compra_id": compra_id, "antes": compra, "textos": [texto],
+                                            "modelo": _nome_modelo(ctx) if origem == "modelo" else None})
 
 
 def _responder_edicao(ctx, texto: str, pendente: dict) -> Resposta:
@@ -259,12 +298,22 @@ def _responder_edicao(ctx, texto: str, pendente: dict) -> Resposta:
     if resposta in RESPOSTAS_CANCELAR:
         return Resposta("Correção descartada. A compra continua como estava.")
     if resposta not in RESPOSTAS_CONFIRMAR:
-        return Resposta("Há uma correção aguardando confirmação. Responda \"sim\" para gravar ou \"não\" para manter a compra como está.",
-                        pendencia=pendente)
-    entrada = {"tipo": "edicao", "canal": ctx.servicos.get("canal") or "chat", "texto": dados.get("texto", "")[:20000],
+        # Outro pedido de correção enquanto a primeira espera o "sim": soma à mesma proposta
+        mudancas, _form, _origem = _mudancas(ctx, texto)
+        if mudancas:
+            try:
+                nova, linhas = edicao_compra.aplicar(dados["nova"], mudancas)
+            except edicao_compra.EdicaoError as erro:
+                return Resposta(f"{erro} A correção anterior continua aguardando \"sim\" ou \"não\".", pendencia=pendente)
+            dados = dict(dados, textos=list(dados.get("textos") or [dados.get("texto", "")]) + [texto])
+            return _proposta(dados["antes"], nova, list(dados.get("linhas") or []) + linhas, dados)
+        return Resposta("Há uma correção aguardando confirmação. Responda \"sim\" para gravar, \"não\" para manter a compra "
+                        "como está, ou peça outra correção.", pendencia=pendente)
+    textos = dados.get("textos") or [dados.get("texto", "")]
+    entrada = {"tipo": "edicao", "canal": ctx.servicos.get("canal") or "chat", "texto": "\n".join(textos)[:20000],
                "resposta_json": json.dumps({"compra_id": dados["compra_id"], "antes": dados["antes"], "depois": dados["nova"]},
                                            ensure_ascii=False)[:20000],
-               "modelo": dados.get("modelo"), "versao_prompt": "edicao-v1"}
+               "modelo": dados.get("modelo"), "versao_prompt": "edicao-v2"}
     try:
         ctx.servico("db_service").editar_compra(dados["compra_id"], dados["nova"], entrada)
     except Exception as erro:
@@ -272,3 +321,16 @@ def _responder_edicao(ctx, texto: str, pendente: dict) -> Resposta:
     nova = dados["nova"]
     return Resposta(f"✅ Compra corrigida: {_rotulo_compra(nova)}, total "
                     f"{edicao_compra.formatar_reais(nova['valor_total_compra'])}.")
+
+
+def ajustar_compra_pendente(ctx, texto: str, compras_pendentes: list):
+    """Pedido de ajuste enquanto uma compra nova espera o "sim" ("adicione a observação…", "a data foi 06/11").
+    Devolve (compras ajustadas, linhas) ou None se a mensagem não é um ajuste."""
+    if not compras_pendentes:
+        return None
+    mudancas, _form, _origem = _mudancas(ctx, texto)
+    if not mudancas:
+        return None
+    nova, linhas = edicao_compra.aplicar(compras_pendentes[0], mudancas)
+    nova["itens"] = [i for i in nova["itens"] if not i.pop("remover", False)]
+    return [nova] + list(compras_pendentes[1:]), linhas

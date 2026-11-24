@@ -15,13 +15,13 @@ import hashlib
 import json
 import shutil
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from core.skills import obter_catalogo
 from services import nfce_service
-from services.dinheiro import formatar_reais
+from services.dinheiro import formatar_reais, para_centavos
 from services.esquemas import ESQUEMA_COMPRAS
 from services.logger_service import logger as custom_logger
 from services.produtos_service import CATEGORIAS, inferir_categoria
@@ -87,6 +87,7 @@ class DocumentosService:
             preparada = self._importar_imagem(anexo)
         if not preparada["compras"]:
             raise DocumentoError("Não encontrei itens de compra nesse documento.")
+        self._avisar_repetida(preparada)
         origem = preparada.setdefault("origem", {})
         origem.update({"tipo": "nota", "canal": canal, "anexo": str(anexo),
                        "texto": origem.get("texto") or f"Arquivo: {caminho.name}",
@@ -115,6 +116,7 @@ class DocumentosService:
         except nfce_service.NotaInvalidaError as erro:
             raise DocumentoError(str(erro)) from None
         preparada = self._preparar_nota(nota)
+        self._avisar_repetida(preparada)
         preparada["origem"].update({"tipo": "nota", "canal": canal, "texto": texto[:20000],
                                     "versao_prompt": "nfe-texto-v1" if nfe else "nfce-texto-v1", "duracao_ms": int((time.monotonic() - inicio) * 1000)})
         return preparada
@@ -129,6 +131,23 @@ class DocumentosService:
         except nfce_service.NotaInvalidaError as erro:
             raise DocumentoError(str(erro)) from None
         return self._preparar_nota(nota)
+
+    def _avisar_repetida(self, preparada: Dict) -> None:
+        """Mesmo valor de uma compra dos últimos 120 dias: provável nota repetida (foto não tem chave de acesso)."""
+        try:
+            compra = preparada["compras"][0]
+            centavos = para_centavos(compra.get("valor_total_compra") or 0)
+            if centavos <= 0:
+                return
+            linhas = self.db.executar_consulta(
+                "SELECT id, data_compra, nome_comercio FROM compras WHERE total_centavos = ? AND data_compra >= ? "
+                "ORDER BY id DESC LIMIT 3", (centavos, (self._agora().date() - timedelta(days=120)).isoformat()))
+        except Exception:   # aviso é ajuda, não pode impedir a importação
+            return
+        for compra_id, data, loja in linhas:
+            preparada.setdefault("duvidas", []).append(
+                f"Pode ser repetida: a compra #{compra_id} ({data[8:10]}/{data[5:7]}/{data[0:4]} · {loja}) tem o mesmo valor. "
+                "Se for a mesma, responda \"não\".")
 
     def _preparar_nota(self, nota: Dict) -> Dict:
         if self.db.documento_ja_gravado(nota.get("chave_acesso")):

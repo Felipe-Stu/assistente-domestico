@@ -21,6 +21,7 @@ gatilhos:
       - '\b(?:renomei\w*|renomear)\b'
       - '\bna verdade\b.{0,40}\b(?:custou|custaram|saiu|sairam|eram|foram|era|foi)\b'
       - '\b(?:tire|tira|remova|exclua)\b.{0,30}\bda\s+(?:ultima\s+)?compra\b'
+      - '\b(?:observacao|observacoes|obs)\b'
   - acao: consultar
     prioridade: 20
     padrao:
@@ -60,6 +61,8 @@ Registra o que a pessoa comprou: estabelecimento, data e itens (produto, quantid
 4. "Desfazer última compra" apaga o último registro.
    Correção (M10): o modelo preenche `prompts/edicao.md` (o que mudar); `services/edicao_compra.py` localiza a compra
    (número, loja, data ou item citados; senão a última), refaz as contas e mostra o antes e depois; grava só com "sim".
+   Observação (anotação livre) vale para a compra inteira ou para um item; acrescenta, troca ou apaga.
+   Enquanto uma compra ou correção espera o "sim", novos pedidos de ajuste se somam a ela.
 5. Consultas (M19): o modelo preenche o formulário `prompts/consulta.md` (tipo, categoria, loja, produto); o período é lido por `services/periodos.py`; `services/consultas_service.py` faz a consulta pronta.
 
 ## Regras

@@ -46,6 +46,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Consultas de gastos (M19) | Listar e somar compras, por categoria e por loja, preço de um produto e comparação de períodos; o período é lido por regra e o modelo só preenche o formulário | `TESTADO` (13 testes) e conferido numa cópia do banco real; acerto do formulário com o modelo real `NÃO TESTADO` (`medir-consultas.bat`) |
 | Correção de compras (M10) | Valor, quantidade, nome do item, loja, data e remoção de item, com antes e depois e confirmação; estoque e total refeitos; correção registrada em `entradas` | `TESTADO` (8 testes) e numa cópia do banco real (renomear o item da moto); com o modelo real `NÃO TESTADO` |
 | Histórico da conversa (M20) | Janela das últimas 6 trocas, resumo das antigas pelo modelo local, gravação em `historico_conversas` e retomada ao reabrir em até 12 h; "nova conversa" zera | `TESTADO` (6 testes) e migração v8 numa cópia do banco real; resumo com o modelo real `NÃO TESTADO` |
+| Observações e ajustes | Observação na compra ou no item (acrescentar, trocar, apagar); ajustes somados antes do "sim"; aviso de compra repetida sem chave de acesso | `TESTADO` (7 testes) e migração v9 numa cópia do banco real |
 | Programação com o Claude (V4.1) | Claude pela assinatura (`claude -p`) ou pela API; sem Claude, Qwen com biblioteca de contexto | `TESTADO` no PC (resposta em 5,5 s) |
 | Ideias de projetos e bot do Telegram (V4.1) | Ideia salva na hora, análise do Claude em segundo plano, `.md` na biblioteca, resposta local sobre a ideia | `TESTADO` no PC (análise em cerca de 20 s) |
 | Cópia de segurança diária e registro de eventos (V4.1) | M11 e M26 | `TESTADO` |
@@ -465,4 +466,16 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Banco | Migração v8: `historico_conversas.contexto` + índice | `TESTADO` numa cópia do banco real |
 
 **Privacidade:** o histórico fica só no SQLite local. A regra da nuvem não mudou: só conversa de contexto liberado leva histórico.
+
+## 21. Foto de nota, observações e ajustes (24/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Modelo de imagem (M34) | `OLLAMA_MODELO_VISAO = gemma3:4b`; o `gemma4:e4b` não lê nem a imagem de controle no Ollama para Windows (issue 16597) | `MEDIDO` no PC: gemma4 "arte abstrata"; gemma3 leu a imagem de controle |
+| Qualidade da foto | O gemma3 leu a nota da moto com erros (loja, produto, data) | `DADOS`: compra #9 |
+| Observações | Compra ou item; acrescentar, trocar, apagar; 📝 nos resumos e consultas | `TESTADO` |
+| Ajustes antes do "sim" | Pedidos durante correção ou registro pendente se somam à proposta | `TESTADO` |
+| Repetida | Mesmo valor nos últimos 120 dias, para notas sem chave | `TESTADO` |
+
+**Dado real pendente:** a compra #9 repete a #8 (moto). A decisão de desfazê-la é do usuário.
 
