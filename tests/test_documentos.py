@@ -256,7 +256,7 @@ class TestTextoColado(BaseDocs):
         resposta = motor.executar(skill, ctx, sem_loja, {"acao": "criar"})
         self.assertIn("Em qual loja", resposta.texto)
         resposta = motor.responder_pendencia(skill, ctx, "Naga Motors", resposta.pendencia)
-        self.assertIn("Qual é o nome dele", resposta.texto)
+        self.assertIn("Qual produto você comprou", resposta.texto)
         resposta = motor.responder_pendencia(skill, ctx, "Moto Royal Enfield Classic 650", resposta.pendencia)
         self.assertIn("Ficou assim", resposta.texto)
         self.assertIn("moto royal enfield classic 650", resposta.texto)
@@ -276,7 +276,7 @@ class TestTextoColado(BaseDocs):
         aberta = perguntas_compra.abrir("Confira:", "resumo", compras, None, ["Loja não informada."])
         self.assertNotIn("Loja não informada", aberta["texto"])   # a pergunta substitui a dúvida
         resposta = motor.responder_pendencia(skill, ctx, "pular", aberta["pendencia"])
-        self.assertIn("nome dele", resposta.texto)
+        self.assertIn("Qual produto você comprou", resposta.texto)
         resposta = motor.responder_pendencia(skill, ctx, "não", resposta.pendencia)
         self.assertIn("descartada", resposta.texto)
 

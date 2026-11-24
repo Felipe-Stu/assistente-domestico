@@ -51,3 +51,7 @@
 {"id": "r51", "frase": "Quais são minhas ideias?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual"}
 {"id": "r52", "frase": "Quais os próximos passos do projeto de receitas que eu salvei?", "skill": "ideias", "acoes": ["consultar"], "grupo": "atual", "nota": "sem gatilho: depende do modelo"}
 {"id": "r53", "frase": "Me dê ideias de melhorias para a documentação de sistemas", "skill": "conversa-geral", "grupo": "atual", "nota": "P23: pede sugestões, não ideia salva"}
+{"id": "r54", "frase": "Renomeie c... para Moto Royal Enfield", "skill": "compras", "acoes": ["corrigir"], "grupo": "atual"}
+{"id": "r55", "frase": "O vinho custou 35, não 40", "skill": "compras", "acoes": ["corrigir"], "grupo": "atual", "nota": "M10: sem gatilho, depende do modelo"}
+{"id": "r56", "frase": "Me informe as compras feitas em 2026", "skill": "compras", "acoes": ["consultar"], "grupo": "atual", "nota": "M19"}
+{"id": "r57", "frase": "Gastei mais em outubro ou novembro?", "skill": "compras", "acoes": ["consultar"], "grupo": "atual", "nota": "M19"}

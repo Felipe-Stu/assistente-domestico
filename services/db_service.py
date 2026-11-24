@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 from core.config import DB_PATH
 from services import estoque_service
-from services.dinheiro import para_centavos
+from services.dinheiro import para_centavos, para_reais
 from services.produtos_service import TABELA_PRODUTOS, resolver_produto
 from services.logger_service import logger as custom_logger
 
@@ -510,6 +510,79 @@ class DatabaseService:
             msg_erro = f"Erro ao remover compras. Transação desfeita (Rollback): {e}"
             logging_logger.error(msg_erro)
             custom_logger.log_assistente(NOME_ASSISTENTE, msg_erro)
+            raise
+        finally:
+            conn.close()
+
+    def obter_compra(self, compra_id: int) -> Optional[Dict[str, Any]]:
+        """Compra com itens, no formato usado no resumo (valores em reais)."""
+        cabecalho = self.executar_consulta_uma_linha(
+            "SELECT id, data_compra, nome_comercio, COALESCE(total_centavos, CAST(ROUND(total_gasto * 100) AS INTEGER)) "
+            "FROM compras WHERE id = ?", (compra_id,))
+        if not cabecalho:
+            return None
+        itens = self.executar_consulta(
+            "SELECT id, produto, marca, quantidade, unidade, "
+            "COALESCE(valor_unitario_centavos, CAST(ROUND(valor_unitario * 100) AS INTEGER)), "
+            "COALESCE(valor_total_centavos, CAST(ROUND(valor_total * 100) AS INTEGER)), categoria, "
+            "embalagem_quantidade, embalagem_unidade FROM itens_compra WHERE compra_id = ? ORDER BY id", (compra_id,))
+        return {
+            "id": cabecalho[0], "data_compra": cabecalho[1], "estabelecimento": cabecalho[2],
+            "valor_total_compra": para_reais(cabecalho[3]),
+            "itens": [{"id": i[0], "produto": i[1], "marca": i[2], "quantidade": i[3], "unidade": i[4],
+                       "valor_unitario": para_reais(i[5]), "valor_total": para_reais(i[6]), "categoria": i[7],
+                       "embalagem_quantidade": i[8], "embalagem_unidade": i[9]} for i in itens],
+        }
+
+    def editar_compra(self, compra_id: int, nova: Dict[str, Any], entrada: Optional[Dict[str, Any]] = None) -> None:
+        """M10: grava a versão corrigida de uma compra (cabeçalho e itens) numa transação.
+
+        `nova` vem de obter_compra() com as alterações aplicadas; item com "remover": True é apagado.
+        O estoque perde o que os itens antigos tinham somado e recebe os novos; o total é refeito pela soma dos itens.
+        A entrada (M09) registra o pedido de correção, com a compra antes e depois.
+        """
+        conn = self.get_connection()
+        try:
+            with custom_logger.etapa("banco", componente=NOME_ASSISTENTE, operacao="editar_compra", compra=compra_id):
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, produto_id, quantidade, unidade, embalagem_quantidade, embalagem_unidade "
+                               "FROM itens_compra WHERE compra_id = ?", (compra_id,))
+                antigos = {linha[0]: linha for linha in cursor.fetchall()}
+                data = nova["data_compra"]
+                total = 0
+                for item in nova["itens"]:
+                    antigo = antigos.get(item.get("id"))
+                    if antigo is None:
+                        raise ValueError(f"Item {item.get('id')} não pertence à compra {compra_id}.")
+                    _, produto_antigo, qtd, un, emb_qtd, emb_un = antigo
+                    estoque_service.reverter_entrada(cursor, produto_antigo,
+                                                     estoque_service.quantidade_base(qtd, un, emb_qtd, emb_un)[0])
+                    if item.get("remover"):
+                        cursor.execute("DELETE FROM itens_compra WHERE id = ?", (item["id"],))
+                        continue
+                    produto_id = resolver_produto(cursor, item["produto"], item.get("categoria") or "outros", item.get("unidade"))
+                    cursor.execute("SELECT categoria FROM produtos WHERE id = ?", (produto_id,))
+                    linha = cursor.fetchone()
+                    categoria = linha[0] if linha else (item.get("categoria") or "outros")
+                    unitario_c, total_c = para_centavos(item["valor_unitario"]), para_centavos(item["valor_total"])
+                    cursor.execute(
+                        "UPDATE itens_compra SET produto = ?, quantidade = ?, unidade = ?, valor_unitario = ?, valor_total = ?, "
+                        "categoria = ?, produto_id = ?, valor_unitario_centavos = ?, valor_total_centavos = ? WHERE id = ?",
+                        (item["produto"], item["quantidade"], item.get("unidade") or "un", para_reais(unitario_c),
+                         para_reais(total_c), categoria, produto_id, unitario_c, total_c, item["id"]))
+                    total += total_c
+                    qtd_base, un_base = estoque_service.quantidade_base(item["quantidade"], item.get("unidade"),
+                                                                        item.get("embalagem_quantidade"), item.get("embalagem_unidade"))
+                    estoque_service.registrar_entrada(cursor, produto_id, item["produto"], categoria, qtd_base, un_base, data)
+                cursor.execute("UPDATE compras SET data_compra = ?, nome_comercio = ?, total_gasto = ?, total_centavos = ? "
+                               "WHERE id = ?", (data, nova["estabelecimento"], para_reais(total), total, compra_id))
+                if entrada:
+                    self._inserir_entrada(cursor, entrada, "gravada")
+                conn.commit()
+            custom_logger.log_assistente(NOME_ASSISTENTE, f"Compra {compra_id} corrigida.")
+        except (sqlite3.Error, ValueError, KeyError) as e:
+            conn.rollback()
+            logging_logger.error(f"Erro ao corrigir a compra {compra_id}. Transação desfeita (Rollback): {e}")
             raise
         finally:
             conn.close()

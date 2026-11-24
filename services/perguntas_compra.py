@@ -42,9 +42,9 @@ def texto_pergunta(pergunta: Dict, compras: List[Dict]) -> str:
         return (f"❓ Em qual loja foi essa compra (total {formatar(compra.get('valor_total_compra') or 0)})? "
                 'Responda com o nome, "pular" para deixar sem loja ou "não" para descartar.')
     item = compra["itens"][pergunta["item"]]
-    return (f"❓ A nota mostra o produto só como \"{item.get('nome_cupom') or item['produto']}\" "
-            f"({formatar(item.get('valor_total') or 0)}). Qual é o nome dele? "
-            'Responda com o nome, "pular" para manter assim ou "não" para descartar.')
+    return (f"❓ Qual produto você comprou? A nota mostra só \"{item.get('nome_cupom') or item['produto']}\" "
+            f"({formatar(item.get('valor_total') or 0)}) em {compra.get('estabelecimento') or 'loja não informada'}. "
+            'Responda com o nome do produto (ex.: "moto honda cg 160"), "pular" para manter assim ou "não" para descartar.')
 
 
 def aplicar_resposta(compras: List[Dict], pergunta: Dict, texto: str) -> None:

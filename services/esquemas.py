@@ -58,3 +58,25 @@ ESQUEMA_CONSULTA_GASTOS: Dict[str, Any] = {
     },
     "required": ["tipo", "categoria", "loja", "produto"],
 }
+
+# M10: formulário de correção de compra (o código localiza a compra e refaz as contas)
+ESQUEMA_EDICAO_COMPRA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "loja_da_compra": {"type": ["string", "null"]},
+        "alteracoes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "campo": {"type": "string", "enum": ["produto", "quantidade", "valor_total", "valor_unitario",
+                                                         "loja", "data", "remover_item"]},
+                    "item": {"type": ["string", "null"]},
+                    "valor": {"type": ["string", "null"]},
+                },
+                "required": ["campo", "item", "valor"],
+            },
+        },
+    },
+    "required": ["loja_da_compra", "alteracoes"],
+}

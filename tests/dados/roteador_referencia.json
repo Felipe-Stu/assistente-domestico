@@ -1352,17 +1352,32 @@
  {
   "frase": "Corrige a compra de ontem, o leite foi 4,99",
   "contexto_atual": null,
-  "decisao": null
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir"
+  }
  },
  {
   "frase": "Corrige a compra de ontem, o leite foi 4,99",
   "contexto_atual": "compras",
-  "decisao": null
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": false,
+   "contexto": "compras",
+   "acao": "corrigir"
+  }
  },
  {
   "frase": "Corrige a compra de ontem, o leite foi 4,99",
   "contexto_atual": "geral",
-  "decisao": null
+  "decisao": {
+   "dificuldade": "facil",
+   "mudanca_de_contexto": true,
+   "contexto": "compras",
+   "acao": "corrigir"
+  }
  },
  {
   "frase": "Pesquise na internet o preço do frango",

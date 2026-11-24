@@ -44,6 +44,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Modo Qwen por comando de texto ou voz | Ativação, desativação e retorno por inatividade testados com troca de modelo simulada | `TESTADO` |
 | Agenda (V4.1) | Anota, consulta e cancela compromissos; falta o aviso na hora e o Google Agenda (V7) | `TESTADO` |
 | Consultas de gastos (M19) | Listar e somar compras, por categoria e por loja, preço de um produto e comparação de períodos; o período é lido por regra e o modelo só preenche o formulário | `TESTADO` (13 testes) e conferido numa cópia do banco real; acerto do formulário com o modelo real `NÃO TESTADO` (`medir-consultas.bat`) |
+| Correção de compras (M10) | Valor, quantidade, nome do item, loja, data e remoção de item, com antes e depois e confirmação; estoque e total refeitos; correção registrada em `entradas` | `TESTADO` (8 testes) e numa cópia do banco real (renomear o item da moto); com o modelo real `NÃO TESTADO` |
 | Programação com o Claude (V4.1) | Claude pela assinatura (`claude -p`) ou pela API; sem Claude, Qwen com biblioteca de contexto | `TESTADO` no PC (resposta em 5,5 s) |
 | Ideias de projetos e bot do Telegram (V4.1) | Ideia salva na hora, análise do Claude em segundo plano, `.md` na biblioteca, resposta local sobre a ideia | `TESTADO` no PC (análise em cerca de 20 s) |
 | Cópia de segurança diária e registro de eventos (V4.1) | M11 e M26 | `TESTADO` |
@@ -439,4 +440,17 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | M19 Consultas de gastos | `services/periodos.py` (período por regra), `services/consultas_service.py` (consultas prontas, em centavos), formulário `skills/compras/prompts/consulta.md` + `ESQUEMA_CONSULTA_GASTOS`; sem modelo, regras decidem o tipo; loja ou produto que não aparece na pergunta é descartado | `TESTADO`; avaliação nova em `evals/consultas.jsonl` (15 casos, `avaliar.py --so-consultas`) |
 
 **Dado inconsistente encontrado:** `itens_compra.categoria` das compras antigas ainda guarda a categoria livre (ex.: "passeios"); a categoria fechada está em `produtos`. As consultas usam a do catálogo.
+
+## 19. M10 — corrigir compras (24/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Formulário | `prompts/edicao.md`: o modelo devolve só campo, item e valor; número ausente da frase é descartado | `TESTADO` |
+| Localização | Número da compra, loja, data ou item citados; sem pista, a última registrada | `TESTADO` |
+| Gravação | `editar_compra` numa transação: estoque revertido e refeito, total pela soma dos itens, produto do catálogo atualizado ao renomear | `TESTADO` + cópia do banco real |
+| Medição M19 (24/11) | Formulário de consulta com gemma4:e4b: 13/15 (tipo 15/15); a categoria preenchida junto com produto passou a ser ignorada | `MEDIDO` (`sk0-20261124-0740`) |
+
+**Dado real:** a compra da moto foi gravada com o nome da loja como nome do produto (resposta à pergunta do nome cortado). Com o M10, basta dizer "renomeie naga motors para Moto Royal Enfield Classic 650".
+
+**Decisão:** o M35 foi descartado; a categoria original do item fica guardada e as consultas usam a do catálogo.
 

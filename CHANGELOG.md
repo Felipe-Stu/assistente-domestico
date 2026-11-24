@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [V4.3, parte 4] — M10: corrigir compras (2026-11-24)
+
+### Adicionado
+- **Correção de compras pelo chat:** "o vinho custou 35", "renomeie c... para moto", "eram 2 litros de leite", "a compra do Muffato foi dia 13/11", "tire o detergente da última compra", "a loja era o Moreschi".
+  - `skills/compras/prompts/edicao.md` + `ESQUEMA_EDICAO_COMPRA`: o modelo só diz o que mudar (campo, item, valor).
+  - `services/edicao_compra.py`: localiza a compra (número citado, loja, data ou item; sem pista, a última registrada), acha o item, refaz as contas (total = unitário × quantidade) e descreve o antes e depois. Sem modelo, regras cobrem as frases comuns.
+  - Número que não está na frase é descartado (o modelo não inventa valor).
+  - `DatabaseService.obter_compra` e `editar_compra`: grava numa transação só depois do "sim"; o estoque perde o que o item antigo somou e recebe o novo; o total da compra é refeito pela soma dos itens; renomear liga o item ao produto certo do catálogo.
+  - A correção fica registrada em `entradas` (tipo `edicao`, com a compra antes e depois).
+- Gatilhos de "corrigir" na skill compras (corrija/edite/altere, renomeie, "na verdade … custou", "tire … da compra").
+- `tests/test_m10.py` (8 testes); `evals/casos.jsonl` r54–r57. Suíte: 315 testes.
+
+### Alterado
+- Pergunta do nome cortado ficou mais clara ("Qual produto você comprou? … em <loja>"): no teste do usuário, o nome da loja foi dado como nome do produto.
+- `tests/dados/roteador_referencia.json`: "Corrige a compra de ontem…" agora é decidido por regra (corrigir), não mais pelo modelo.
+
+### Decisões
+- **M35 descartado:** a categoria original de cada item continua guardada (decisão do M07, coberta por teste); a categoria fechada vem do catálogo `produtos`, que é o que as consultas usam.
+
+### Limitações
+- A memória por significado (ChromaDB) guarda o nome antigo do item corrigido até a próxima reconstrução dos embeddings.
+
 ## [V4.3, parte 3] — M19: consultas de gastos (2026-11-23)
 
 ### Adicionado

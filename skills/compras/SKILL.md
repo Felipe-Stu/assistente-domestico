@@ -14,6 +14,13 @@ gatilhos:
     parametros: {operacao: desfazer}
     padrao:
       - '\b(?:desfazer|desfaca|cancelar|cancele|apagar|apague|remover|remova|excluir|exclua)\s+(?:a\s+|minha\s+)?(?:ultima\s+compra|compra\s+anterior)\b'
+  - acao: corrigir
+    prioridade: 15
+    padrao:
+      - '\b(?:corrig\w*|corrija|edit\w*|alter\w*)\b.{0,40}\b(?:compra|item|valor|preco|nome|data|loja|mercado)\b'
+      - '\b(?:renomei\w*|renomear)\b'
+      - '\bna verdade\b.{0,40}\b(?:custou|custaram|saiu|sairam|eram|foram|era|foi)\b'
+      - '\b(?:tire|tira|remova|exclua)\b.{0,30}\bda\s+(?:ultima\s+)?compra\b'
   - acao: consultar
     prioridade: 20
     padrao:
@@ -51,6 +58,8 @@ Registra o que a pessoa comprou: estabelecimento, data e itens (produto, quantid
 2. O código valida contas e datas, aponta dúvidas (loja não informada, data vaga, preço por kg ambíguo).
 3. Sem dúvidas, grava; com dúvidas, mostra o resumo e pede "sim" ou "não".
 4. "Desfazer última compra" apaga o último registro.
+   Correção (M10): o modelo preenche `prompts/edicao.md` (o que mudar); `services/edicao_compra.py` localiza a compra
+   (número, loja, data ou item citados; senão a última), refaz as contas e mostra o antes e depois; grava só com "sim".
 5. Consultas (M19): o modelo preenche o formulário `prompts/consulta.md` (tipo, categoria, loja, produto); o período é lido por `services/periodos.py`; `services/consultas_service.py` faz a consulta pronta.
 
 ## Regras
