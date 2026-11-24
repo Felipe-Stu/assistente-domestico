@@ -58,6 +58,25 @@ def limpar_transcricao(texto: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", texto).strip()
 
 
+_RE_DATA_BR = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
+
+
+def datas_da_transcricao(texto: str) -> list:
+    """Datas dd/mm/aaaa da transcrição, a de emissão primeiro (quando o rótulo aparece)."""
+    texto = str(texto or "")
+    emissao = re.search(r"emiss[ãa]o", texto, re.I)
+    ordenado = texto[emissao.start():] + "\n" + texto[:emissao.start()] if emissao else texto
+    datas = []
+    for d, m, a in _RE_DATA_BR.findall(ordenado):
+        try:
+            iso = date(int(a), int(m), int(d)).isoformat()
+        except ValueError:
+            continue
+        if iso not in datas:
+            datas.append(iso)
+    return datas
+
+
 def data_suspeita(data_iso, hoje: date) -> bool:
     """Data no futuro ou com mais de um ano: modelo de imagem costuma errar o ano."""
     try:
@@ -136,7 +155,7 @@ class DocumentosService:
             raise DocumentoError(str(erro)) from None
         preparada = self._preparar_nota(nota)
         self._avisar_repetida(preparada)
-        preparada["origem"].update({"tipo": "nota", "canal": canal, "texto": texto[:20000],
+        preparada["origem"].update({"tipo": "nota", "canal": canal, "texto": nfce_service.ocultar_consumidor(texto)[:20000],
                                     "versao_prompt": "nfe-texto-v1" if nfe else "nfce-texto-v1", "duracao_ms": int((time.monotonic() - inicio) * 1000)})
         return preparada
 
@@ -260,10 +279,16 @@ class DocumentosService:
         if self.llm_visao is None:
             raise DocumentoError("Nenhum modelo para ler imagens está configurado (OLLAMA_MODELO_VISAO).")
         transcricao = self._transcrever([parte for anexo in anexos for parte in imagem_service.preparar(anexo)])
+        transcricao = nfce_service.ocultar_consumidor(transcricao)
         preparada = self._compra_da_transcricao(transcricao) if transcricao else None
         if not preparada or not preparada.get("compras"):
             preparada = self._leitura_direta(anexos)
         compra = preparada["compras"][0]
+        # O modelo de texto às vezes troca a data lida (mesmo com o ano errado) pela de hoje: vale a da transcrição,
+        # e a pergunta de conferência aparece se ela parecer errada
+        datas = datas_da_transcricao(transcricao)
+        if datas and compra.get("data_compra") not in datas:
+            compra["data_compra"] = datas[0]
         conferir = ["loja"] if compra.get("estabelecimento") not in (None, "", "Não informado") else []
         if data_suspeita(compra.get("data_compra"), self._agora().date()):
             conferir.append("data")

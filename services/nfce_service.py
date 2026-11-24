@@ -215,3 +215,17 @@ def ler_nfe_texto(texto: str) -> Dict:
     digitos = re.sub(r"\D", "", chave.group(1))[:44] if chave else ""
     return _fechar_nota(itens, loja.group(1) if loja else None, cnpj.group(1) if cnpj else None, data,
                         digitos if len(digitos) == 44 else None, produtos.group(2), None, None, None)
+
+
+# Dados do consumidor fora de qualquer registro (o leitor já não os lê; o texto guardado também não deve trazê-los)
+_RE_CPF = re.compile(r"(?<![\d*])[\d*]{3}[.\s]?[\d*]{3}[.\s]?[\d*]{3}[-\s]?\d{2}(?!\d)")
+_RE_BLOCO_DESTINATARIO = re.compile(
+    r"Destinat[áa]rio\b.*?(?=\b(?:Produtos|Itens|Emitente|Eventos|Valor total|Dados da NF|Informa[çc][õo]es)\b|$)", re.S | re.I)
+_RE_LINHA_CONSUMIDOR = re.compile(r"^.*\bCONSUMIDOR\b.*$", re.M | re.I)
+
+
+def ocultar_consumidor(texto: str) -> str:
+    """Tira o bloco do destinatário (NF-e), a linha do consumidor (NFC-e) e qualquer CPF do texto."""
+    texto = _RE_BLOCO_DESTINATARIO.sub("Destinatário [omitido]\n", str(texto or ""))
+    texto = _RE_LINHA_CONSUMIDOR.sub("[consumidor omitido]", texto)
+    return _RE_CPF.sub("[CPF omitido]", texto)

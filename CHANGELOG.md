@@ -11,7 +11,10 @@
   - A transcrição fica guardada na origem do registro (`entradas.texto`).
 - **Conferência antes do "sim"** para compras lidas de foto: "Li a loja como X. Está certo?" e, quando a data parece errada (no futuro ou com mais de um ano), "Qual é a data certa?". Nessas perguntas, "sim" mantém o valor e segue.
 - `testar_visao.py --modelos a,b` e `comparar-modelos-visao.bat` (gemma3:4b × qwen2.5vl:7b, com download opcional).
-- `tests/test_m34.py` (7 testes). Suíte: 335 testes.
+- **Teste no PC (24/11, nota da moto):** transcrição completa, sem laço, valor certo. Dois problemas corrigidos em seguida:
+  - o gemma4 trocou a data lida ("06/11/2020") pela de hoje, e a conferência não perguntou. Agora vale a data da transcrição (a de emissão primeiro) e a pergunta aparece se ela parecer errada;
+  - a transcrição guardada trazia o bloco do destinatário. `nfce_service.ocultar_consumidor` tira o destinatário, a linha do consumidor e qualquer CPF do texto guardado e do texto enviado ao modelo (também no texto colado). Os textos já gravados no banco de teste foram limpos.
+- `tests/test_m34.py` (8 testes). Suíte: 336 testes.
 
 ## [V4.3, parte 6] — Observações e ajustes inteligentes nas compras (2026-11-24)
 

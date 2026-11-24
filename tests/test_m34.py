@@ -119,6 +119,20 @@ class TestFoto(fase1.BaseBanco):
         resposta = motor.responder_pendencia(skill, ctx, "06/11/2026", aberta["pendencia"])
         self.assertIn("06/11/2026", resposta.texto)
 
+    def test_data_da_transcricao_vale_e_e_conferida_e_destinatario_nao_fica(self):
+        transcricao = ("Emitente\nVAGA MOTORS\nDestinatário\nNome FELIPE\nCPF 132.965.880-01\nProdutos\n1 C. 1000  32.990,00\n"
+                       "Data de emissão\n06/11/2020 13:23\nData/Hora 23/11/2020")
+        hoje = dict(fase1.compra(fase1.item("moto", 1, "un", 32990.0, 32990.0), estabelecimento="Vaga Motors"),
+                    data_compra="2026-11-24", valor_total_compra=32990.0)
+        with mock.patch.object(self.compras, "preparar_compra", return_value={"compras": [hoje], "duvidas": [], "origem": {}}) as preparar:
+            preparada = self.servico(Visao(transcricao)).importar(self.foto, "app")
+        compra = preparada["compras"][0]
+        self.assertEqual(compra["data_compra"], "2020-11-06")        # a da emissão, não a de hoje
+        self.assertIn("data", compra["_conferir"])                   # e, por ser antiga, é perguntada
+        for texto in (preparar.call_args.args[0], preparada["origem"]["texto"]):
+            self.assertNotIn("FELIPE", texto)
+            self.assertNotIn("132.965.880-01", texto)
+
     def test_sem_transcricao_cai_na_leitura_direta(self):
         direto = {"compras": [dict(fase1.compra(), data_compra="2026-11-20", valor_total_compra=10.0)]}
         preparada = self.servico(Visao("", json_direto=direto)).importar(self.foto, "app")
