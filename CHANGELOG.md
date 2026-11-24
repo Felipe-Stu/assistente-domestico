@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [V4.3, parte 8] — Modelo de imagem qwen2.5vl:7b e chave de acesso lida na foto (2026-11-24)
+
+### Alterado
+- `OLLAMA_MODELO_VISAO` passa a ser `qwen2.5vl:7b`. Medição de 24/11 (`comparar-modelos-visao.bat`, nota da moto):
+  - qwen2.5vl:7b: loja, data e hora de emissão, CNPJ, chave de acesso, protocolo e valor certos (13,2 s);
+  - gemma3:4b: loja, ano, CNPJ e chave errados (5,9 s).
+- `instalar-modelo-visao.bat` baixa o qwen2.5vl:7b.
+
+### Adicionado
+- `nfce_service.chave_valida` (dígito verificador, módulo 11) e `chave_no_texto`: a chave de acesso lida na transcrição da foto só vale se o dígito conferir.
+  - Com chave válida, a nota já registrada é recusada ("mesma chave de acesso, lida na foto") e a chave é gravada na entrada.
+- Suíte: 337 testes.
+
 ## [V4.3, parte 7] — M34: foto de nota em duas etapas, com conferência (2026-11-24)
 
 ### Adicionado

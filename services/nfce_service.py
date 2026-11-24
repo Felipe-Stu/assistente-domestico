@@ -229,3 +229,22 @@ def ocultar_consumidor(texto: str) -> str:
     texto = _RE_BLOCO_DESTINATARIO.sub("Destinatário [omitido]\n", str(texto or ""))
     texto = _RE_LINHA_CONSUMIDOR.sub("[consumidor omitido]", texto)
     return _RE_CPF.sub("[CPF omitido]", texto)
+
+
+def chave_valida(chave: str) -> bool:
+    """Chave de acesso de 44 dígitos com o dígito verificador certo (módulo 11, pesos 2 a 9 da direita)."""
+    if not chave or len(chave) != 44 or not chave.isdigit():
+        return False
+    soma = sum(int(d) * (2 + i % 8) for i, d in enumerate(reversed(chave[:43])))
+    resto = soma % 11
+    return int(chave[43]) == (0 if resto < 2 else 11 - resto)
+
+
+def chave_no_texto(texto: str):
+    """Primeira chave de acesso válida no texto (transcrição de foto); leitura errada não passa no dígito verificador."""
+    for achado in re.finditer(r"Chave de acesso[:\s]*([\d\s.\-/]{44,90})", str(texto or ""), re.I):
+        digitos = re.sub(r"\D", "", achado.group(1))
+        for inicio in range(0, max(1, len(digitos) - 43)):
+            if chave_valida(digitos[inicio:inicio + 44]):
+                return digitos[inicio:inicio + 44]
+    return None

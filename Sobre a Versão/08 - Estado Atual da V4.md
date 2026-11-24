@@ -488,3 +488,13 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Conferência | Loja lida sempre conferida em foto; data suspeita perguntada | `TESTADO` (fluxo até a gravação) |
 | Qualidade real | gemma3:4b na nota da moto: valor e dia/mês certos; ano, CNPJ e loja errados; laço de repetição | `MEDIDO` (24/11, antes das mudanças); depois das mudanças `NÃO TESTADO` |
 
+## 23. Modelo de imagem: qwen2.5vl:7b (24/11/2026)
+
+| Modelo | Loja | Data | CNPJ | Chave | Valor | Tempo |
+|---|---|---|---|---|---|---|
+| gemma4:e4b | não enxerga imagem (Ollama para Windows, issue 16597) | — | — | — | — | — |
+| gemma3:4b | errada | ano errado | errado | errada | certo | 5,9 s |
+| **qwen2.5vl:7b** | **certa** | **certa** | **certo** | **certa** | **certo** | 13,2 s |
+
+Fonte: `MEDIDO` com `comparar-modelos-visao.bat` na nota da moto. Com a chave lida certa (dígito verificador confere), a foto de uma nota já registrada é recusada.
+

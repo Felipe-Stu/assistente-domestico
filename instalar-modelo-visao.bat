@@ -26,8 +26,8 @@ goto fim
 
 :ollama_ok
 echo [ok] Ollama em execucao.
-echo Baixando o modelo de leitura de imagens gemma3:4b (cerca de 3,3 GB)...
-ollama pull gemma3:4b
+echo Baixando o modelo de leitura de imagens qwen2.5vl:7b (cerca de 6 GB)...
+ollama pull qwen2.5vl:7b
 if errorlevel 1 (
   echo [ERRO] Nao consegui baixar. Confira a internet e rode de novo.
   goto fim

@@ -280,6 +280,10 @@ class DocumentosService:
             raise DocumentoError("Nenhum modelo para ler imagens está configurado (OLLAMA_MODELO_VISAO).")
         transcricao = self._transcrever([parte for anexo in anexos for parte in imagem_service.preparar(anexo)])
         transcricao = nfce_service.ocultar_consumidor(transcricao)
+        # Chave de acesso lida certa (dígito verificador confere) evita registrar a mesma nota duas vezes
+        chave = nfce_service.chave_no_texto(transcricao)
+        if chave and self.db.documento_ja_gravado(chave):
+            raise DocumentoError("Essa nota já foi registrada (mesma chave de acesso, lida na foto).")
         preparada = self._compra_da_transcricao(transcricao) if transcricao else None
         if not preparada or not preparada.get("compras"):
             preparada = self._leitura_direta(anexos)
@@ -297,6 +301,9 @@ class DocumentosService:
         origem = preparada.setdefault("origem", {})
         origem["modelo"] = f"{getattr(self.llm_visao, 'modelo', None)} + {origem.get('modelo') or 'leitor'}"
         origem["texto"] = ("Transcrição da foto:\n" + transcricao[:18000]) if transcricao else origem.get("texto")
+        if chave:
+            origem["chave_documento"] = chave
+            compra["chave_acesso"] = chave
         return preparada
 
     def _transcrever(self, partes: List[bytes]) -> str:

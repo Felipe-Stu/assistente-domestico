@@ -133,6 +133,22 @@ class TestFoto(fase1.BaseBanco):
             self.assertNotIn("FELIPE", texto)
             self.assertNotIn("132.965.880-01", texto)
 
+    def test_chave_lida_na_foto_barra_nota_repetida(self):
+        from services import nfce_service
+        from services.documentos_service import DocumentoError
+        self.assertTrue(nfce_service.chave_valida("35261113773688000194550010000007581596081574"))
+        self.assertFalse(nfce_service.chave_valida("35261113773688000194550010000007581596081575"))
+        texto = test_documentos.TEXTO_NFE
+        docs = self.servico(Visao(texto))
+        preparada = docs.importar(self.foto, "app")
+        self.assertEqual(preparada["origem"]["chave_documento"], "35261113773688000194550010000007581596081574")
+        self.compras.registrar_compras(preparada["compras"], preparada["origem"])
+        foto2 = Path(self._tmp.name) / "nota2.png"
+        foto2.write_bytes(b"png2")
+        with self.assertRaises(DocumentoError) as ctx:
+            docs.importar(foto2, "app")
+        self.assertIn("já foi registrada", str(ctx.exception))
+
     def test_sem_transcricao_cai_na_leitura_direta(self):
         direto = {"compras": [dict(fase1.compra(), data_compra="2026-11-20", valor_total_compra=10.0)]}
         preparada = self.servico(Visao("", json_direto=direto)).importar(self.foto, "app")
