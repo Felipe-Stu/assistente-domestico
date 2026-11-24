@@ -106,15 +106,30 @@ class DocumentosService:
 
     # ------------------------------------------------------------------
 
+    def importar_texto(self, texto: str, canal: str = "chat") -> Dict:
+        """Texto da NFC-e copiado da página e colado no chat: mesmo leitor exato, mesma confirmação."""
+        inicio = time.monotonic()
+        try:
+            nota = nfce_service.ler_nfce_texto(texto)
+        except nfce_service.NotaInvalidaError as erro:
+            raise DocumentoError(str(erro)) from None
+        preparada = self._preparar_nota(nota)
+        preparada["origem"].update({"tipo": "nota", "canal": canal, "texto": texto[:20000],
+                                    "versao_prompt": "nfce-texto-v1", "duracao_ms": int((time.monotonic() - inicio) * 1000)})
+        return preparada
+
     def _importar_nfce(self, caminho: Path) -> Dict:
         bruto = caminho.read_bytes()
         conteudo = bruto.decode("utf-8", errors="replace")
-        if "�" in conteudo:
+        if "\ufffd" in conteudo:
             conteudo = bruto.decode("latin-1")
         try:
             nota = nfce_service.ler_nfce(conteudo)
         except nfce_service.NotaInvalidaError as erro:
             raise DocumentoError(str(erro)) from None
+        return self._preparar_nota(nota)
+
+    def _preparar_nota(self, nota: Dict) -> Dict:
         if self.db.documento_ja_gravado(nota.get("chave_acesso")):
             raise DocumentoError("Essa nota já foi registrada (mesma chave de acesso).")
         modelo = self._nomes_legiveis(nota["itens"])
@@ -123,7 +138,13 @@ class DocumentosService:
         for chave in ("cnpj", "chave_acesso", "valor_bruto", "desconto", "forma_pagamento"):
             validada[chave] = nota.get(chave)
         registro = {k: v for k, v in nota.items()}
-        return {"compras": [validada], "duvidas": [],
+        duvidas = []
+        if not nota.get("data_compra"):
+            duvidas.append(f"A data da compra não veio na nota: vai como hoje ({date.today():%d/%m/%Y}). Se for outra, "
+                           "responda \"não\" e mande de novo com a linha \"Emissão: dd/mm/aaaa\".")
+        if validada.get("estabelecimento") in (None, "", "Não informado"):
+            duvidas.append("O mercado não veio no texto colado.")
+        return {"compras": [validada], "duvidas": duvidas,
                 "origem": {"resposta_json": json.dumps(registro, ensure_ascii=False)[:20000],
                            "modelo": modelo, "versao_prompt": "nfce-v1", "chave_documento": nota.get("chave_acesso")}}
 

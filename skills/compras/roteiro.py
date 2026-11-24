@@ -7,6 +7,7 @@ consultar / corrigir: ainda não implementados; a resposta informa e nada é gra
 """
 from core.skills.motor import Resposta
 from services.intent_router import normalizar_texto
+from services.nfce_service import parece_nfce_texto
 from services.logger_service import logger as custom_logger
 
 RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar",
@@ -27,6 +28,19 @@ def executar(ctx, texto, decisao):
 
     if acao != "criar":
         return Resposta("As consultas de gastos e preços ainda não estão disponíveis. Nada foi registrado.")
+
+    documentos = ctx.servicos.get("documentos")
+    if documentos is not None and parece_nfce_texto(texto):
+        # Texto copiado da nota fiscal: leitor exato (desconto, data, mercado), sempre com confirmação
+        try:
+            preparada = documentos.importar_texto(texto, ctx.servicos.get("canal") or "chat")
+        except Exception as erro:
+            return Resposta(f"Reconheci uma nota fiscal, mas não consegui lê-la: {erro}. Nada foi registrado.")
+        return Resposta(
+            f"📄 Nota fiscal reconhecida:\n{documentos.resumo(preparada)}\n\nResponda \"sim\" para gravar ou \"não\" para descartar.",
+            fala="Reconheci uma nota fiscal. Confira o resumo no chat e responda sim ou não.",
+            pendencia={"compras": preparada["compras"], "origem": preparada["origem"]},
+        )
 
     preparada = ctx.repetir(
         custom_logger.cronometrado("extracao_compras", compras.preparar_compra),

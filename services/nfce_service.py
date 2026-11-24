@@ -97,34 +97,86 @@ def ler_nfce(conteudo: str) -> Dict:
 
     itens = []
     for bloco in _RE_ITEM.findall(conteudo):
-        nome = _span(bloco, "txtTit")
-        codigo = re.sub(r"\D", "", _span(bloco, "RCod")) or None
-        quantidade = _numero(_depois_do_rotulo(_span(bloco, "Rqtd")))
-        unidade = _depois_do_rotulo(_span(bloco, "RUN")).lower() or "un"
-        unitario = _numero(_depois_do_rotulo(_span(bloco, "RvlUnit")))
-        total = _numero(_span(bloco, "valor"))
-        emb_qtd, emb_unid = embalagem_pelo_nome(nome) if unidade in ("un", "und", "pc", "pct", "cx") else (None, None)
-        itens.append({"produto": nome, "codigo": codigo, "marca": None, "quantidade": quantidade,
-                      "unidade": "kg" if unidade == "kg" else ("litro" if unidade in ("l", "lt") else "un"),
-                      "valor_unitario": unitario, "valor_total": total, "categoria": "outros",
-                      "embalagem_quantidade": emb_qtd, "embalagem_unidade": emb_unid})
+        itens.append(_item(_span(bloco, "txtTit"), re.sub(r"\D", "", _span(bloco, "RCod")) or None,
+                           _numero(_depois_do_rotulo(_span(bloco, "Rqtd"))), _depois_do_rotulo(_span(bloco, "RUN")) or "un",
+                           _numero(_depois_do_rotulo(_span(bloco, "RvlUnit"))), _numero(_span(bloco, "valor"))))
+    pagamento = re.search(r'<label class="tx">\s*(.*?)\s*</label>', conteudo, re.S)
+    return _fechar_nota(itens, estabelecimento, cnpj, data_compra, chave,
+                        _total(conteudo, "Valor total R$:"), _total(conteudo, "Descontos R$:"),
+                        _total(conteudo, "Valor a pagar R$:"), _texto(pagamento.group(1)) if pagamento else None)
+
+
+def _item(nome, codigo, quantidade, unidade, unitario, total) -> Dict:
+    unidade = (unidade or "un").lower()
+    emb_qtd, emb_unid = embalagem_pelo_nome(nome) if unidade in ("un", "und", "pc", "pct", "cx") else (None, None)
+    return {"produto": nome, "codigo": codigo, "marca": None, "quantidade": quantidade,
+            "unidade": "kg" if unidade == "kg" else ("litro" if unidade in ("l", "lt") else "un"),
+            "valor_unitario": unitario, "valor_total": total, "categoria": "outros",
+            "embalagem_quantidade": emb_qtd, "embalagem_unidade": emb_unid}
+
+
+def _fechar_nota(itens, estabelecimento, cnpj, data_compra, chave, total_txt, desconto_txt, pago_txt, pagamento) -> Dict:
+    """Distribui o desconto nos itens (em centavos) e monta o resultado comum ao HTML e ao texto copiado."""
     if not itens:
         raise NotaInvalidaError("Nenhum item encontrado na NFC-e.")
-
-    total_nota = para_centavos(_total(conteudo, "Valor total R$:") or sum(i["valor_total"] for i in itens))
-    desconto = para_centavos(_total(conteudo, "Descontos R$:") or 0)
-    pago = para_centavos(_total(conteudo, "Valor a pagar R$:") or 0) or (total_nota - desconto)
+    total_nota = para_centavos(total_txt or sum(i["valor_total"] for i in itens))
+    desconto = para_centavos(desconto_txt or 0)
+    pago = para_centavos(pago_txt or 0) or (total_nota - desconto)
     liquidos = distribuir_desconto([para_centavos(i["valor_total"]) for i in itens], total_nota - pago if pago else desconto)
     for item, liquido in zip(itens, liquidos):
         item["valor_bruto"] = item["valor_total"]
         item["valor_total"] = para_reais(liquido)
         item["valor_unitario"] = round(item["valor_total"] / item["quantidade"], 4) if item["quantidade"] else item["valor_total"]
-
-    pagamento = re.search(r'<label class="tx">\s*(.*?)\s*</label>', conteudo, re.S)
     return {
         "estabelecimento": nome_estabelecimento(estabelecimento),
         "cnpj": cnpj, "data_compra": data_compra, "chave_acesso": chave,
         "itens": itens, "valor_total_compra": para_reais(sum(liquidos)),
         "valor_bruto": para_reais(total_nota), "desconto": para_reais(desconto),
-        "forma_pagamento": _texto(pagamento.group(1)) if pagamento else None,
+        "forma_pagamento": pagamento,
     }
+
+
+# Texto copiado da página da NFC-e e colado no chat
+_RE_ITEM_TEXTO = re.compile(
+    r"\(C[óo]digo:\s*(?P<cod>\d+)\s*\)\s*Qtde\.:\s*(?P<qtd>[\d.,]+)\s*UN:\s*(?P<un>[A-Za-z]+)\s*"
+    r"Vl\. Unit\.:\s*(?P<unit>[\d.,]+)\s*Vl\. Total\s*(?P<tot>[\d.,]+)")
+
+
+def parece_nfce_texto(texto: str) -> bool:
+    return len(_RE_ITEM_TEXTO.findall(texto or "")) >= 1 and "Vl. Total" in (texto or "")
+
+
+def _valor_depois(texto: str, rotulo: str) -> Optional[str]:
+    achado = re.search(re.escape(rotulo) + r"\s*([\d.]*\d,\d{2})", texto)
+    return achado.group(1) if achado else None
+
+
+def ler_nfce_texto(texto: str) -> Dict:
+    """Texto copiado da "Consulta Resumida NFC-e" (como sai ao selecionar a página) → mesmo formato de ler_nfce."""
+    texto = " ".join((texto or "").split())
+    achados = list(_RE_ITEM_TEXTO.finditer(texto))
+    if not achados:
+        raise NotaInvalidaError("O texto não parece uma NFC-e copiada da página da Sefaz.")
+    itens, inicio = [], 0
+    for n, achado in enumerate(achados):
+        nome = texto[inicio:achado.start()].strip()
+        if n == 0:
+            # Antes do 1º item vêm o cabeçalho (loja, CNPJ, endereço ", Cidade , UF") ou uma frase ("Fiz a compra:")
+            fim_endereco = list(re.finditer(r",\s*[A-Z]{2}\s+(?=[A-Z0-9])", nome))
+            if fim_endereco:
+                nome = nome[fim_endereco[-1].end():]
+            elif ":" in nome:
+                nome = nome.rsplit(":", 1)[1]
+        itens.append(_item(nome.strip(" -:"), achado.group("cod"), _numero(achado.group("qtd")), achado.group("un"),
+                           _numero(achado.group("unit")), _numero(achado.group("tot"))))
+        inicio = achado.end()
+    cabecalho = texto[:achados[0].start()]
+    loja = re.search(r"^(.*?)\s+CNPJ:", cabecalho)
+    cnpj = (re.search(r"CNPJ:\s*([\d./-]+)", cabecalho) or [None, None])[1]
+    emissao = re.search(r"Emiss[ãa]o:\s*(\d{2}/\d{2}/\d{4})", texto)
+    data = datetime.strptime(emissao.group(1), "%d/%m/%Y").date().isoformat() if emissao else None
+    chave = re.search(r"Chave de acesso:\s*((?:\d{4}\s*){11})", texto)
+    pagamento = re.search(r"Valor pago R\$:\s*([A-Za-zÀ-ú ]+?)\s*[\d.]*\d,\d{2}", texto)
+    return _fechar_nota(itens, loja.group(1) if loja else None, cnpj, data, re.sub(r"\D", "", chave.group(1)) if chave else None,
+                        _valor_depois(texto, "Valor total R$:"), _valor_depois(texto, "Descontos R$:"),
+                        _valor_depois(texto, "Valor a pagar R$:"), pagamento.group(1).strip() if pagamento else None)

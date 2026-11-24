@@ -481,6 +481,7 @@ class AssistenteRuntime(ModoVoz):
             "progresso": lambda mensagem: emitir_electron("debug_log", {"message": mensagem}),
             "ideias": getattr(self, "ideias", None),
             "canal": getattr(self, "_canal_atual", "chat"),
+            "documentos": getattr(self, "documentos", None),
             # Modelo local residente, para qualquer skill (SK6): uma skill nova não precisa mudar o núcleo
             "llm_local": LocalLLMProvider(temperatura=0.1),
         }

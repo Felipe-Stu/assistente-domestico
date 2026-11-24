@@ -154,6 +154,41 @@ class TestImportacao(BaseDocs):
         self.assertIn("PDF", preparada["duvidas"][-1])
 
 
+TEXTO_COLADO = ("IRMAOS MUFFATO E CIA LTDA CNPJ: 76.430.438/0097-13 AVENIDA SAO DOMINGOS , 1491 , , Vila Guzzo , Catanduva , SP "
+                "VINHO BENJAMIM NIETO (Código: 97029 ) Qtde.:2   UN: Un   Vl. Unit.:   49,9 \tVl. Total 99,80 "
+                "RODO PRAT CSA UN (Código: 300429 ) Qtde.:1   UN: Un   Vl. Unit.:   46,75 \tVl. Total 46,75 "
+                "LIMP TRIEX 500ML (Código: 304016 ) Qtde.:1   UN: Un   Vl. Unit.:   3,28 \tVl. Total 3,28 "
+                "Qtd. total de itens:3 Valor total R$:149,83 Descontos R$:43,30 Valor a pagar R$:106,53 "
+                "Forma de pagamento:Valor pago R$: Cartão de Crédito106,53 TrocoNaN")
+
+
+class TestTextoColado(BaseDocs):
+    def test_leitor_do_texto(self):
+        from services.nfce_service import ler_nfce_texto, parece_nfce_texto
+        self.assertTrue(parece_nfce_texto(TEXTO_COLADO))
+        self.assertFalse(parece_nfce_texto("Comprei leite por 10 reais no Moreschi"))
+        nota = ler_nfce_texto(TEXTO_COLADO)
+        self.assertEqual((nota["estabelecimento"], nota["forma_pagamento"], nota["valor_total_compra"]),
+                         ("Irmaos Muffato", "Cartão de Crédito", 106.53))
+        self.assertEqual([i["produto"] for i in nota["itens"]], ["VINHO BENJAMIM NIETO", "RODO PRAT CSA UN", "LIMP TRIEX 500ML"])
+        frase = ler_nfce_texto("Fiz a seguinte compra:" + TEXTO_COLADO.split(" SP ", 1)[1])
+        self.assertEqual(frase["itens"][0]["produto"], "VINHO BENJAMIM NIETO")
+        self.assertEqual(frase["estabelecimento"], "Não informado")
+
+    def test_skill_compras_usa_o_leitor_e_pede_confirmacao(self):
+        from core.skills import Contexto, motor, obter_catalogo
+        skill = obter_catalogo().skill("compras")
+        ctx = Contexto(servicos={"shopping_assistant": self.compras, "documentos": self.servico(), "canal": "chat"},
+                       repetir=lambda f, a, **_k: f(*a))
+        resposta = motor.executar(skill, ctx, TEXTO_COLADO, {"acao": "criar"})
+        self.assertIn("Nota fiscal reconhecida", resposta.texto)
+        self.assertIn("data da compra não veio", resposta.texto)
+        self.assertEqual(self.contar("compras"), 0)  # nada gravado antes do "sim"
+        motor.responder_pendencia(skill, ctx, "sim", resposta.pendencia)
+        self.assertEqual(self.db.executar_consulta_uma_linha("SELECT total_centavos, nome_comercio FROM compras"), (10653, "Irmaos Muffato"))
+        self.assertEqual(self.db.executar_consulta_uma_linha("SELECT tipo, versao_prompt FROM entradas"), ("nota", "nfce-texto-v1"))
+
+
 class TestPastaEntradas(BaseDocs):
     def test_entrega_quando_a_copia_termina_e_move(self):
         achados = []
