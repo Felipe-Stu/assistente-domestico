@@ -11,6 +11,10 @@
 - Migração v8: coluna `contexto` e índice em `historico_conversas`.
 - `tests/test_m20.py` (6 testes). Suíte: 321 testes.
 
+### Alterado (M34)
+- `OLLAMA_MODELO_VISAO` passa a ser `gemma3:4b`. Medição de 24/11 com `testar-visao.bat`: o `gemma4:e4b` descreveu como "arte abstrata, sem texto" até uma imagem de controle com texto grande em fundo branco; é o problema aberto no Ollama para Windows (issue 16597), em que o gemma3 lê a mesma imagem.
+- `instalar-modelo-visao.bat`: baixa o `gemma3:4b` (≈ 3,3 GB) e roda o teste.
+
 ### Mantido
 - Mudar de assunto (contexto) zera janela e resumo, como antes.
 - A nuvem continua recebendo histórico só quando a conversa em curso é de contexto liberado (`geral`, `outro`).
