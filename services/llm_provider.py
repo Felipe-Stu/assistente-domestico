@@ -282,6 +282,30 @@ class LocalLLMProvider(BaseLLMProvider):
             raise _converter_erro_conexao(e) from e
         return response['message']['content'].strip()
 
+    def gerar_json_imagem(self, prompt_sistema: str, mensagem_usuario: str, imagens: List[str],
+                          esquema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Como gerar_json, com imagens (caminhos) anexadas à mensagem; o modelo precisa entender imagem."""
+        _atualizar_timestamp_atividade()
+        garantir_ollama_disponivel()
+        cliente_ollama = ollama.Client(timeout=OLLAMA_TIMEOUT * 2)
+        parametros = {
+            "model": self.modelo,
+            "messages": [{"role": "system", "content": prompt_sistema},
+                         {"role": "user", "content": mensagem_usuario, "images": list(imagens)}],
+            "keep_alive": OLLAMA_KEEP_ALIVE,
+            "options": {"temperature": self.temperatura},
+            "format": esquema if (esquema and OLLAMA_SAIDA_ESTRUTURADA) else "json",
+        }
+        try:
+            response = cliente_ollama.chat(**parametros)
+        except _ERROS_CONEXAO as e:
+            raise _converter_erro_conexao(e) from e
+        conteudo = response['message']['content']
+        try:
+            return json.loads(self._sanitizar_resposta_json(conteudo))
+        except ValueError as e:
+            raise InvalidOrchestratorOutputException(f"Resposta da imagem não é JSON: {e}") from e
+
     def gerar_json(
         self,
         prompt_sistema: str,

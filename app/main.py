@@ -43,7 +43,9 @@ from services.backup_service import BackupService
 from services.biblioteca_service import BibliotecaService
 from services.claude_assinatura_service import ClaudeAssinaturaService
 from services.claude_service import ClaudeService
+from services.documentos_service import DocumentoError, DocumentosService
 from services.ideias_service import IdeiasService
+from services.pasta_entradas_service import PastaEntradas
 from services.telegram_service import TelegramService
 import core.config as config_app
 from services.project_analyzer import ProjectAnalyzer
@@ -128,6 +130,8 @@ class AssistenteRuntime(ModoVoz):
         self.biblioteca = None
         self.ideias = None
         self.telegram = None
+        self.documentos = None
+        self.pasta_entradas = None
 
         # Serviços de voz (inicializados sob demanda na Fase 2)
         self.voice_service = None
@@ -222,6 +226,15 @@ class AssistenteRuntime(ModoVoz):
                 db_service=self.db_service,
                 llm_provider=self.local_llm,
                 vector_store=self.vector_store
+            )
+            # Notas fiscais em HTML, PDF ou foto (pasta de entrada e Telegram)
+            self.documentos = DocumentosService(
+                db=self.db_service,
+                compras=self.shopping_assistant,
+                pasta_anexos=config_app.ANEXOS_DIR,
+                llm_nomes=LocalLLMProvider(temperatura=0.1),
+                llm_visao=LocalLLMProvider(modelo=config_app.OLLAMA_MODELO_VISAO, temperatura=0.1),
+                tamanho_max_mb=config_app.ENTRADAS_TAMANHO_MAX_MB,
             )
             emitir_electron("debug_log", {"message": "✓ Assistentes de domínio prontos."})
 
@@ -389,6 +402,7 @@ class AssistenteRuntime(ModoVoz):
             chats_permitidos=config_app.TELEGRAM_CHAT_IDS,
             arquivo_offset=config_app.TELEGRAM_OFFSET_ARQUIVO,
             ao_receber=lambda chat, texto: self.ideias.responder_mensagem(texto, f"telegram:{chat}"),
+            ao_receber_arquivo=self._receber_arquivo_telegram,
         )
         if not telegram.configurado():
             if config_app.TELEGRAM_BOT_TOKEN:
@@ -397,6 +411,65 @@ class AssistenteRuntime(ModoVoz):
         self.telegram = telegram
         telegram.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
         emitir_electron("debug_log", {"message": "✓ Bot do Telegram ativo para receber ideias."})
+
+    def _iniciar_pasta_entradas(self):
+        if self.documentos is None:
+            return
+        self.pasta_entradas = PastaEntradas(
+            config_app.ENTRADAS_DIR,
+            ao_encontrar=lambda caminho, canal: self.fila.put({"type": "documento", "payload": {"caminho": str(caminho), "canal": canal}}),
+            intervalo_s=config_app.ENTRADAS_INTERVALO_S,
+        )
+        self.pasta_entradas.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
+        emitir_electron("debug_log", {"message": f"✓ Pasta de notas fiscais vigiada: {config_app.ENTRADAS_DIR}"})
+
+    def _importar_documento(self, caminho: str, canal: str = "pasta"):
+        """Nota fiscal encontrada na pasta de entrada: vira compra aguardando "sim" ou "não"."""
+        arquivo = Path(caminho)
+        if self.pendencia is not None:
+            # Já há uma confirmação esperando: a nota volta para a fila daqui a pouco
+            threading.Timer(10, lambda: self.fila.put({"type": "documento", "payload": {"caminho": caminho, "canal": canal}})).start()
+            return None
+        chat = self._chat_do_arquivo(arquivo)
+        ok = False
+        try:
+            with custom_logger.requisicao(canal=canal, caracteres=0):
+                preparada = self.documentos.importar(arquivo, canal)
+            self.pendencia = ("compras", {"compras": preparada["compras"], "origem": preparada["origem"]})
+            texto = (f"📄 Nota fiscal recebida ({arquivo.name}):\n{self.documentos.resumo(preparada)}\n\n"
+                     "Responda \"sim\" para gravar ou \"não\" para descartar.")
+            ok = True
+        except DocumentoError as erro:
+            texto = f"Não consegui importar {arquivo.name}: {erro}"
+        except Exception as erro:
+            logger.error(f"Falha ao importar documento: {erro}")
+            texto = f"Não consegui importar {arquivo.name} ({type(erro).__name__})."
+        finally:
+            if self.pasta_entradas is not None and arquivo.exists():
+                self.pasta_entradas.mover(arquivo, ok)
+        emitir_electron("assistant_message", {"text": texto})
+        if chat is not None and self.telegram is not None:
+            aviso = texto.replace('Responda "sim" para gravar ou "não" para descartar.', "Confirme no assistente do PC (sim ou não).")
+            self.telegram.enviar(chat, aviso)
+        return texto
+
+    @staticmethod
+    def _chat_do_arquivo(arquivo: Path):
+        partes = arquivo.name.split("_", 2)
+        return int(partes[1]) if len(partes) == 3 and partes[0] == "telegram" and partes[1].lstrip("-").isdigit() else None
+
+    def _receber_arquivo_telegram(self, chat: int, mensagem: dict) -> str:
+        """Arquivo ou foto mandado ao bot: vai para a pasta de entrada e é importado no PC."""
+        documento = mensagem.get("document") or (mensagem.get("photo") or [None])[-1]
+        if not documento:
+            return "Por enquanto eu entendo texto, arquivos (HTML da nota, PDF) e fotos."
+        if (documento.get("file_size") or 0) > 20 * 1024 * 1024:
+            return "Arquivo grande demais: o Telegram só deixa o bot baixar até 20 MB."
+        nome = documento.get("file_name") or f"foto_{mensagem.get('message_id', 'cupom')}.jpg"
+        nome = "".join(c if c.isalnum() or c in "._-" else "_" for c in nome)[-80:]
+        destino = config_app.ENTRADAS_DIR / f"telegram_{chat}_{nome}"
+        self.telegram.baixar(documento["file_id"], destino)
+        return "Recebi o arquivo. O resumo da compra vai aparecer aqui e no assistente do PC para você confirmar."
 
     def _contexto_skill(self, skill=None) -> Contexto:
         """O que as skills podem usar: serviços e a política de repetição. Nada de runtime ou IPC."""
@@ -715,6 +788,9 @@ class AssistenteRuntime(ModoVoz):
         # Fila de análise das ideias e bot do Telegram, em segundo plano
         self._iniciar_ideias_e_telegram()
 
+        # Pasta de entrada de notas fiscais (HTML da NFC-e, PDF, foto)
+        self._iniciar_pasta_entradas()
+
         # =====================================================================
         # SISTEMA PRONTO PARA TEXTO — Chat desbloqueado!
         # =====================================================================
@@ -783,6 +859,9 @@ class AssistenteRuntime(ModoVoz):
             # -----------------------------------------------------------------
             # INPUT DE VOZ (vindo da thread do microfone)
             # -----------------------------------------------------------------
+            elif tipo == "documento":
+                self._importar_documento(payload.get("caminho", ""), payload.get("canal", "pasta"))
+
             elif tipo == "voice_input":
                 text = payload.get("text", "").strip()
                 if not text:

@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [V4.3] — Notas fiscais por arquivo: NFC-e (HTML), PDF, foto, pasta de entrada e Telegram (2026-11-23)
+
+### Adicionado
+- `services/nfce_service.py`: leitor da página da NFC-e da Sefaz (HTML), sem IA.
+  - Lê estabelecimento, CNPJ, data de emissão, itens (código, quantidade, unidade, unitário, total), desconto, valor pago, forma de pagamento e chave de acesso.
+  - **Não lê os dados do consumidor** (CPF, nome).
+  - O desconto é distribuído entre os itens, proporcionalmente e em centavos, de modo que a soma dos itens fica igual ao valor pago.
+  - O tamanho da embalagem é lido do nome ("500ML" vira 0,5 litro no estoque).
+- `services/documentos_service.py`: importa HTML da NFC-e, PDF (texto via `pypdf`) e foto (modelo local que entende imagem, `OLLAMA_MODELO_VISAO`).
+  - O modelo local só torna legíveis os nomes abreviados do cupom e escolhe a categoria.
+  - O original é copiado para `Anexos/AAAA-MM/`; a chave de acesso impede registrar a mesma nota duas vezes (migração v7: `entradas.chave_documento`).
+  - Foto e PDF vêm marcados para revisão.
+- `services/pasta_entradas_service.py`: a pasta `E:\Agente IA\Entradas` é vigiada.
+  - A nota salva ali vira um resumo com "sim/não"; depois o arquivo vai para `processados/` ou `com_erro/`.
+- **Telegram:** arquivos e fotos mandados ao bot vão para a pasta de entrada; o resumo volta ao chat do celular e a confirmação é feita no PC.
+- `LocalLLMProvider.gerar_json_imagem`.
+- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 284 testes.
+
+### Pendente no PC
+- Instalar `pypdf` (`pip install pypdf`) e testar uma nota real pela pasta e pelo Telegram.
+- Confirmar se o `gemma4:e4b` lê fotos no seu Ollama; se não, definir outro modelo de visão em `OLLAMA_MODELO_VISAO`.
+
 ## [V4.3, parte 1] — Catálogo, centavos e estoque: M07, M08, M06 (2026-11-23)
 
 ### Adicionado

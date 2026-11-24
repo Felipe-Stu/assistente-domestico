@@ -18,3 +18,5 @@ edge-tts>=6.1.0
 pygame>=2.5.0
 # Cabeçalhos das skills (skills/<nome>/SKILL.md)
 PyYAML>=6.0
+# Leitura de notas fiscais em PDF (services/documentos_service.py)
+pypdf>=4.0

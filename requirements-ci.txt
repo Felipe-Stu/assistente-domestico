@@ -7,3 +7,5 @@ google-genai>=1.0.0
 PyYAML>=6.0
 # Claude pela API e bot do Telegram
 requests>=2.31.0
+# Notas fiscais em PDF
+pypdf>=4.0

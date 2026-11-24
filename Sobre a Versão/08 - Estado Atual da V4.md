@@ -20,7 +20,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Indicador | Valor |
 |---|---|
 | Código versionado (Python, JS, HTML, CSS) | ≈ 15.600 linhas em 23/11/2026, com os testes (≈ 8.070 em 03/11) |
-| Testes automatizados | 271 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
+| Testes automatizados | 284 em 23/11/2026 (70 em 03/11); a fase das skills acrescentou os arquivos `test_skills`, `test_sk0`, `test_sk2`, `test_sk3`, `test_skp`, `test_sk6`, `test_sk7` e `test_ideias`; ver seções 11 a 14 |
 | Testes de estoque, serviços vetoriais reais e IPC | Nenhum |
 | Dados reais em `assistente_casa.db` (schema v2) | 4 compras, 11 itens, **0 em `controle_consumo`**; 3 ideias analisadas (23/11) |
 | Problemas abertos | 7 (0 alto, 4 médios, 3 baixos); 16 resolvidos (P21 em 17/11; P13 e P22 em 22/11; P1, P9, P10, P16 e P23 em 23/11) |
@@ -412,4 +412,17 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | M06 Estoque pelas compras | Item gravado soma ao estoque em unidade base; ritmo aprendido na recompra; desfazer tira do estoque; consulta com unidade | `TESTADO` (10 testes, inclusive o critério "comprei 2 litros de leite" → "ainda tenho leite?"); migração no banco real na próxima abertura |
 
 **Migrações v3 a v6 no banco real:** acontecem na próxima abertura do assistente, depois da cópia de segurança do dia. Só acrescentam tabelas e colunas e preenchem as novas; nada é apagado.
+
+## 17. Notas fiscais por arquivo (23/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| NFC-e em HTML | Leitor exato da página da Sefaz; desconto distribuído; embalagem pelo nome; dados do consumidor ignorados | `TESTADO` com uma nota real (Muffato, 13/11/2026; CPF trocado por fictício no arquivo de teste) |
+| PDF | Texto extraído com `pypdf` e enviado à extração por texto; PDF digitalizado deve ir como foto | `TESTADO` (PDF gerado no teste); `pypdf` precisa ser instalado no PC |
+| Foto | Modelo local de visão lê o cupom; sempre com revisão | `TESTADO` com modelo simulado; leitura real no PC `NÃO TESTADO` |
+| Pasta de entrada | `Entradas/` vigiada; resumo com "sim/não"; arquivo movido para `processados/` ou `com_erro/` | `TESTADO` |
+| Telegram | Arquivo ou foto vai para a pasta de entrada; resumo também no celular | `TESTADO` com Telegram simulado |
+| Duplicidade | Chave de acesso registrada (migração v7); a mesma nota não entra duas vezes | `TESTADO` |
+
+**Dados:** o arquivo original (que traz o CPF impresso na nota) fica só no PC, em `Anexos/`, fora do Git. Nada da nota vai à nuvem.
 

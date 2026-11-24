@@ -23,6 +23,7 @@ from services.logger_service import logger as custom_logger
 
 COMPONENTE = "telegram"
 URL = "https://api.telegram.org/bot{token}/{metodo}"
+URL_ARQUIVO = "https://api.telegram.org/file/bot{token}/{caminho}"
 LIMITE_MENSAGEM = 4000
 
 
@@ -51,11 +52,13 @@ def dividir_mensagem(texto: str, limite: int = LIMITE_MENSAGEM) -> List[str]:
 class TelegramService:
     def __init__(self, token: str, chats_permitidos: Iterable[int], arquivo_offset: Path,
                  ao_receber: Optional[Callable[[int, str], Optional[str]]] = None,
+                 ao_receber_arquivo: Optional[Callable[[int, Dict], Optional[str]]] = None,
                  get: Callable = requests.get, post: Callable = requests.post, espera_s: int = 30):
         self._token = token or ""
         self.chats_permitidos = set(chats_permitidos)
         self.arquivo_offset = Path(arquivo_offset)
         self.ao_receber = ao_receber
+        self.ao_receber_arquivo = ao_receber_arquivo
         self._get = get
         self._post = post
         self.espera_s = espera_s
@@ -76,6 +79,24 @@ class TelegramService:
     def enviar(self, chat_id: int, texto: str) -> None:
         for parte in dividir_mensagem(texto):
             self._chamar("sendMessage", self._post, json={"chat_id": chat_id, "text": parte})
+
+    def baixar(self, file_id: str, destino: Path) -> Path:
+        """Baixa um arquivo mandado ao bot (getFile + download). O token não vai para os logs."""
+        info = self._chamar("getFile", self._get, params={"file_id": file_id})
+        caminho = (info or {}).get("file_path")
+        if not caminho:
+            raise TelegramErro("o Telegram não informou o arquivo")
+        try:
+            resposta = self._get(URL_ARQUIVO.format(token=self._token, caminho=caminho), timeout=120)
+            conteudo = resposta.content
+        except requests.RequestException as erro:
+            raise TelegramErro(f"falha ao baixar o arquivo ({type(erro).__name__})") from None
+        destino = Path(destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temporario = destino.with_name(destino.name + ".parcial")
+        temporario.write_bytes(conteudo)
+        temporario.replace(destino)  # só aparece com o nome final quando o download terminou
+        return destino
 
     def _ler_offset(self) -> int:
         try:
@@ -103,6 +124,16 @@ class TelegramService:
                 custom_logger.evento(COMPONENTE, "chat_recusado", nivel="WARNING", chat_id=chat_id)
                 continue
             texto = mensagem.get("text")
+            if not texto and (mensagem.get("document") or mensagem.get("photo")) and self.ao_receber_arquivo:
+                try:
+                    resposta = self.ao_receber_arquivo(chat_id, mensagem)
+                except Exception as erro:
+                    custom_logger.evento(COMPONENTE, "falha_arquivo", type(erro).__name__, nivel="ERROR")
+                    resposta = "Não consegui baixar o arquivo. Tente de novo em instantes."
+                if resposta:
+                    self.enviar(chat_id, resposta)
+                atendidas += 1
+                continue
             if not texto:
                 self.enviar(chat_id, "Por enquanto eu só entendo texto. Escreva a ideia, por favor.")
                 continue

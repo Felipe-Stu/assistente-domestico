@@ -77,7 +77,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 6
+        SCHEMA_VERSION = 7
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -251,6 +251,17 @@ class DatabaseService:
                         cursor.execute("ALTER TABLE controle_consumo ADD COLUMN unidade TEXT;")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_consumo_produto ON controle_consumo (produto_id);")
                     # Sem preencher com compras antigas: sem ritmo conhecido, elas apareceriam como estoque cheio
+                    cursor.execute("PRAGMA user_version = 6;")
+                    atual_version = 6
+
+                if atual_version < 7:
+                    msg_migracao = "Aplicando migração v7: chave do documento (nota fiscal) nas entradas."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute("PRAGMA table_info(entradas);")
+                    if "chave_documento" not in [coluna[1] for coluna in cursor.fetchall()]:
+                        cursor.execute("ALTER TABLE entradas ADD COLUMN chave_documento TEXT;")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_entradas_chave ON entradas (chave_documento);")
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -321,17 +332,25 @@ class DatabaseService:
     def _inserir_entrada(cursor: sqlite3.Cursor, entrada: Dict[str, Any], situacao: str) -> int:
         cursor.execute(
             """
-            INSERT INTO entradas (criado_em, tipo, canal, texto, anexo, resposta_json, modelo, versao_prompt, duracao_ms, situacao)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO entradas (criado_em, tipo, canal, texto, anexo, resposta_json, modelo, versao_prompt, duracao_ms,
+                                  situacao, chave_documento)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entrada.get("criado_em") or datetime.now().isoformat(timespec="seconds"),
                 entrada.get("tipo", "compra"), entrada.get("canal", "chat"), entrada.get("texto", ""),
                 entrada.get("anexo"), entrada.get("resposta_json"), entrada.get("modelo"),
-                entrada.get("versao_prompt"), entrada.get("duracao_ms"), situacao,
+                entrada.get("versao_prompt"), entrada.get("duracao_ms"), situacao, entrada.get("chave_documento"),
             ),
         )
         return cursor.lastrowid
+
+    def documento_ja_gravado(self, chave: str) -> bool:
+        """Nota com esta chave de acesso já registrada (e não desfeita)."""
+        if not chave:
+            return False
+        return bool(self.executar_consulta_uma_linha(
+            "SELECT 1 FROM entradas WHERE chave_documento = ? AND situacao = 'gravada'", (chave,)))
 
     def registrar_entrada(self, entrada: Dict[str, Any], situacao: str) -> int:
         """Registra uma entrada sem compra gravada (ex.: compra descartada pelo usuário)."""
