@@ -398,7 +398,8 @@ class TestRuntime(BaseBanco):
 
     def test_resposta_indefinida_mantem_pendencia(self):
         self.runtime.shopping_assistant = self.assistente({"compras": [compra(estabelecimento="Não informado")]})
-        self.responder("Comprei leite")
+        self.assertIn("Em qual loja", self.responder("Comprei leite"))
+        self.assertIn("Ficou assim", self.responder("Moreschi"))     # a resposta preenche a loja
         self.assertIn("aguardando confirmação", self.responder("talvez"))
         self.assertIsNotNone(self.runtime.compra_pendente)
         self.assertEqual(self.contar("compras"), 0)

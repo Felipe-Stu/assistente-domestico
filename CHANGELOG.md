@@ -24,9 +24,13 @@
 - `scripts/testar_visao.py` + `testar-visao.bat` (arrastar a imagem sobre o .bat): mostra o que o modelo de imagem enxerga.
 - **Texto da nota colado no chat:** usa o mesmo leitor exato do HTML (desconto distribuído, confirmação antes de gravar).
 - **NF-e (modelo 55) colada no chat** (compra em loja: moto, eletrônico, móvel): leitor exato da consulta da Sefaz — loja (emitente), CNPJ, data, itens, total e chave. Os dados do destinatário não são lidos.
-  - Descrição cortada pela própria Sefaz ("C...") não vai ao modelo local (ele inventaria um nome) e vira ponto de dúvida.
 - Mensagens dizem "loja" em vez de "mercado" ("Loja não informada.").
-- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 292 testes.
+- `services/perguntas_compra.py`: antes do "sim", o assistente **pergunta o que falta** — a loja (quando não veio) e o nome de cada produto cortado ("C...").
+  - A resposta preenche o campo e puxa a próxima pergunta; no fim mostra "Ficou assim" e pede "sim" ou "não".
+  - "pular" mantém o que veio na nota; "sim" grava como está; "não" descarta.
+  - Vale para texto colado, arquivo (app, pasta, Telegram) e compra digitada sem loja.
+  - Descrição cortada pela própria Sefaz ("C...") não vai ao modelo local (ele inventaria um nome).
+- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 294 testes.
 
 ### Pendente no PC
 - Testar PDF e foto pelo app e pelo Telegram (pypdf já instalado; texto colado testado e aprovado).

@@ -94,13 +94,13 @@ class DocumentosService:
         custom_logger.evento(COMPONENTE, "importado", tipo=tipo, canal=canal, itens=len(preparada["compras"][0]["itens"]))
         return preparada
 
-    def resumo(self, preparada: Dict) -> str:
+    def resumo(self, preparada: Dict, com_duvidas: bool = True) -> str:
         compra = preparada["compras"][0]
         linhas = [self.compras.formatar_resumo(preparada["compras"])]
         if compra.get("desconto"):
             linhas.append(f"Desconto de {formatar_reais(compra['desconto'])} já distribuído nos itens "
                           f"(preço cheio {formatar_reais(compra.get('valor_bruto'))}).")
-        if preparada.get("duvidas"):
+        if com_duvidas and preparada.get("duvidas"):
             linhas.append("Pontos de dúvida:\n" + "\n".join(f"- {d}" for d in preparada["duvidas"]))
         return "\n".join(linhas)
 
@@ -145,10 +145,6 @@ class DocumentosService:
                            "responda \"não\" e mande de novo com a linha \"Emissão: dd/mm/aaaa\".")
         if validada.get("estabelecimento") in (None, "", "Não informado"):
             duvidas.append("A loja não veio no texto colado.")
-        cortados = [i["nome_cupom"] for i in nota["itens"] if i.get("nome_cortado")]
-        if cortados:
-            duvidas.append(f"A página da Sefaz mostra a descrição cortada ({', '.join(cortados)}). Se quiser outro nome, "
-                           "responda \"não\" e cole de novo trocando o nome cortado pelo nome do produto.")
         return {"compras": [validada], "duvidas": duvidas,
                 "origem": {"resposta_json": json.dumps(registro, ensure_ascii=False)[:20000],
                            "modelo": modelo, "versao_prompt": "nfce-v1", "chave_documento": nota.get("chave_acesso")}}

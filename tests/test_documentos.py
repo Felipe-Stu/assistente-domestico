@@ -217,7 +217,8 @@ class TestTextoColado(BaseDocs):
         compra = preparada["compras"][0]
         self.assertEqual(compra["data_compra"], "2026-11-06")
         self.assertEqual(compra["itens"][0]["produto"], "c...")
-        self.assertTrue(any("cortada" in d for d in preparada["duvidas"]))
+        from services import perguntas_compra
+        self.assertEqual(perguntas_compra.perguntas_faltando(preparada["compras"]), [{"campo": "produto", "compra": 0, "item": 0}])
         self.assertEqual(preparada["origem"]["versao_prompt"], "nfe-texto-v1")
 
     def test_leitor_do_texto(self):
@@ -244,6 +245,40 @@ class TestTextoColado(BaseDocs):
         motor.responder_pendencia(skill, ctx, "sim", resposta.pendencia)
         self.assertEqual(self.db.executar_consulta_uma_linha("SELECT total_centavos, nome_comercio FROM compras"), (10653, "Irmaos Muffato"))
         self.assertEqual(self.db.executar_consulta_uma_linha("SELECT tipo, versao_prompt FROM entradas"), ("nota", "nfce-texto-v1"))
+
+
+    def test_nome_cortado_e_loja_ausente_viram_perguntas(self):
+        from core.skills import Contexto, motor, obter_catalogo
+        skill = obter_catalogo().skill("compras")
+        ctx = Contexto(servicos={"shopping_assistant": self.compras, "documentos": self.servico(), "canal": "chat"},
+                       repetir=lambda f, a, **_k: f(*a))
+        sem_loja = TEXTO_NFE.replace("Nome/Razão Social Naga Motors Comercio de Motos Ltda. Bauru  ", "")
+        resposta = motor.executar(skill, ctx, sem_loja, {"acao": "criar"})
+        self.assertIn("Em qual loja", resposta.texto)
+        resposta = motor.responder_pendencia(skill, ctx, "Naga Motors", resposta.pendencia)
+        self.assertIn("Qual é o nome dele", resposta.texto)
+        resposta = motor.responder_pendencia(skill, ctx, "Moto Royal Enfield Classic 650", resposta.pendencia)
+        self.assertIn("Ficou assim", resposta.texto)
+        self.assertIn("moto royal enfield classic 650", resposta.texto)
+        self.assertEqual(self.contar("compras"), 0)
+        motor.responder_pendencia(skill, ctx, "sim", resposta.pendencia)
+        self.assertEqual(self.db.executar_consulta_uma_linha("SELECT nome_comercio, total_centavos FROM compras"), ("Naga Motors", 3299000))
+        self.assertEqual(self.db.executar_consulta_uma_linha("SELECT produto FROM itens_compra"), ("moto royal enfield classic 650",))
+
+    def test_pular_mantem_e_nao_descarta(self):
+        from services import perguntas_compra
+        compras = [{"estabelecimento": "Não informado", "valor_total_compra": 10.0,
+                    "itens": [{"produto": "C...", "valor_total": 10.0}]}]
+        self.assertEqual([p["campo"] for p in perguntas_compra.perguntas_faltando(compras)], ["loja", "produto"])
+        from core.skills import Contexto, motor, obter_catalogo
+        skill = obter_catalogo().skill("compras")
+        ctx = Contexto(servicos={"shopping_assistant": self.compras, "canal": "chat"}, repetir=lambda f, a, **_k: f(*a))
+        aberta = perguntas_compra.abrir("Confira:", "resumo", compras, None, ["Loja não informada."])
+        self.assertNotIn("Loja não informada", aberta["texto"])   # a pergunta substitui a dúvida
+        resposta = motor.responder_pendencia(skill, ctx, "pular", aberta["pendencia"])
+        self.assertIn("nome dele", resposta.texto)
+        resposta = motor.responder_pendencia(skill, ctx, "não", resposta.pendencia)
+        self.assertIn("descartada", resposta.texto)
 
 
 class TestPastaEntradas(BaseDocs):

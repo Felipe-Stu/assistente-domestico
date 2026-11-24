@@ -43,6 +43,7 @@ from services.backup_service import BackupService
 from services.biblioteca_service import BibliotecaService
 from services.claude_assinatura_service import ClaudeAssinaturaService
 from services.claude_service import ClaudeService
+from services import perguntas_compra
 from services.documentos_service import DocumentoError, DocumentosService
 from services.ideias_service import IdeiasService
 from services.pasta_entradas_service import PastaEntradas
@@ -439,9 +440,11 @@ class AssistenteRuntime(ModoVoz):
         try:
             with custom_logger.requisicao(canal=canal, caracteres=0):
                 preparada = self.documentos.importar(arquivo, canal)
-            self.pendencia = ("compras", {"compras": preparada["compras"], "origem": preparada["origem"]})
-            texto = (f"📄 Nota fiscal recebida ({arquivo.name}):\n{self.documentos.resumo(preparada)}\n\n"
-                     "Responda \"sim\" para gravar ou \"não\" para descartar.")
+            aberta = perguntas_compra.abrir(f"📄 Nota fiscal recebida ({arquivo.name}):",
+                                            self.documentos.resumo(preparada, com_duvidas=False),
+                                            preparada["compras"], preparada["origem"], preparada.get("duvidas"))
+            self.pendencia = ("compras", aberta["pendencia"])
+            texto = aberta["texto"]
             ok = True
         except DocumentoError as erro:
             texto = f"Não consegui importar {arquivo.name}: {erro}"
@@ -456,7 +459,9 @@ class AssistenteRuntime(ModoVoz):
                 self._set_estado("WAITING_INPUT")
         emitir_electron("assistant_message", {"text": texto})
         if chat is not None and self.telegram is not None:
-            aviso = texto.replace('Responda "sim" para gravar ou "não" para descartar.', "Confirme no assistente do PC (sim ou não).")
+            aviso = texto.replace(perguntas_compra.PEDIR_CONFIRMACAO, "Confirme no assistente do PC (sim ou não).")
+            if self.pendencia and self.pendencia[1].get("perguntas"):
+                aviso += "\n\nResponda a pergunta no assistente do PC."
             self.telegram.enviar(chat, aviso)
         return texto
 

@@ -7,6 +7,7 @@ consultar / corrigir: ainda não implementados; a resposta informa e nada é gra
 """
 from core.skills.motor import Resposta
 from services.intent_router import normalizar_texto
+from services import perguntas_compra
 from services.nfce_service import parece_nfce_texto, parece_nfe_texto
 from services.logger_service import logger as custom_logger
 
@@ -36,11 +37,10 @@ def executar(ctx, texto, decisao):
             preparada = documentos.importar_texto(texto, ctx.servicos.get("canal") or "chat")
         except Exception as erro:
             return Resposta(f"Reconheci uma nota fiscal, mas não consegui lê-la: {erro}. Nada foi registrado.")
-        return Resposta(
-            f"📄 Nota fiscal reconhecida:\n{documentos.resumo(preparada)}\n\nResponda \"sim\" para gravar ou \"não\" para descartar.",
-            fala="Reconheci uma nota fiscal. Confira o resumo no chat e responda sim ou não.",
-            pendencia={"compras": preparada["compras"], "origem": preparada["origem"]},
-        )
+        aberta = perguntas_compra.abrir("📄 Nota fiscal reconhecida:", documentos.resumo(preparada, com_duvidas=False),
+                                        preparada["compras"], preparada["origem"], preparada.get("duvidas"))
+        return Resposta(aberta["texto"], fala="Reconheci uma nota fiscal. Confira o resumo no chat.",
+                        pendencia=aberta["pendencia"])
 
     preparada = ctx.repetir(
         custom_logger.cronometrado("extracao_compras", compras.preparar_compra),
@@ -55,14 +55,10 @@ def executar(ctx, texto, decisao):
         return Resposta("Não identifiquei itens de compra nessa mensagem. Nada foi registrado.")
 
     if preparada["duvidas"]:
-        duvidas = "\n".join(f"- {d}" for d in preparada["duvidas"])
-        resumo = compras.formatar_resumo(preparada["compras"])
-        return Resposta(
-            f"Antes de gravar, confira esta compra:\n{resumo}\n\nPontos de dúvida:\n{duvidas}\n\n"
-            "Responda \"sim\" para gravar ou \"não\" para descartar.",
-            fala="Tenho uma dúvida sobre esta compra. Confira no chat e responda sim ou não.",
-            pendencia={"compras": preparada["compras"], "origem": origem},
-        )
+        aberta = perguntas_compra.abrir("Antes de gravar, confira esta compra:", compras.formatar_resumo(preparada["compras"]),
+                                        preparada["compras"], origem, preparada["duvidas"])
+        return Resposta(aberta["texto"], fala="Tenho uma dúvida sobre esta compra. Confira no chat.",
+                        pendencia=aberta["pendencia"])
 
     return Resposta(compras.registrar_compras(preparada["compras"], origem)["mensagem"])
 
@@ -73,6 +69,18 @@ def responder_pendencia(ctx, texto, pendente):
     compras_pendentes, origem = (pendente["compras"], pendente.get("origem")) if isinstance(pendente, dict) else (pendente, None)
     servico = ctx.servico("shopping_assistant")
     resposta = normalizar_texto(texto).strip(" .,!")
+    perguntas = list(pendente.get("perguntas") or []) if isinstance(pendente, dict) else []
+    # "sim" no meio das perguntas grava como está; "não" descarta; qualquer outra resposta preenche o campo
+    if perguntas and resposta not in RESPOSTAS_CANCELAR and resposta not in RESPOSTAS_CONFIRMAR:
+        # Ainda falta um dado (loja ou nome cortado): a resposta preenche o campo da pergunta atual
+        atual = perguntas.pop(0)
+        if resposta not in perguntas_compra.RESPOSTAS_PULAR:
+            perguntas_compra.aplicar_resposta(compras_pendentes, atual, texto)
+        novo = dict(pendente, compras=compras_pendentes, perguntas=perguntas)
+        if perguntas:
+            return Resposta(perguntas_compra.texto_pergunta(perguntas[0], compras_pendentes), pendencia=novo)
+        return Resposta(f"Ficou assim:\n{servico.formatar_resumo(compras_pendentes)}\n\n{perguntas_compra.PEDIR_CONFIRMACAO}",
+                        fala="Confira o resumo no chat e responda sim ou não.", pendencia=novo)
     if resposta in RESPOSTAS_CONFIRMAR:
         return Resposta(servico.registrar_compras(compras_pendentes, origem)["mensagem"])
     if resposta in RESPOSTAS_CANCELAR:
