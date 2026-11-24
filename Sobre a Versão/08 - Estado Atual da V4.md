@@ -43,6 +43,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Memória semântica no ChromaDB e contexto RAG no assistente genérico e no Gemini | Funciona, com filtro permissivo (P19) | `CÓDIGO` + `DADOS` |
 | Modo Qwen por comando de texto ou voz | Ativação, desativação e retorno por inatividade testados com troca de modelo simulada | `TESTADO` |
 | Agenda (V4.1) | Anota, consulta e cancela compromissos; falta o aviso na hora e o Google Agenda (V7) | `TESTADO` |
+| Consultas de gastos (M19) | Listar e somar compras, por categoria e por loja, preço de um produto e comparação de períodos; o período é lido por regra e o modelo só preenche o formulário | `TESTADO` (13 testes) e conferido numa cópia do banco real; acerto do formulário com o modelo real `NÃO TESTADO` (`medir-consultas.bat`) |
 | Programação com o Claude (V4.1) | Claude pela assinatura (`claude -p`) ou pela API; sem Claude, Qwen com biblioteca de contexto | `TESTADO` no PC (resposta em 5,5 s) |
 | Ideias de projetos e bot do Telegram (V4.1) | Ideia salva na hora, análise do Claude em segundo plano, `.md` na biblioteca, resposta local sobre a ideia | `TESTADO` no PC (análise em cerca de 20 s) |
 | Cópia de segurança diária e registro de eventos (V4.1) | M11 e M26 | `TESTADO` |
@@ -51,7 +52,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 
 | Funcionalidade | O que falta | Problemas |
 |---|---|---|
-| Consulta de estoque por texto | A lógica existe, mas a tabela consultada nunca é preenchida | Consultas de gastos e preços | São reconhecidas, mas respondem que a função ainda não existe (Fase 3) | — |
+| Consulta de estoque por texto | Desde o M06 a tabela é preenchida pelas compras; compras gravadas antes do M06 não entram | — |
 | Modo Qwen manual (`ativar qwen`) | Não libera a VRAM por completo e não executa ferramentas. A programação pela skill `programacao` (Claude ou Qwen) resolveu o P10 | P7 |
 | Modo voz | Código presente; depende de microfone, Google Speech e Edge TTS | `NÃO TESTADO` |
 | Bot do Telegram | Só guarda ideias; ainda não conversa com o assistente inteiro. Separa pergunta de ideia por regra simples | — |
@@ -425,4 +426,17 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 | Duplicidade | Chave de acesso registrada (migração v7); a mesma nota não entra duas vezes | `TESTADO` |
 
 **Dados:** o arquivo original (que traz o CPF impresso na nota) fica só no PC, em `Anexos/`, fora do Git. Nada da nota vai à nuvem.
+
+## 18. Notas pelo app, NF-e, perguntas antes de gravar e consultas de gastos (23/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Anexo no app | Botão 📎 e arrastar-e-soltar no chat (HTML, PDF, JPG, PNG, WEBP); o arquivo do usuário não é movido | Fluxo Python `TESTADO`; botão `TESTADO` pelo usuário no PC; arrastar corrigido, reteste pendente |
+| PDF digitalizado | A imagem interna do PDF vai ao leitor de fotos | `TESTADO` (PDF gerado no teste) |
+| Foto | Resposta vazia do modelo fica no registro (`imagem_sem_itens`); `testar-visao.bat` mostra o que o modelo vê | Leitura real `NÃO TESTADO`: a captura de tela de uma NF-e voltou sem itens |
+| NF-e (modelo 55) colada | Leitor exato da consulta da Sefaz: loja, CNPJ, data, itens, total, chave; destinatário ignorado | `TESTADO` com o texto real (destinatário trocado por fictício) e pelo usuário no PC |
+| Perguntas antes de gravar | Loja ausente e nome de produto cortado ("C...") viram perguntas; "pular", "sim" e "não" | `TESTADO` (fluxo completo até a gravação) |
+| M19 Consultas de gastos | `services/periodos.py` (período por regra), `services/consultas_service.py` (consultas prontas, em centavos), formulário `skills/compras/prompts/consulta.md` + `ESQUEMA_CONSULTA_GASTOS`; sem modelo, regras decidem o tipo; loja ou produto que não aparece na pergunta é descartado | `TESTADO`; avaliação nova em `evals/consultas.jsonl` (15 casos, `avaliar.py --so-consultas`) |
+
+**Dado inconsistente encontrado:** `itens_compra.categoria` das compras antigas ainda guarda a categoria livre (ex.: "passeios"); a categoria fechada está em `produtos`. As consultas usam a do catálogo.
 

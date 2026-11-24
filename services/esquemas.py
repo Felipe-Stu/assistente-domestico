@@ -46,3 +46,15 @@ ESQUEMA_COMPRAS: Dict[str, Any] = {
     },
     "required": ["compras"],
 }
+
+# M19: formulário de consulta de gastos (o período é lido pelo código, não pelo modelo)
+ESQUEMA_CONSULTA_GASTOS: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "tipo": {"type": "string", "enum": ["listar", "total", "por_categoria", "por_loja", "preco_produto", "comparar"]},
+        "categoria": {"type": ["string", "null"], "enum": list(CATEGORIAS) + [None]},
+        "loja": {"type": ["string", "null"]},
+        "produto": {"type": ["string", "null"]},
+    },
+    "required": ["tipo", "categoria", "loja", "produto"],
+}

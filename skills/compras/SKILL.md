@@ -1,6 +1,6 @@
 ---
 name: compras
-description: Registra compras de mercado, farmácia, loja ou restaurante contadas em texto ou voz, desfaz o último registro e, no futuro, responde sobre gastos e preços. Use quando a pessoa conta o que comprou, quanto pagou, onde, ou pergunta sobre o que gastou.
+description: Registra compras de mercado, farmácia, loja ou restaurante contadas em texto ou voz, desfaz o último registro e responde sobre gastos e preços. Use quando a pessoa conta o que comprou, quanto pagou, onde, ou pergunta sobre o que gastou.
 contextos: [compras]
 estado: ativa
 privacidade: local
@@ -51,9 +51,10 @@ Registra o que a pessoa comprou: estabelecimento, data e itens (produto, quantid
 2. O código valida contas e datas, aponta dúvidas (loja não informada, data vaga, preço por kg ambíguo).
 3. Sem dúvidas, grava; com dúvidas, mostra o resumo e pede "sim" ou "não".
 4. "Desfazer última compra" apaga o último registro.
+5. Consultas (M19): o modelo preenche o formulário `prompts/consulta.md` (tipo, categoria, loja, produto); o período é lido por `services/periodos.py`; `services/consultas_service.py` faz a consulta pronta.
 
 ## Regras
 
 - Nada desta skill vai à nuvem.
 - O modelo nunca grava: só o código grava, depois da validação.
-- Consultas de gastos e preços ainda não existem; a resposta informa isso e nada é gravado.
+- Consultas nunca gravam. O modelo não escreve SQL nem calcula valores: só escolhe o tipo de consulta e os filtros.

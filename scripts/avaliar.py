@@ -41,9 +41,11 @@ except Exception:
 
 ARQUIVO_CASOS = ROOT / "evals" / "casos.jsonl"
 ARQUIVO_COMPRAS = ROOT / "evals" / "compras.jsonl"
+ARQUIVO_CONSULTAS = ROOT / "evals" / "consultas.jsonl"   # M19: formulário da consulta de gastos
 PASTA_SAIDA_PADRAO = ROOT.parent / "Planejamento" / "medicoes"
 ARQUIVO_HISTORICO = "historico-avaliacao.jsonl"   # M13: uma linha por medição, dentro da pasta de saída
 CAMPOS_EXTRACAO = ("itens", "total", "mercado", "embalagem")
+CAMPOS_CONSULTA = ("tipo", "categoria", "loja", "produto")
 MODELOS_PADRAO = ["gemma4:e4b", "qwen2.5:7b", "qwen2.5-coder:7b"]
 MODOS = ["atual", "catalogo", "nativo"]
 RACIOCINIO = {"padrao": None, "nao": False, "sim": True}
@@ -270,6 +272,55 @@ def avaliar_extracao(casos, modelos, raciocinios, repeticoes=1, log=print):
     return resultados
 
 
+def conferir_consulta(caso: dict, form: dict) -> dict:
+    """M19: cada campo do formulário contra o esperado (loja e produto sem acento, por trecho)."""
+    def campo(nome):
+        esperado, obtido = caso.get(nome), (form or {}).get(nome)
+        if esperado is None:
+            return obtido in (None, "", "null")
+        return normalizar(esperado) in normalizar(obtido) if nome in ("loja", "produto") else obtido == esperado
+    return {nome: campo(nome) for nome in CAMPOS_CONSULTA}
+
+
+def avaliar_consultas(casos, modelos, repeticoes=1, log=print):
+    from core.skills import obter_catalogo
+    from services import llm_provider
+    from services.esquemas import ESQUEMA_CONSULTA_GASTOS
+    prompt = obter_catalogo().skill("compras").prompt("consulta")
+    resultados = []
+    for modelo in modelos:
+        provedor = llm_provider.LocalLLMProvider(modelo=modelo, temperatura=0.1)
+        log(f"\n[consultas] modelo={modelo}")
+        for caso in casos:
+            for rep in range(repeticoes):
+                t0 = time.perf_counter()
+                try:
+                    form, erro = provedor.gerar_json(prompt, caso["frase"], esquema=ESQUEMA_CONSULTA_GASTOS), None
+                except Exception as e:
+                    form, erro = {}, f"{type(e).__name__}: {e}"[:200]
+                segundos = round(time.perf_counter() - t0, 3)
+                checagens = conferir_consulta(caso, form)
+                ok = erro is None and all(checagens.values())
+                resultados.append({"modelo": modelo, "rep": rep + 1, "id": caso["id"], "acerto": ok, "segundos": segundos,
+                                   "erro": erro, "checagens": checagens, "form": form})
+                log(f"  {'ok ' if ok else 'ERR'} {segundos:6.2f}s {caso['id']} {form if not ok else ''}")
+    return resultados
+
+
+def resumir_consultas(resultados):
+    grupos = {}
+    for r in resultados:
+        grupos.setdefault(r["modelo"], []).append(r)
+    linhas = []
+    for m, rs in grupos.items():
+        linha = {"modelo": m, "acerto": f"{sum(r['acerto'] for r in rs)}/{len(rs)}",
+                 "p50_s": percentil([r["segundos"] for r in rs], 50), "p95_s": percentil([r["segundos"] for r in rs], 95)}
+        for campo in CAMPOS_CONSULTA:
+            linha[campo] = f"{sum(bool(r['checagens'].get(campo)) for r in rs)}/{len(rs)}"
+        linhas.append(linha)
+    return linhas
+
+
 # =============================================================================
 # Troca de modelo na VRAM
 # =============================================================================
@@ -381,6 +432,8 @@ def linha_historico(dados) -> dict:
     if dados.get("extracao") is not None:
         linha["extracao"] = [{k: r[k] for k in ("modelo", "raciocinio", "acerto", "p50_s", "p95_s") + CAMPOS_EXTRACAO}
                              for r in resumir_extracao(dados["extracao"])]
+    if dados.get("consultas") is not None:
+        linha["consultas"] = resumir_consultas(dados["consultas"])
     return linha
 
 
@@ -440,6 +493,13 @@ def relatorio_md(dados) -> str:
         md += ["## Extração de compras", "", tabela_md(resumir_extracao(dados["extracao"]),
                                                        ["modelo", "raciocinio", "acerto", *CAMPOS_EXTRACAO,
                                                         "p50_s", "p95_s", "tokens_p50"])]
+    if dados.get("consultas") is not None:
+        md += ["## Consultas de gastos (M19: formulário do modelo)", "",
+               tabela_md(resumir_consultas(dados["consultas"]), ["modelo", "acerto", *CAMPOS_CONSULTA, "p50_s", "p95_s"])]
+        erros = [r for r in dados["consultas"] if not r["acerto"]]
+        if erros:
+            md += ["", tabela_md([{**r, "form": json.dumps(r["form"], ensure_ascii=False)[:90]} for r in erros],
+                                 ["modelo", "id", "form", "erro"])]
     if dados.get("troca") is not None:
         md += ["## Troca de modelo", "", tabela_md(dados["troca"], ["modelo", "segundos", "s_carga", "na_vram", "erro"])]
     if dados.get("prompts"):
@@ -486,6 +546,7 @@ def main(argv=None):
     parser.add_argument("--so-roteamento", action="store_true")
     parser.add_argument("--so-extracao", action="store_true")
     parser.add_argument("--so-troca", action="store_true")
+    parser.add_argument("--so-consultas", action="store_true", help="M19: formulário da consulta de gastos")
     parser.add_argument("--saida", default=str(PASTA_SAIDA_PADRAO))
     parser.add_argument("--skill", help="usa skills/<nome>/exemplos.jsonl em vez de evals/casos.jsonl")
     args = parser.parse_args(argv)
@@ -500,11 +561,11 @@ def main(argv=None):
     if not modelos:
         raise SystemExit("Nenhum dos modelos pedidos está instalado.")
 
-    so = [args.so_roteamento, args.so_extracao, args.so_troca]
+    so = [args.so_roteamento, args.so_extracao, args.so_troca, args.so_consultas]
     fazer = (lambda i: so[i] or not any(so))
     dados = {"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "modelos": modelos, "usar_regras": not args.sem_regras,
              "orquestrador": "catalogo", "prompts": versoes_dos_prompts(), "skill": args.skill,
-             "repeticoes": args.repeticoes, "roteamento": None, "extracao": None, "troca": None}
+             "repeticoes": args.repeticoes, "roteamento": None, "extracao": None, "troca": None, "consultas": None}
     if fazer(2):
         dados["troca"] = medir_troca(modelos)
     if fazer(0):
@@ -515,6 +576,9 @@ def main(argv=None):
     if fazer(1):
         raciocinios = [r for r in args.raciocinio.split(",") if r in RACIOCINIO]
         dados["extracao"] = avaliar_extracao(ler_jsonl(ARQUIVO_COMPRAS), modelos, raciocinios, args.repeticoes)
+
+    if fazer(3):
+        dados["consultas"] = avaliar_consultas(ler_jsonl(ARQUIVO_CONSULTAS), modelos, args.repeticoes)
 
     base = gravar_relatorio(dados, Path(args.saida))
     print("\n" + relatorio_md(dados))

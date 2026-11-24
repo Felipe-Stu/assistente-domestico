@@ -1,0 +1,15 @@
+{"id": "q01", "frase": "Me informe as compras feitas em 2026", "tipo": "listar", "categoria": null, "loja": null, "produto": null}
+{"id": "q02", "frase": "Quanto gastei em novembro?", "tipo": "total", "categoria": null, "loja": null, "produto": null}
+{"id": "q03", "frase": "Quanto eu gastei com produtos de limpeza este mês?", "tipo": "total", "categoria": "limpeza", "loja": null, "produto": null}
+{"id": "q04", "frase": "Quanto gastamos no Moreschi no mês passado?", "tipo": "total", "categoria": null, "loja": "moreschi", "produto": null}
+{"id": "q05", "frase": "Com o que eu mais gastei em outubro?", "tipo": "por_categoria", "categoria": null, "loja": null, "produto": null}
+{"id": "q06", "frase": "Me mostre meus gastos por categoria", "tipo": "por_categoria", "categoria": null, "loja": null, "produto": null}
+{"id": "q07", "frase": "Em qual mercado eu gasto mais?", "tipo": "por_loja", "categoria": null, "loja": null, "produto": null}
+{"id": "q08", "frase": "Quanto paguei no café da última vez?", "tipo": "preco_produto", "categoria": null, "loja": null, "produto": "cafe"}
+{"id": "q09", "frase": "Onde o arroz saiu mais barato?", "tipo": "preco_produto", "categoria": null, "loja": null, "produto": "arroz"}
+{"id": "q10", "frase": "Qual foi o preço do vinho em novembro?", "tipo": "preco_produto", "categoria": null, "loja": null, "produto": "vinho"}
+{"id": "q11", "frase": "Gastei mais em outubro ou em novembro?", "tipo": "comparar", "categoria": null, "loja": null, "produto": null}
+{"id": "q12", "frase": "Compare meus gastos com bebidas deste mês com o mês passado", "tipo": "comparar", "categoria": "bebidas", "loja": null, "produto": null}
+{"id": "q13", "frase": "Quais foram minhas últimas compras?", "tipo": "listar", "categoria": null, "loja": null, "produto": null}
+{"id": "q14", "frase": "Quanto gastei na farmácia em 2026?", "tipo": "total", "categoria": "farmacia", "loja": null, "produto": null}
+{"id": "q15", "frase": "Quais compras eu fiz no Muffato?", "tipo": "listar", "categoria": null, "loja": "muffato", "produto": null}

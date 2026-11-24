@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [V4.3, parte 3] — M19: consultas de gastos (2026-11-23)
+
+### Adicionado
+- `services/periodos.py`: períodos em português viram datas por regra fixa ("2026", "novembro", "mês passado", "últimos 30 dias", "de 01/10 a 15/11", "ultimamente"...). Abreviações curtas ("mar", "dez") só contam perto de "de/em".
+- `services/consultas_service.py`: consultas prontas e parametrizadas, em centavos:
+  - listar compras (as 10 mais recentes + total), total gasto, gastos por categoria e por loja, preço de um produto (último, menor, média e onde), comparação de períodos.
+  - Loja e produto comparados sem acento e por trecho ("muffato" acha "Irmãos Muffato").
+  - Categoria vem do catálogo (M07); itens antigos usam a categoria do item, normalizada.
+- `skills/compras/prompts/consulta.md` + `ESQUEMA_CONSULTA_GASTOS`: o modelo só preenche o formulário (tipo, categoria, loja, produto); não escreve SQL nem datas.
+  - Sem modelo (Ollama fora), regras escolhem o tipo.
+  - Loja ou produto que não aparece na pergunta é descartado (o modelo às vezes copia o exemplo do prompt).
+- `evals/consultas.jsonl` (15 casos) e `avaliar.py --so-consultas`; `medir-consultas.bat`.
+- `tests/test_m19.py` (13 testes). Suíte: 306 testes.
+
+### Alterado
+- "Consultar" da skill compras deixou de responder "ainda não disponível".
+
 ## [V4.3] — Notas fiscais por arquivo: NFC-e (HTML), PDF, foto, pasta de entrada e Telegram (2026-11-23)
 
 ### Adicionado

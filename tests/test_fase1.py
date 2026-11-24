@@ -378,7 +378,7 @@ class TestRuntime(BaseBanco):
 
     def test_consulta_de_compras_nao_grava(self):
         resposta = self.responder("O que eu tenho comprado ultimamente?")
-        self.assertIn("Nada foi registrado", resposta)
+        self.assertIn("Não encontrei compras nos últimos 30 dias", resposta)   # M19: consulta de verdade
         self.assertEqual(self.contar("compras"), 0)
 
     def test_confirmacao_positiva_grava(self):
