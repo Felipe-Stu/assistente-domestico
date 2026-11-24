@@ -77,6 +77,33 @@ def datas_da_transcricao(texto: str) -> list:
     return datas
 
 
+_RE_DESCONTO = re.compile(r"Descontos?\s*(?:R\$)?\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2})", re.I)
+_RE_A_PAGAR = re.compile(r"Valor\s+(?:a\s+pagar|pago|l[íi]quido)\s*(?:R\$)?\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2})", re.I)
+
+
+def aplicar_desconto_lido(compra: Dict, transcricao: str) -> None:
+    """Desconto da nota (lido na foto) distribuído nos itens, quando a conta fecha: soma dos itens − desconto = valor pago."""
+    if compra.get("desconto"):
+        return
+    texto = " ".join(str(transcricao or "").replace("*", " ").split())
+    desconto, pago = _RE_DESCONTO.search(texto), _RE_A_PAGAR.search(texto)
+    if not desconto or not pago:
+        return
+    d, p = para_centavos(desconto.group(1)), para_centavos(pago.group(1))
+    itens = compra.get("itens") or []
+    totais = [para_centavos(i.get("valor_total") or 0) for i in itens]
+    if d <= 0 or not itens or abs(sum(totais) - d - p) > 5:
+        return
+    for item, liquido in zip(itens, nfce_service.distribuir_desconto(totais, d)):
+        item["valor_bruto"] = item.get("valor_total")
+        item["valor_total"] = liquido / 100
+        qtd = float(item.get("quantidade") or 1)
+        item["valor_unitario"] = round(item["valor_total"] / qtd, 4) if qtd else item["valor_total"]
+    compra["valor_bruto"] = sum(totais) / 100
+    compra["desconto"] = d / 100
+    compra["valor_total_compra"] = round(sum(i["valor_total"] for i in itens), 2)
+
+
 def data_suspeita(data_iso, hoje: date) -> bool:
     """Data no futuro ou com mais de um ano: modelo de imagem costuma errar o ano."""
     try:
@@ -193,7 +220,7 @@ class DocumentosService:
         modelo = self._nomes_legiveis(nota["itens"])
         validada = self.compras._validar_e_sanitizar_compra(nota)
         validada["data_compra"] = nota.get("data_compra") or date.today().isoformat()
-        for chave in ("cnpj", "chave_acesso", "valor_bruto", "desconto", "forma_pagamento"):
+        for chave in ("cnpj", "chave_acesso", "valor_bruto", "desconto", "forma_pagamento", "numero_nf", "serie_nf", "emissao"):
             validada[chave] = nota.get(chave)
         registro = {k: v for k, v in nota.items()}
         duvidas = []
@@ -288,11 +315,18 @@ class DocumentosService:
         if not preparada or not preparada.get("compras"):
             preparada = self._leitura_direta(anexos)
         compra = preparada["compras"][0]
-        # O modelo de texto às vezes troca a data lida (mesmo com o ano errado) pela de hoje: vale a da transcrição,
-        # e a pergunta de conferência aparece se ela parecer errada
+        # Número, série e emissão lidos na transcrição; a emissão é a data da compra. Sem emissão, vale a primeira
+        # data da transcrição (o modelo de texto às vezes troca a data lida pela de hoje)
+        ident = nfce_service.identificacao(transcricao)
+        for campo in ("numero_nf", "serie_nf", "emissao"):
+            if ident.get(campo) and not compra.get(campo):
+                compra[campo] = ident[campo]
         datas = datas_da_transcricao(transcricao)
-        if datas and compra.get("data_compra") not in datas:
+        if ident.get("data_compra"):
+            compra["data_compra"] = ident["data_compra"]
+        elif datas and compra.get("data_compra") not in datas:
             compra["data_compra"] = datas[0]
+        aplicar_desconto_lido(compra, transcricao)
         conferir = ["loja"] if compra.get("estabelecimento") not in (None, "", "Não informado") else []
         if data_suspeita(compra.get("data_compra"), self._agora().date()):
             conferir.append("data")

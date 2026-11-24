@@ -77,7 +77,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 9
+        SCHEMA_VERSION = 10
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -284,6 +284,18 @@ class DatabaseService:
                         cursor.execute(f"PRAGMA table_info({tabela});")
                         if "observacao" not in [coluna[1] for coluna in cursor.fetchall()]:
                             cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN observacao TEXT;")
+                    cursor.execute("PRAGMA user_version = 9;")
+                    atual_version = 9
+
+                if atual_version < 10:
+                    msg_migracao = "Aplicando migração v10: número, série e emissão da nota fiscal nas compras."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute("PRAGMA table_info(compras);")
+                    existentes = [coluna[1] for coluna in cursor.fetchall()]
+                    for coluna in ("numero_nf", "serie_nf", "emissao"):
+                        if coluna not in existentes:
+                            cursor.execute(f"ALTER TABLE compras ADD COLUMN {coluna} TEXT;")
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 
@@ -390,11 +402,13 @@ class DatabaseService:
 
         cursor.execute(
             """
-            INSERT INTO compras (data_compra, nome_comercio, total_gasto, total_centavos, entrada_id, observacao)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO compras (data_compra, nome_comercio, total_gasto, total_centavos, entrada_id, observacao,
+                                 numero_nf, serie_nf, emissao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (data_compra, nome_comercio, total_gasto, para_centavos(total_gasto), entrada_id,
-             (dados_ia.get("observacao") or None))
+             (dados_ia.get("observacao") or None), dados_ia.get("numero_nf"), dados_ia.get("serie_nf"),
+             dados_ia.get("emissao"))
         )
         compra_id = cursor.lastrowid
 
@@ -543,7 +557,7 @@ class DatabaseService:
         """Compra com itens, no formato usado no resumo (valores em reais)."""
         cabecalho = self.executar_consulta_uma_linha(
             "SELECT id, data_compra, nome_comercio, COALESCE(total_centavos, CAST(ROUND(total_gasto * 100) AS INTEGER)), "
-            "observacao FROM compras WHERE id = ?", (compra_id,))
+            "observacao, numero_nf, serie_nf, emissao FROM compras WHERE id = ?", (compra_id,))
         if not cabecalho:
             return None
         itens = self.executar_consulta(
@@ -554,6 +568,7 @@ class DatabaseService:
         return {
             "id": cabecalho[0], "data_compra": cabecalho[1], "estabelecimento": cabecalho[2],
             "valor_total_compra": para_reais(cabecalho[3]), "observacao": cabecalho[4],
+            "numero_nf": cabecalho[5], "serie_nf": cabecalho[6], "emissao": cabecalho[7],
             "itens": [{"id": i[0], "produto": i[1], "marca": i[2], "quantidade": i[3], "unidade": i[4],
                        "valor_unitario": para_reais(i[5]), "valor_total": para_reais(i[6]), "categoria": i[7],
                        "embalagem_quantidade": i[8], "embalagem_unidade": i[9], "observacao": i[10]} for i in itens],

@@ -498,3 +498,12 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 
 Fonte: `MEDIDO` com `comparar-modelos-visao.bat` na nota da moto. Com a chave lida certa (dígito verificador confere), a foto de uma nota já registrada é recusada.
 
+## 24. Código NF, Série NF e Emissão (24/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Campos novos | `numero_nf`, `serie_nf`, `emissao` em `compras` (migração v10); emissão = data da compra | `TESTADO` + migração numa cópia do banco real |
+| Leitura | NFC-e (HTML, texto, foto) e NF-e (texto, foto) | `TESTADO` |
+| Erro corrigido | "Via Consumidor" fazia a linha da emissão ser apagada junto com os dados do consumidor | `DADOS`: teste do usuário com a NFC-e do Muffato (data saiu 24/11 em vez de 13/11) |
+| Desconto na foto | Distribuído nos itens quando soma − desconto = valor a pagar | `TESTADO` (Muffato: R$ 149,83 − 43,30 = 106,53) |
+

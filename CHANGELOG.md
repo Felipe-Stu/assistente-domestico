@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [V4.3, parte 9] — Código NF, Série NF e Emissão (2026-11-24)
+
+### Adicionado
+- Migração v10: `compras.numero_nf` (Código NF), `serie_nf` (Série NF) e `emissao` (data e hora, AAAA-MM-DDTHH:MM:SS).
+- `nfce_service.identificacao`: lê Número, Série e Emissão nos formatos da NFC-e ("Número: 62867 Série: 31 Emissão: 13/11/2026 16:10:51") e da NF-e ("Série 1 Número 758 Data/Hora da emissão …"), com ou sem dois-pontos e negrito.
+  - Vale para HTML, texto colado e foto. **A emissão é a data da compra.**
+- O resumo mostra "🧾 NF 62867 série 31, emitida em 13/11/2026 às 16:10".
+- Foto lida pelo modelo de texto: desconto da nota distribuído nos itens quando a conta fecha (soma − desconto = valor a pagar).
+- `tests/test_nota_identificacao.py` (5 testes). Suíte: 342 testes.
+
+### Corrigido
+- `ocultar_consumidor` apagava a linha "Número … Série … Emissão … - Via Consumidor" (a data da compra se perdia e virava a de hoje). Agora só sai a linha que identifica o consumidor ("CONSUMIDOR - CPF/CNPJ/Nome…") e qualquer CPF.
+
 ## [V4.3, parte 8] — Modelo de imagem qwen2.5vl:7b e chave de acesso lida na foto (2026-11-24)
 
 ### Alterado

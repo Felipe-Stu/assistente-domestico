@@ -101,9 +101,10 @@ def ler_nfce(conteudo: str) -> Dict:
                            _numero(_depois_do_rotulo(_span(bloco, "Rqtd"))), _depois_do_rotulo(_span(bloco, "RUN")) or "un",
                            _numero(_depois_do_rotulo(_span(bloco, "RvlUnit"))), _numero(_span(bloco, "valor"))))
     pagamento = re.search(r'<label class="tx">\s*(.*?)\s*</label>', conteudo, re.S)
-    return _fechar_nota(itens, estabelecimento, cnpj, data_compra, chave,
-                        _total(conteudo, "Valor total R$:"), _total(conteudo, "Descontos R$:"),
-                        _total(conteudo, "Valor a pagar R$:"), _texto(pagamento.group(1)) if pagamento else None)
+    return _com_identificacao(_fechar_nota(itens, estabelecimento, cnpj, data_compra, chave,
+                                           _total(conteudo, "Valor total R$:"), _total(conteudo, "Descontos R$:"),
+                                           _total(conteudo, "Valor a pagar R$:"), _texto(pagamento.group(1)) if pagamento else None),
+                              _texto(conteudo))
 
 
 def _item(nome, codigo, quantidade, unidade, unitario, total) -> Dict:
@@ -177,9 +178,11 @@ def ler_nfce_texto(texto: str) -> Dict:
     data = datetime.strptime(emissao.group(1), "%d/%m/%Y").date().isoformat() if emissao else None
     chave = re.search(r"Chave de acesso:\s*((?:\d{4}\s*){11})", texto)
     pagamento = re.search(r"Valor pago R\$:\s*([A-Za-zÀ-ú ]+?)\s*[\d.]*\d,\d{2}", texto)
-    return _fechar_nota(itens, loja.group(1) if loja else None, cnpj, data, re.sub(r"\D", "", chave.group(1)) if chave else None,
-                        _valor_depois(texto, "Valor total R$:"), _valor_depois(texto, "Descontos R$:"),
-                        _valor_depois(texto, "Valor a pagar R$:"), pagamento.group(1).strip() if pagamento else None)
+    return _com_identificacao(_fechar_nota(itens, loja.group(1) if loja else None, cnpj, data,
+                                           re.sub(r"\D", "", chave.group(1)) if chave else None,
+                                           _valor_depois(texto, "Valor total R$:"), _valor_depois(texto, "Descontos R$:"),
+                                           _valor_depois(texto, "Valor a pagar R$:"), pagamento.group(1).strip() if pagamento else None),
+                              texto)
 
 
 # Texto copiado da consulta completa da NF-e (modelo 55: loja de motos, eletrônicos, móveis...)
@@ -213,15 +216,16 @@ def ler_nfe_texto(texto: str) -> Dict:
     data = datetime.strptime(emissao.group(1), "%d/%m/%Y").date().isoformat() if emissao else None
     chave = re.search(r"Chave de acesso\s+([\d\s-]{44,70})", texto)
     digitos = re.sub(r"\D", "", chave.group(1))[:44] if chave else ""
-    return _fechar_nota(itens, loja.group(1) if loja else None, cnpj.group(1) if cnpj else None, data,
-                        digitos if len(digitos) == 44 else None, produtos.group(2), None, None, None)
+    return _com_identificacao(_fechar_nota(itens, loja.group(1) if loja else None, cnpj.group(1) if cnpj else None, data,
+                                           digitos if len(digitos) == 44 else None, produtos.group(2), None, None, None),
+                              texto)
 
 
 # Dados do consumidor fora de qualquer registro (o leitor já não os lê; o texto guardado também não deve trazê-los)
 _RE_CPF = re.compile(r"(?<![\d*])[\d*]{3}[.\s]?[\d*]{3}[.\s]?[\d*]{3}[-\s]?\d{2}(?!\d)")
 _RE_BLOCO_DESTINATARIO = re.compile(
     r"Destinat[áa]rio\b.*?(?=\b(?:Produtos|Itens|Emitente|Eventos|Valor total|Dados da NF|Informa[çc][õo]es)\b|$)", re.S | re.I)
-_RE_LINHA_CONSUMIDOR = re.compile(r"^.*\bCONSUMIDOR\b.*$", re.M | re.I)
+_RE_LINHA_CONSUMIDOR = re.compile(r"^.*\bCONSUMIDOR\b\s*[-:]?\s*(?:CPF|CNPJ|NOME|ID\b|N[ÃA]O IDENTIFICADO).*$", re.M | re.I)
 
 
 def ocultar_consumidor(texto: str) -> str:
@@ -248,3 +252,38 @@ def chave_no_texto(texto: str):
             if chave_valida(digitos[inicio:inicio + 44]):
                 return digitos[inicio:inicio + 44]
     return None
+
+
+# Identificação da nota (NFC-e e NF-e): número (Código NF), série (Série NF) e emissão (data e hora da compra)
+_RE_NUMERO_NF = re.compile(r"\bN[úu]mero(?:\s+(?:da\s+)?NF-?e)?\s*:?\s*(\d[\d.]{0,14})", re.I)
+_RE_SERIE_NF = re.compile(r"\bS[ée]rie\s*:?\s*(\d{1,3})\b", re.I)
+_RE_EMISSAO = re.compile(r"Emiss[ãa]o\s*:?\s*(\d{2}/\d{2}/\d{4})(?:\s+(?:[àa]s\s+)?(\d{2}:\d{2}(?::\d{2})?))?", re.I)
+
+
+def identificacao(texto: str) -> Dict:
+    """{"numero_nf", "serie_nf", "emissao" (AAAA-MM-DDTHH:MM:SS), "data_compra"} do texto da nota; ausentes ficam fora."""
+    texto = " ".join(str(texto or "").replace("*", " ").split())
+    dados = {}
+    numero = _RE_NUMERO_NF.search(texto)
+    if numero:
+        dados["numero_nf"] = str(int(re.sub(r"\D", "", numero.group(1)) or 0)) if re.sub(r"\D", "", numero.group(1)) else None
+    serie = _RE_SERIE_NF.search(texto)
+    if serie:
+        dados["serie_nf"] = str(int(serie.group(1)))
+    emissao = _RE_EMISSAO.search(texto)
+    if emissao:
+        try:
+            dia = datetime.strptime(emissao.group(1), "%d/%m/%Y")
+            hora = (emissao.group(2) or "00:00:00")
+            hora = hora if hora.count(":") == 2 else hora + ":00"
+            dados["emissao"] = f"{dia.date().isoformat()}T{hora}"
+            dados["data_compra"] = dia.date().isoformat()
+        except ValueError:
+            pass
+    return {k: v for k, v in dados.items() if v}
+
+
+def _com_identificacao(nota: Dict, texto: str) -> Dict:
+    """A emissão é a data da compra; número e série vão junto."""
+    nota.update(identificacao(texto))
+    return nota

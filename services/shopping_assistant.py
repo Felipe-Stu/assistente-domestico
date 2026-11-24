@@ -274,6 +274,14 @@ class ShoppingAssistant:
                 f"{compra.get('estabelecimento') or 'Não informado'}, {_formatar_data(compra.get('data_compra'))}, "
                 f"total {_formatar_moeda(compra.get('valor_total_compra', 0.0))}"
             )
+            nota = []
+            if compra.get("numero_nf"):
+                nota.append(f"NF {compra['numero_nf']}" + (f" série {compra['serie_nf']}" if compra.get("serie_nf") else ""))
+            if compra.get("emissao"):
+                e = str(compra["emissao"])
+                nota.append(f"emitida em {e[8:10]}/{e[5:7]}/{e[0:4]} às {e[11:16]}")
+            if nota:
+                linhas.append("  🧾 " + ", ".join(nota))
             if compra.get("observacao"):
                 linhas.append(f"  📝 {compra['observacao']}")
             for item in compra.get("itens", []):
