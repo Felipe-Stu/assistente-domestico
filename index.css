@@ -588,6 +588,9 @@ body {
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     padding: 0.75rem 0.9rem;
+    width: auto;        /* .btn ocupa 100% por padrão; aqui o botão fica do tamanho do ícone */
+    flex: 0 0 auto;
+    font-size: 1.1rem;
 }
 
 .btn-attach:hover {
