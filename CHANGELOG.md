@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [V4.3, parte 5] — M20: histórico persistente com janela (2026-11-24)
+
+### Adicionado
+- `app/sessao.py` reescrito:
+  - **Janela:** o modelo recebe só as últimas `HISTORICO_JANELA_TROCAS` trocas (padrão 6). Antes o histórico crescia sem limite enquanto o assunto não mudava.
+  - **Resumo:** as trocas que saem da janela viram um resumo curto feito pelo modelo local em segundo plano (não atrasa a resposta); ele vai no começo do histórico. Se o modelo falhar, as trocas antigas só saem.
+  - **Gravação:** cada troca vai para `historico_conversas` (SQLite local). Ao reabrir o app em até `HISTORICO_RETOMAR_HORAS` (padrão 12), a conversa continua, com aviso no chat.
+  - "nova conversa" (ou "limpar a conversa", "esqueça essa conversa") começa do zero; o que foi gravado fica no banco, numa sessão encerrada.
+- Migração v8: coluna `contexto` e índice em `historico_conversas`.
+- `tests/test_m20.py` (6 testes). Suíte: 321 testes.
+
+### Mantido
+- Mudar de assunto (contexto) zera janela e resumo, como antes.
+- A nuvem continua recebendo histórico só quando a conversa em curso é de contexto liberado (`geral`, `outro`).
+
 ## [V4.3, parte 4] — M10: corrigir compras (2026-11-24)
 
 ### Adicionado

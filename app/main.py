@@ -5,6 +5,7 @@ AssistenteRuntime: ciclo de vida, filas e pipeline de cada solicitação
 import logging
 import json
 import queue
+import re
 import sys
 import threading
 from pathlib import Path
@@ -24,7 +25,7 @@ from services.db_service import DatabaseService
 from services.gemma_service import executar_assistente_local, orquestrar_requisicao
 from core.skills import Contexto, obter_catalogo
 from core.skills import motor as motor_skills
-from services.intent_router import pede_nuvem
+from services.intent_router import normalizar_texto, pede_nuvem
 from services.inventory_assistant import InventoryAssistant
 from services.llm_provider import LocalLLMProvider, CloudLLMProvider, MODELO_PADRAO, alternar_modelo_vram
 import services.llm_provider as llm_provider_estado
@@ -75,6 +76,10 @@ logger = logging.getLogger(__name__)
 TEMPO_RETRY = config_app.RETRY_ESPERA_S
 MAX_TENTATIVAS = config_app.RETRY_TENTATIVAS
 
+# M20: começar do zero (o histórico gravado fica no banco, numa sessão encerrada)
+RE_NOVA_CONVERSA = re.compile(r"^(?:nova conversa|comecar (?:uma )?(?:nova )?conversa(?: nova)?|limpar (?:a )?conversa|"
+                              r"esqueca (?:esta|essa) conversa|zerar (?:a )?conversa)$")
+
 MSG_IA_LOCAL_INDISPONIVEL = (
     "A IA local não respondeu. Nada foi gravado nem enviado à nuvem. "
     "Verifique se o Ollama está em execução e tente novamente."
@@ -116,7 +121,7 @@ class AssistenteRuntime(ModoVoz):
         self.voice_mode_active = False
         self.deve_encerrar = False
         self.fila = queue.Queue()
-        self.sessao = GerenciadorDeSessao()
+        self.sessao = GerenciadorDeSessao(janela_trocas=config_app.HISTORICO_JANELA_TROCAS)
         # (nome da skill, dados) aguardando confirmação: a próxima mensagem volta para essa skill
         self.pendencia = None
 
@@ -166,6 +171,10 @@ class AssistenteRuntime(ModoVoz):
             # 1. Serviços de Infraestrutura
             self.db_service = DatabaseService()
             emitir_electron("debug_log", {"message": "✓ Banco de dados relacional (SQLite) conectado."})
+            # M20: a conversa fica no SQLite; reabrir o app em poucas horas continua de onde parou
+            if self.sessao.conectar(self.db_service, self._resumir_conversa if config_app.HISTORICO_RESUMO else None,
+                                    config_app.HISTORICO_RETOMAR_HORAS):
+                self._aviso_retomada = True
 
             self.vector_store = VectorStoreService()
             self.memory_service = MemoryService(vector_store=self.vector_store)
@@ -515,6 +524,15 @@ class AssistenteRuntime(ModoVoz):
             servicos["claude"] = getattr(self, "claude_service", None)
         return Contexto(servicos=servicos, repetir=self._repetir)
 
+    def _resumir_conversa(self, resumo_anterior, mensagens) -> str:
+        """M20: resumo curto das trocas que saem da janela (modelo local, em segundo plano)."""
+        texto = (f"Resumo anterior: {resumo_anterior}\n\n" if resumo_anterior else "") + "\n".join(
+            f"{'Usuário' if m['role'] == 'user' else 'Assistente'}: {m['content']}" for m in mensagens)
+        prompt = ("Resuma em no máximo 5 frases curtas, em português, o que importa desta conversa entre o usuário e o "
+                  "assistente doméstico: fatos, pedidos, nomes, números e decisões. Não invente nada. Responda só com o resumo.")
+        with custom_logger.etapa("resumo_conversa"):
+            return LocalLLMProvider(temperatura=0.1).gerar_texto(prompt, texto[-6000:])
+
     def _responder_pendencia(self, texto: str):
         """Encaminha a resposta do usuário à skill que pediu confirmação."""
         nome, dados = self.pendencia
@@ -571,6 +589,11 @@ class AssistenteRuntime(ModoVoz):
 
         if self.pendencia is not None:
             return self._responder_pendencia(solicitacao_original)
+
+        if RE_NOVA_CONVERSA.match(normalizar_texto(solicitacao_original).strip(" .!?")):
+            self.sessao.nova_conversa()
+            custom_logger.evento("main", "nova_conversa")
+            return self._entregar_resposta("Pronto, começamos uma conversa nova. O que deseja fazer?")
 
         # =====================================================================
         # PASSO 1: Orquestração Gemma 4
@@ -816,6 +839,10 @@ class AssistenteRuntime(ModoVoz):
         # =====================================================================
         self._set_estado("READY")
         emitir_electron("system_ready")
+        if getattr(self, "_aviso_retomada", False):
+            trocas = sum(1 for m in self.sessao.historico if m["role"] == "user" and not m["content"].startswith("Resumo da conversa"))
+            emitir_electron("assistant_message", {"text": f"Continuei a conversa anterior ({trocas} troca(s) recentes na memória). "
+                                                          "Diga \"nova conversa\" para começar do zero."})
         self._set_estado("WAITING_INPUT")
 
         logger.info("🟢 Assistente pronto no MODO TEXTO. Chat desbloqueado para o usuário.")

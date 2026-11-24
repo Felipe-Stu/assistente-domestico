@@ -77,7 +77,7 @@ class DatabaseService:
         e aplica migrações de schema ordenadas via PRAGMA user_version.
         """
         # Versão alvo atual da aplicação
-        SCHEMA_VERSION = 7
+        SCHEMA_VERSION = 8
 
         query_compras = """
         CREATE TABLE IF NOT EXISTS compras (
@@ -92,7 +92,7 @@ class DatabaseService:
         CREATE TABLE IF NOT EXISTS historico_conversas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
-            papel TEXT NOT NULL, -- 'user' ou 'assistant'
+            papel TEXT NOT NULL, -- 'user', 'assistant' ou 'resumo' (M20)
             conteudo TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -262,6 +262,17 @@ class DatabaseService:
                     if "chave_documento" not in [coluna[1] for coluna in cursor.fetchall()]:
                         cursor.execute("ALTER TABLE entradas ADD COLUMN chave_documento TEXT;")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_entradas_chave ON entradas (chave_documento);")
+                    cursor.execute("PRAGMA user_version = 7;")
+                    atual_version = 7
+
+                if atual_version < 8:
+                    msg_migracao = "Aplicando migração v8 (M20): contexto no histórico das conversas."
+                    logging_logger.info(msg_migracao)
+                    custom_logger.log_assistente(NOME_ASSISTENTE, msg_migracao)
+                    cursor.execute("PRAGMA table_info(historico_conversas);")
+                    if "contexto" not in [coluna[1] for coluna in cursor.fetchall()]:
+                        cursor.execute("ALTER TABLE historico_conversas ADD COLUMN contexto TEXT;")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_historico_sessao ON historico_conversas (session_id, id);")
                     cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
                     atual_version = SCHEMA_VERSION
 

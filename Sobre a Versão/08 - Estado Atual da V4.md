@@ -45,6 +45,7 @@ A Fase 1 concluiu a base confiável: frases conhecidas são roteadas por regras,
 | Agenda (V4.1) | Anota, consulta e cancela compromissos; falta o aviso na hora e o Google Agenda (V7) | `TESTADO` |
 | Consultas de gastos (M19) | Listar e somar compras, por categoria e por loja, preço de um produto e comparação de períodos; o período é lido por regra e o modelo só preenche o formulário | `TESTADO` (13 testes) e conferido numa cópia do banco real; acerto do formulário com o modelo real `NÃO TESTADO` (`medir-consultas.bat`) |
 | Correção de compras (M10) | Valor, quantidade, nome do item, loja, data e remoção de item, com antes e depois e confirmação; estoque e total refeitos; correção registrada em `entradas` | `TESTADO` (8 testes) e numa cópia do banco real (renomear o item da moto); com o modelo real `NÃO TESTADO` |
+| Histórico da conversa (M20) | Janela das últimas 6 trocas, resumo das antigas pelo modelo local, gravação em `historico_conversas` e retomada ao reabrir em até 12 h; "nova conversa" zera | `TESTADO` (6 testes) e migração v8 numa cópia do banco real; resumo com o modelo real `NÃO TESTADO` |
 | Programação com o Claude (V4.1) | Claude pela assinatura (`claude -p`) ou pela API; sem Claude, Qwen com biblioteca de contexto | `TESTADO` no PC (resposta em 5,5 s) |
 | Ideias de projetos e bot do Telegram (V4.1) | Ideia salva na hora, análise do Claude em segundo plano, `.md` na biblioteca, resposta local sobre a ideia | `TESTADO` no PC (análise em cerca de 20 s) |
 | Cópia de segurança diária e registro de eventos (V4.1) | M11 e M26 | `TESTADO` |
@@ -453,4 +454,15 @@ Feitas com `scripts/medir_v41.py`; relatórios completos em `Planejamento/medico
 **Dado real:** a compra da moto foi gravada com o nome da loja como nome do produto (resposta à pergunta do nome cortado). Com o M10, basta dizer "renomeie naga motors para Moto Royal Enfield Classic 650".
 
 **Decisão:** o M35 foi descartado; a categoria original do item fica guardada e as consultas usam a do catálogo.
+
+## 20. M20 — histórico persistente com janela (24/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| Janela | Só as últimas `HISTORICO_JANELA_TROCAS` (6) trocas vão ao modelo; antes, sem limite | `TESTADO` |
+| Resumo | Trocas que saem da janela viram resumo (modelo local, segundo plano); falha não quebra a conversa | `TESTADO` com resumo simulado |
+| Retomada | Reabrir o app em até 12 h continua a conversa (aviso no chat); "nova conversa" começa outra | `TESTADO` |
+| Banco | Migração v8: `historico_conversas.contexto` + índice | `TESTADO` numa cópia do banco real |
+
+**Privacidade:** o histórico fica só no SQLite local. A regra da nuvem não mudou: só conversa de contexto liberado leva histórico.
 

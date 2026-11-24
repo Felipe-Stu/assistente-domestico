@@ -38,6 +38,11 @@ OLLAMA_MODELO_VISAO = os.getenv("OLLAMA_MODELO_VISAO", "gemma4:e4b")   # lê fot
 ENTRADAS_DIR = Path(os.getenv("ENTRADAS_DIR", str(BASE_DIR.parent / "Entradas")))   # pasta vigiada
 ANEXOS_DIR = Path(os.getenv("ANEXOS_DIR", str(BASE_DIR.parent / "Anexos")))         # originais guardados
 ENTRADAS_INTERVALO_S = float(os.getenv("ENTRADAS_INTERVALO_S", "5"))
+
+# M20: histórico da conversa (gravado no SQLite local)
+HISTORICO_JANELA_TROCAS = int(os.getenv("HISTORICO_JANELA_TROCAS", "6"))      # trocas inteiras que vão ao modelo
+HISTORICO_RETOMAR_HORAS = float(os.getenv("HISTORICO_RETOMAR_HORAS", "12"))   # reabrir o app continua a conversa
+HISTORICO_RESUMO = os.getenv("HISTORICO_RESUMO", "1") != "0"                   # resumo das trocas que saem da janela
 ENTRADAS_TAMANHO_MAX_MB = float(os.getenv("ENTRADAS_TAMANHO_MAX_MB", "20"))
 
 # Repetição das chamadas ao modelo local quando a resposta vem malformada
