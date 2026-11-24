@@ -144,7 +144,7 @@ chatPanel.addEventListener('drop', async (e) => {
     chatPanel.classList.remove('arrastando');
     const arquivos = e.dataTransfer ? e.dataTransfer.files : [];
     if (!arquivos.length) return;
-    const nomes = await window.api.enviarAnexos(arquivos);
+    const nomes = await window.api.enviarAnexosSoltos();
     mostrarAnexosEnviados(nomes, arquivos.length);
 });
 // Arquivo solto fora da área do chat não abre no lugar do aplicativo

@@ -17,7 +17,7 @@ import shutil
 import time
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from core.skills import obter_catalogo
 from services import nfce_service
@@ -184,19 +184,41 @@ class DocumentosService:
         except Exception as erro:  # PDF corrompido, protegido por senha etc.
             raise DocumentoError(f"Não consegui ler o PDF ({type(erro).__name__}).") from None
         if len(texto) < 20:
-            raise DocumentoError("O PDF não tem texto (parece digitalizado). Mande como foto (JPG/PNG).")
+            # PDF sem texto (página salva como imagem): lê a maior imagem de cada página
+            return self._importar_imagem(*self._imagens_do_pdf(caminho))
         if nfce_service.eh_nfce(texto):
             return self._importar_nfce(caminho)
         preparada = self.compras.preparar_compra(texto[:8000], canal)
         preparada.setdefault("duvidas", []).append("Lido de um PDF: confira os itens e valores.")
         return preparada
 
-    def _importar_imagem(self, anexo: Path) -> Dict:
+    def _imagens_do_pdf(self, caminho: Path) -> List[Path]:
+        from pypdf import PdfReader
+        destino = self.pasta_anexos / "_paginas"
+        destino.mkdir(parents=True, exist_ok=True)
+        arquivos = []
+        try:
+            for n, pagina in enumerate(PdfReader(str(caminho)).pages[:3], start=1):
+                imagens = sorted(pagina.images, key=lambda im: len(im.data), reverse=True)
+                if not imagens:
+                    continue
+                maior = imagens[0]
+                extensao = Path(maior.name).suffix.lower() or ".png"
+                saida = destino / f"{caminho.stem}-p{n}{extensao}"
+                saida.write_bytes(maior.data)
+                arquivos.append(saida)
+        except Exception as erro:
+            raise DocumentoError(f"Não consegui tirar a imagem do PDF ({type(erro).__name__}).") from None
+        if not arquivos:
+            raise DocumentoError("O PDF não tem texto nem imagem que eu consiga ler.")
+        return arquivos
+
+    def _importar_imagem(self, *anexos: Path) -> Dict:
         if self.llm_visao is None:
             raise DocumentoError("Nenhum modelo para ler imagens está configurado (OLLAMA_MODELO_VISAO).")
         prompt = obter_catalogo().skill("compras").prompt("foto_cupom", data_atual=date.today().isoformat())
         try:
-            resposta = self.llm_visao.gerar_json_imagem(prompt, "Leia este cupom de compra.", [str(anexo)], ESQUEMA_COMPRAS)
+            resposta = self.llm_visao.gerar_json_imagem(prompt, "Leia este cupom de compra.", [str(a) for a in anexos], ESQUEMA_COMPRAS)
         except Exception as erro:
             raise DocumentoError(f"Não consegui ler a foto ({type(erro).__name__}). Confira se o Ollama está aberto "
                                  "e se o modelo de imagem está instalado.") from None
@@ -206,6 +228,12 @@ class DocumentosService:
             if validada.get("itens"):
                 validada["data_compra"] = dados.get("data_compra") or date.today().isoformat()
                 compras.append(validada)
+        if not compras:
+            # Guarda o que o modelo devolveu para diagnosticar (só itens e valores; o prompt manda ignorar CPF)
+            custom_logger.evento(COMPONENTE, "imagem_sem_itens", modelo=getattr(self.llm_visao, "modelo", None),
+                                 resposta=json.dumps(resposta, ensure_ascii=False)[:2000])
+            raise DocumentoError("o modelo de imagem não reconheceu itens. Para nota aberta no site da Sefaz, "
+                                 "salve a página (Ctrl+S) e mande o arquivo HTML: a leitura é exata.")
         return {"compras": compras[:1], "duvidas": ["Lido de uma foto: confira cada item e valor antes de gravar."],
                 "origem": {"resposta_json": json.dumps(resposta, ensure_ascii=False)[:20000],
                            "modelo": getattr(self.llm_visao, "modelo", None), "versao_prompt": "foto-v1"}}

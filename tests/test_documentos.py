@@ -124,6 +124,29 @@ class TestImportacao(BaseDocs):
         self.assertEqual(preparada["origem"]["versao_prompt"], "foto-v1")
         self.assertEqual(visao.gerar_json_imagem.call_args[0][2], [preparada["origem"]["anexo"]])
 
+    def test_foto_sem_itens_explica_e_sugere_html(self):
+        visao = mock.Mock(modelo="gemma4:e4b")
+        visao.gerar_json_imagem.return_value = {"compras": [{"estabelecimento": "Loja", "itens": []}]}
+        (self.entrada / "tela.png").write_bytes(b"png")
+        with self.assertRaises(DocumentoError) as ctx:
+            self.servico(visao=visao).importar(self.entrada / "tela.png", "app")
+        self.assertIn("HTML", str(ctx.exception))
+
+    def test_pdf_digitalizado_vai_para_o_leitor_de_imagem(self):
+        try:
+            import pypdf  # noqa: F401
+            from PIL import Image
+        except ImportError:
+            self.skipTest("pypdf ou Pillow ausente")
+        Image.new("RGB", (300, 120), "white").save(self.entrada / "moto.pdf")
+        visao = mock.Mock(modelo="gemma4:e4b")
+        visao.gerar_json_imagem.return_value = {"compras": [fase1.compra(fase1.item("moto", 1, "un", 100, 100, categoria="outros"))]}
+        preparada = self.servico(visao=visao).importar(self.entrada / "moto.pdf", "app")
+        self.assertEqual(preparada["compras"][0]["itens"][0]["produto"], "moto")
+        imagens = visao.gerar_json_imagem.call_args[0][2]
+        self.assertEqual(len(imagens), 1)
+        self.assertTrue(Path(imagens[0]).exists())
+
     def test_pdf_sem_texto_ou_sem_biblioteca(self):
         (self.entrada / "nota.pdf").write_bytes(b"%PDF-1.4")
         with self.assertRaises(DocumentoError):

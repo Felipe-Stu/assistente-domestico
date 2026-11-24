@@ -2,6 +2,16 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 console.log('⚡ [PRELOAD] Script preload.js inicializado.');
 
+// Caminhos dos arquivos soltos na janela. Lidos aqui, na fase de captura, porque o objeto File
+// perde o vínculo com o arquivo ao passar pela contextBridge e webUtils só funciona no preload.
+let caminhosSoltos = [];
+window.addEventListener('drop', (e) => {
+    const arquivos = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
+    caminhosSoltos = arquivos.map((f) => {
+        try { return webUtils.getPathForFile(f); } catch (erro) { return ''; }
+    }).filter(Boolean);
+}, true);
+
 const logIPC = (canal, dados) => {
     console.log(`📡 [IPC RECEBIDO no Preload -> ${canal}]:`, dados !== undefined ? dados : '(sem payload)');
 };
@@ -19,10 +29,9 @@ contextBridge.exposeInMainWorld('api', {
     // Anexos: abre a janela de escolha ou envia os arquivos arrastados.
     // Devolve os nomes aceitos (formatos: HTML, PDF, JPG, PNG, WEBP).
     escolherAnexos: () => ipcRenderer.invoke('escolher-anexos'),
-    enviarAnexos: (arquivos) => {
-        const caminhos = Array.from(arquivos || []).map((f) => {
-            try { return webUtils.getPathForFile(f); } catch (e) { return ''; }
-        }).filter(Boolean);
+    enviarAnexosSoltos: () => {
+        const caminhos = caminhosSoltos;
+        caminhosSoltos = [];
         return ipcRenderer.invoke('enviar-anexos', caminhos);
     },
 
