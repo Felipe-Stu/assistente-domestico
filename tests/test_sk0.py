@@ -76,7 +76,7 @@ class TestPontuacao(unittest.TestCase):
         checagens = avaliar.conferir_extracao(caso, preparada)
         self.assertTrue(all(v for k, v in checagens.items() if not k.startswith("_")))
         caso_sem_mercado = {"mercado": None, "itens": 0, "total": 0, "embalagem": False}
-        self.assertTrue(avaliar.conferir_extracao(caso_sem_mercado, {"compras": [], "duvidas": ["Mercado não informado."]})["mercado"])
+        self.assertTrue(avaliar.conferir_extracao(caso_sem_mercado, {"compras": [], "duvidas": ["Loja não informada."]})["mercado"])
 
 
 class TestSeletor(unittest.TestCase):

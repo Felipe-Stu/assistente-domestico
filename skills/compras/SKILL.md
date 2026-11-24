@@ -48,7 +48,7 @@ Registra o que a pessoa comprou: estabelecimento, data e itens (produto, quantid
 ## Como funciona hoje (roteiro fixo, em código)
 
 1. O modelo extrai os dados com o prompt `prompts/extracao.md` e o esquema de `services/esquemas.py`.
-2. O código valida contas e datas, aponta dúvidas (mercado não informado, data vaga, preço por kg ambíguo).
+2. O código valida contas e datas, aponta dúvidas (loja não informada, data vaga, preço por kg ambíguo).
 3. Sem dúvidas, grava; com dúvidas, mostra o resumo e pede "sim" ou "não".
 4. "Desfazer última compra" apaga o último registro.
 

@@ -191,7 +191,7 @@ class TestPreparacaoCompra(BaseBanco):
 
     def test_mercado_e_preco_ausentes_geram_duvida(self):
         preparada = self.preparar({"compras": [compra(item(valor_unitario=0, valor_total=0), estabelecimento="Não informado")]})
-        self.assertIn("Mercado não informado.", preparada["duvidas"])
+        self.assertIn("Loja não informada.", preparada["duvidas"])
         self.assertIn("Compra com total zero.", preparada["duvidas"])
         self.assertTrue(any("preço não informado" in d for d in preparada["duvidas"]))
 

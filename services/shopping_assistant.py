@@ -250,7 +250,7 @@ class ShoppingAssistant:
         for compra in compras:
             estabelecimento = normalizar_texto(str(compra.get("estabelecimento") or ""))
             if estabelecimento in ESTABELECIMENTOS_INVALIDOS:
-                duvidas.append("Mercado não informado.")
+                duvidas.append("Loja não informada.")
             if compra.get("valor_total_compra", 0) <= 0:
                 duvidas.append("Compra com total zero.")
 

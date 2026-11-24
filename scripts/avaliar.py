@@ -233,7 +233,7 @@ def conferir_extracao(caso: dict, preparada: dict) -> dict:
     return {
         "itens": len(itens) == caso["itens"],
         "total": abs(soma - caso["total"]) <= 0.05,
-        "mercado": (caso["mercado"] in mercados) if caso["mercado"] else ("Mercado não informado." in preparada.get("duvidas", [])),
+        "mercado": (caso["mercado"] in mercados) if caso["mercado"] else ("Loja não informada." in preparada.get("duvidas", [])),
         "embalagem": any(i.get("embalagem_quantidade") for i in itens) if caso["embalagem"] else True,
         "_soma": soma,
         "_n_itens": len(itens),

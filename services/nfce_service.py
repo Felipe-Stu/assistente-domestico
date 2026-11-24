@@ -49,7 +49,7 @@ def _total(html_nota: str, rotulo: str) -> Optional[str]:
 def nome_estabelecimento(razao_social: str) -> str:
     """'IRMAOS MUFFATO E CIA LTDA' → 'Irmaos Muffato' (sem 'Ltda', 'S/A', 'E Cia', 'ME'...)."""
     nome = re.sub(r"\b(e\s+cia|ltda|s\s*/?\s*a|me|epp|eireli|comercio\s+de|com\.?)\b\.?", " ", razao_social or "", flags=re.I)
-    nome = " ".join(nome.replace(" - ", " ").split()).strip(" -.,")
+    nome = " ".join(p for p in nome.replace(" - ", " ").split() if p.strip(".,-")).strip(" -.,")
     return nome.title() if nome else "Não informado"
 
 
@@ -180,3 +180,38 @@ def ler_nfce_texto(texto: str) -> Dict:
     return _fechar_nota(itens, loja.group(1) if loja else None, cnpj, data, re.sub(r"\D", "", chave.group(1)) if chave else None,
                         _valor_depois(texto, "Valor total R$:"), _valor_depois(texto, "Descontos R$:"),
                         _valor_depois(texto, "Valor a pagar R$:"), pagamento.group(1).strip() if pagamento else None)
+
+
+# Texto copiado da consulta completa da NF-e (modelo 55: loja de motos, eletrônicos, móveis...)
+_NUM = r"[\d.]*\d,\d+"
+_RE_ITEM_NFE = re.compile(rf"(?:^|\s)(\d{{1,3}})\s+(.+?)\s+({_NUM})\s+([A-Za-z]{{1,6}})\s+({_NUM})\s+({_NUM})(?=\s|$)")
+
+
+def parece_nfe_texto(texto: str) -> bool:
+    t = " ".join((texto or "").split())
+    return bool(re.search(r"Emitente\b", t) and re.search(r"Produtos\b", t) and "Valor Prod" in t
+                and re.search(r"Data/Hora da emiss[ãa]o", t))
+
+
+def ler_nfe_texto(texto: str) -> Dict:
+    """Consulta da NF-e (Dados da NFe / Emitente / Destinatário / Produtos). Os dados do destinatário não são lidos."""
+    texto = " ".join((texto or "").split())
+    produtos = re.search(r"Valor Prod\.?\s*(.*?)\s*Valor total\s+(" + _NUM + ")", texto)
+    if not produtos:
+        raise NotaInvalidaError("O texto não parece uma NF-e copiada da página da Sefaz.")
+    itens = []
+    for achado in _RE_ITEM_NFE.finditer(produtos.group(1)):
+        nome = achado.group(2).strip()
+        item = _item(nome, achado.group(1), _numero(achado.group(3)), achado.group(4),
+                     _numero(achado.group(5)), _numero(achado.group(6)))
+        item["nome_cortado"] = nome.endswith("...") or nome.endswith("…")
+        itens.append(item)
+    emitente = texto.split("Destinatário", 1)[0]   # só o trecho antes do destinatário
+    loja = re.search(r"Emitente.*?Nome/Raz[ãa]o Social\s+(.*?)\s+(?:Munic[íi]pio|Endere[çc]o|UF)\b", emitente)
+    cnpj = re.search(r"Emitente\s+CNPJ\s+([\d./-]+)", emitente)
+    emissao = re.search(r"Data/Hora da emiss[ãa]o\s+(\d{2}/\d{2}/\d{4})", texto)
+    data = datetime.strptime(emissao.group(1), "%d/%m/%Y").date().isoformat() if emissao else None
+    chave = re.search(r"Chave de acesso\s+([\d\s-]{44,70})", texto)
+    digitos = re.sub(r"\D", "", chave.group(1))[:44] if chave else ""
+    return _fechar_nota(itens, loja.group(1) if loja else None, cnpj.group(1) if cnpj else None, data,
+                        digitos if len(digitos) == 44 else None, produtos.group(2), None, None, None)

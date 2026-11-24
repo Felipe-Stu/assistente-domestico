@@ -185,7 +185,41 @@ TEXTO_COLADO = ("IRMAOS MUFFATO E CIA LTDA CNPJ: 76.430.438/0097-13 AVENIDA SAO 
                 "Forma de pagamento:Valor pago R$: Cartão de Crédito106,53 TrocoNaN")
 
 
+# NF-e (modelo 55) copiada da consulta da Sefaz; destinatário fictício
+TEXTO_NFE = ("Dados da NFe Natureza da operação VENDA MERC. ADQ. REC. TERC. REG. SUBST. TRIB.  Tipo da operação 1 - Saída  "
+             "Chave de acesso 35-2611-13773688000194-55-001-000000758-159608157-4  Modelo 55  Série 1  Número 758  "
+             "Data/Hora da emissão 06/11/2026 15:23:12-03:00  Emitente CNPJ 13.773.688/0001-94  IE 157839135112  "
+             "Nome/Razão Social Naga Motors Comercio de Motos Ltda. Bauru  Município BAURU  UF SP  "
+             "Destinatário CPF ***.**0.000-00  Nome/Razão Social FULANO***  Município CIDADE  UF SP  País BRASIL  "
+             "Produtos Descrição\tQuantidade\tUnid. Com.\tValor Unit.\tValor Prod. 1\tC...\t1,0000\tUN\t32.990,000\t32.990,000 "
+             "Valor total\t32.990,000 Eventos e Serviços Evento\tProtocolo\tData autorização Autorização de Uso\t"
+             "135264751561912\t06/11/2026 às 15:23:31 Digest Value XYZ=")
+
+
 class TestTextoColado(BaseDocs):
+    def test_nfe_modelo_55(self):
+        from services.nfce_service import ler_nfe_texto, parece_nfce_texto, parece_nfe_texto
+        self.assertTrue(parece_nfe_texto(TEXTO_NFE))
+        self.assertFalse(parece_nfce_texto(TEXTO_NFE))
+        self.assertFalse(parece_nfe_texto(TEXTO_COLADO))
+        nota = ler_nfe_texto(TEXTO_NFE)
+        self.assertEqual((nota["estabelecimento"], nota["cnpj"], nota["data_compra"], nota["valor_total_compra"]),
+                         ("Naga Motors Motos Bauru", "13.773.688/0001-94", "2026-11-06", 32990.0))
+        self.assertEqual(nota["chave_acesso"], "35261113773688000194550010000007581596081574")
+        self.assertEqual(len(nota["itens"]), 1)
+        self.assertTrue(nota["itens"][0]["nome_cortado"])
+        self.assertNotIn("FULANO", str(nota))
+
+    def test_nfe_colada_pede_confirmacao_e_nao_inventa_nome(self):
+        nomes = mock.Mock(modelo="gemma4:e4b")
+        nomes.gerar_json.return_value = {"itens": []}
+        preparada = self.servico(nomes=nomes).importar_texto(TEXTO_NFE, "chat")
+        compra = preparada["compras"][0]
+        self.assertEqual(compra["data_compra"], "2026-11-06")
+        self.assertEqual(compra["itens"][0]["produto"], "c...")
+        self.assertTrue(any("cortada" in d for d in preparada["duvidas"]))
+        self.assertEqual(preparada["origem"]["versao_prompt"], "nfe-texto-v1")
+
     def test_leitor_do_texto(self):
         from services.nfce_service import ler_nfce_texto, parece_nfce_texto
         self.assertTrue(parece_nfce_texto(TEXTO_COLADO))

@@ -23,7 +23,10 @@
 - **Foto sem itens reconhecidos:** a resposta do modelo fica no registro de eventos (`imagem_sem_itens`) e a mensagem sugere mandar o HTML da página da Sefaz.
 - `scripts/testar_visao.py` + `testar-visao.bat` (arrastar a imagem sobre o .bat): mostra o que o modelo de imagem enxerga.
 - **Texto da nota colado no chat:** usa o mesmo leitor exato do HTML (desconto distribuído, confirmação antes de gravar).
-- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 290 testes.
+- **NF-e (modelo 55) colada no chat** (compra em loja: moto, eletrônico, móvel): leitor exato da consulta da Sefaz — loja (emitente), CNPJ, data, itens, total e chave. Os dados do destinatário não são lidos.
+  - Descrição cortada pela própria Sefaz ("C...") não vai ao modelo local (ele inventaria um nome) e vira ponto de dúvida.
+- Mensagens dizem "loja" em vez de "mercado" ("Loja não informada.").
+- `tests/test_documentos.py` (14 testes, com a sua nota real e o CPF trocado por um fictício). Suíte: 292 testes.
 
 ### Pendente no PC
 - Testar PDF e foto pelo app e pelo Telegram (pypdf já instalado; texto colado testado e aprovado).

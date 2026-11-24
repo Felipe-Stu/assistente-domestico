@@ -109,13 +109,14 @@ class DocumentosService:
     def importar_texto(self, texto: str, canal: str = "chat") -> Dict:
         """Texto da NFC-e copiado da página e colado no chat: mesmo leitor exato, mesma confirmação."""
         inicio = time.monotonic()
+        nfe = nfce_service.parece_nfe_texto(texto) and not nfce_service.parece_nfce_texto(texto)
         try:
-            nota = nfce_service.ler_nfce_texto(texto)
+            nota = nfce_service.ler_nfe_texto(texto) if nfe else nfce_service.ler_nfce_texto(texto)
         except nfce_service.NotaInvalidaError as erro:
             raise DocumentoError(str(erro)) from None
         preparada = self._preparar_nota(nota)
         preparada["origem"].update({"tipo": "nota", "canal": canal, "texto": texto[:20000],
-                                    "versao_prompt": "nfce-texto-v1", "duracao_ms": int((time.monotonic() - inicio) * 1000)})
+                                    "versao_prompt": "nfe-texto-v1" if nfe else "nfce-texto-v1", "duracao_ms": int((time.monotonic() - inicio) * 1000)})
         return preparada
 
     def _importar_nfce(self, caminho: Path) -> Dict:
@@ -143,7 +144,11 @@ class DocumentosService:
             duvidas.append(f"A data da compra não veio na nota: vai como hoje ({date.today():%d/%m/%Y}). Se for outra, "
                            "responda \"não\" e mande de novo com a linha \"Emissão: dd/mm/aaaa\".")
         if validada.get("estabelecimento") in (None, "", "Não informado"):
-            duvidas.append("O mercado não veio no texto colado.")
+            duvidas.append("A loja não veio no texto colado.")
+        cortados = [i["nome_cupom"] for i in nota["itens"] if i.get("nome_cortado")]
+        if cortados:
+            duvidas.append(f"A página da Sefaz mostra a descrição cortada ({', '.join(cortados)}). Se quiser outro nome, "
+                           "responda \"não\" e cole de novo trocando o nome cortado pelo nome do produto.")
         return {"compras": [validada], "duvidas": duvidas,
                 "origem": {"resposta_json": json.dumps(registro, ensure_ascii=False)[:20000],
                            "modelo": modelo, "versao_prompt": "nfce-v1", "chave_documento": nota.get("chave_acesso")}}
@@ -155,7 +160,9 @@ class DocumentosService:
             item["categoria"] = inferir_categoria(item["produto"], "outros")
         if self.llm_nomes is None:
             return None
-        pedido = json.dumps([{"codigo": i.get("codigo") or str(n), "nome": i["produto"]} for n, i in enumerate(itens)], ensure_ascii=False)
+        # Nome cortado pela Sefaz ("C...") não vai ao modelo: ele inventaria um produto
+        pedido = json.dumps([{"codigo": i.get("codigo") or str(n), "nome": i["produto"]} for n, i in enumerate(itens)
+                             if not i.get("nome_cortado")], ensure_ascii=False)
         try:
             prompt = obter_catalogo().skill("compras").prompt("nomes_nota")
             resposta = self.llm_nomes.gerar_json(prompt_sistema=prompt, mensagem_usuario=pedido, esquema=ESQUEMA_NOMES)
@@ -166,7 +173,7 @@ class DocumentosService:
             return None
         por_codigo = {str(r.get("codigo")): r for r in (resposta or {}).get("itens", []) if isinstance(r, dict)}
         for n, item in enumerate(itens):
-            novo = por_codigo.get(item.get("codigo") or str(n))
+            novo = None if item.get("nome_cortado") else por_codigo.get(item.get("codigo") or str(n))
             if novo and str(novo.get("produto") or "").strip():
                 item["produto"] = str(novo["produto"]).strip().lower()
                 item["categoria"] = inferir_categoria(item["produto"], novo.get("categoria"))
