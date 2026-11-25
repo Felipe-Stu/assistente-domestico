@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [V5.5, parte 4] — Cartão de compra (2026-11-25)
+
+### Adicionado
+- `app/cartao.py`: a compra que espera confirmação vai também estruturada no `assistant_message` (`cartao`: loja, data, NF, total, observação, desconto, itens em centavos, e o texto antes e depois do resumo). O `text` completo continua igual (Telegram, voz, histórico, telas antigas).
+- Janela do PC e celular desenham o cartão (`Formatar.cartaoCompra`): loja, data, NF, total, itens com quantidade e valor (os demais em "+ N itens") e os botões **Sim, gravar / Corrigir / Não**. "Corrigir" não descarta: põe o foco no campo com um exemplo de correção. Com pergunta pendente (loja, nome cortado), ficam os botões da pergunta.
+- Testes: `tests/test_cartao.py` e o caminho do anexo pelo celular. Suíte: 363 (6 pulados sem as dependências do servidor).
+
 ## [V5.5, parte 3] — M28: nova janela do PC e Electron 45 (2026-11-25)
 
 ### Alterado

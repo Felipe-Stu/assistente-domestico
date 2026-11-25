@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 
 import core.config as config_app
+from app import cartao
 from services import perguntas_compra
 from services.documentos_service import DocumentoError
 from services.logger_service import logger as custom_logger
@@ -69,7 +70,7 @@ class ImportacaoDeDocumentos:
                     logger.warning(f"Não consegui apagar o temporário {arquivo.name}: {erro}")
             if canal in CANAIS_INTERATIVOS:
                 self._set_estado("WAITING_INPUT")
-        self._emitir("assistant_message", {"text": texto})
+        self._emitir("assistant_message", cartao.payload(texto, self.pendencia if ok else None))
         if chat is not None and self.telegram is not None:
             aviso = texto.replace(perguntas_compra.PEDIR_CONFIRMACAO, "Confirme no assistente do PC (sim ou não).")
             if self.pendencia and self.pendencia[1].get("perguntas"):

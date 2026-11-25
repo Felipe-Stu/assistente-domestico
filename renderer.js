@@ -49,8 +49,11 @@ function desativarBotoesAntigos() {
     document.querySelectorAll('.resposta-rapida button').forEach((b) => { b.disabled = true; });
 }
 
-function adicionarBotoes(msgElement, text) {
-    const botoes = window.Formatar ? window.Formatar.botoesDeResposta(text) : [];
+function adicionarBotoes(msgElement, text, cartao = null) {
+    const botoes = cartao && cartao.confirmar
+        ? [{ rotulo: 'Sim, gravar', envio: 'sim', estilo: 'confirmar' }, { rotulo: 'Corrigir', envio: null, estilo: 'neutro' },
+           { rotulo: 'Não', envio: 'não', estilo: 'cancelar' }]
+        : (window.Formatar ? window.Formatar.botoesDeResposta(text) : []);
     if (!botoes.length) return;
     const barra = document.createElement('div');
     barra.className = 'resposta-rapida';
@@ -60,6 +63,11 @@ function adicionarBotoes(msgElement, text) {
         b.className = `btn-rapido btn-${botao.estilo}`;
         b.textContent = botao.rotulo;
         b.addEventListener('click', () => {
+            if (botao.envio === null) {   // Corrigir: a compra continua esperando; o pedido vai pelo campo de texto
+                chatInput.placeholder = 'O que corrigir? Ex.: o arroz custou 24,90 ou a loja era o Moreschi';
+                chatInput.focus();
+                return;
+            }
             desativarBotoesAntigos();
             window.api.sendText(botao.envio);
         });
@@ -72,11 +80,15 @@ function appendMessage(sender, text, retryText = null, opcoes = {}) {
     const msgElement = document.createElement('div');
     msgElement.classList.add('message');
     msgElement.classList.add(sender === 'user' ? 'user-msg' : 'assistant-msg');
+    if (opcoes.cartao) msgElement.classList.add('com-cartao');
     if (sender === 'erro') msgElement.classList.add('erro-msg');
 
     const avatar = sender === 'user' ? (opcoes.canal === 'celular' ? ICONE_CELULAR : ICONE_PESSOA) : (sender === 'erro' ? '!' : '');
     const timeStr = getFormattedTime();
-    const corpo = window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text);
+    const cartao = opcoes.cartao && window.Formatar && window.Formatar.cartaoCompra ? opcoes.cartao : null;
+    const corpo = cartao ? window.Formatar.formatarMensagem(cartao.antes || '') + window.Formatar.cartaoCompra(cartao)
+                           + window.Formatar.formatarMensagem(cartao.depois || '')
+                         : (window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text));
 
     msgElement.innerHTML = `
         <div class="msg-avatar" aria-hidden="${avatar === '' ? 'true' : 'false'}">${avatar}</div>
@@ -87,7 +99,7 @@ function appendMessage(sender, text, retryText = null, opcoes = {}) {
     `;
     if (sender !== 'user') {
         desativarBotoesAntigos();
-        adicionarBotoes(msgElement, text);
+        adicionarBotoes(msgElement, cartao ? cartao.texto : text, cartao);
     }
 
     // Botão "Tentar de novo" quando a IA local estava indisponível (reenvia o mesmo texto)
@@ -389,7 +401,7 @@ window.api.onAssistantMessage((data) => {
         bolhaEmFluxo.remove();
         bolhaEmFluxo = null;
     }
-    appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null);
+    appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null, { cartao: isObj ? data.cartao : null });
     atualizarResumo();   // uma compra pode ter sido gravada ou corrigida
 });
 

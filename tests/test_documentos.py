@@ -361,6 +361,8 @@ class TestPeloApp(BaseDocs):
         self.assertTrue(any(self.anexos.rglob("*nota.html")))
         estados = [p["state"] for tipo, p in mensagens if tipo == "state_changed"]
         self.assertEqual(estados, ["PROCESSING", "WAITING_INPUT"])
+        resumo = [p for tipo, p in mensagens if tipo == "assistant_message"][-1]
+        self.assertTrue(resumo["cartao"]["compras"][0]["itens"])   # M28: as telas desenham o cartão da compra
 
     def test_anexo_com_confirmacao_pendente_avisa_uma_vez(self):
         mensagens = []

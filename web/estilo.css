@@ -142,3 +142,20 @@ svg rect.coluna-mes { fill: var(--barra); }
 svg rect.coluna-mes.ativa, .mes-clicavel:hover rect.coluna-mes { fill: var(--azul); }
 svg text.mes-ativo { fill: var(--acento-texto); }
 .selo { font-size: .78rem; color: var(--suave); text-align: center; margin: 0 0 .8rem; }
+
+/* M28: cartão da compra aguardando confirmação */
+.cartao-compra { margin-top: 8px; background: var(--cartao-2); border: 1px solid var(--borda); border-radius: 12px; overflow: hidden; margin-bottom: 10px; color: var(--texto); }
+.cartao-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--borda); }
+.cartao-loja { font-weight: 800; font-size: 15px; }
+.cartao-meta { font-size: 12px; color: var(--suave); margin-top: 2px; }
+.cartao-total { font-weight: 800; font-size: 18px; white-space: nowrap; }
+.cartao-obs { padding: 8px 14px 0; font-size: 12px; color: var(--suave); }
+.cartao-itens, .cartao-mais table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cartao-itens td, .cartao-mais td { padding: 6px 14px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.cartao-itens tr:last-child td { border-bottom: none; }
+.cartao-itens td small { display: block; color: var(--suave); font-size: 11px; }
+.cartao-compra td.num { text-align: right; white-space: nowrap; }
+.cartao-compra td.qtd { color: var(--suave); }
+.cartao-mais { border-top: 1px solid var(--borda); }
+.cartao-mais summary { cursor: pointer; padding: 8px 14px; font-size: 13px; color: var(--suave); }
+.msg.com-cartao { max-width: 96%; width: 100%; }

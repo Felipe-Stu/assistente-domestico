@@ -19,16 +19,28 @@ function mostrarAviso(texto) {
 
 function desativarBotoes() { document.querySelectorAll('.resposta-rapida button').forEach((b) => { b.disabled = true; }); }
 
-function adicionar(tipo, texto, extra) {
+const CORRIGIR = { rotulo: 'Corrigir', envio: null, estilo: 'neutro' };
+
+function pedirCorrecao() {
+    const campo = $('texto');
+    campo.placeholder = 'O que corrigir? Ex.: o arroz custou 24,90';
+    campo.focus();
+}
+
+function adicionar(tipo, texto, extra, cartao) {
     const div = document.createElement('div');
-    div.className = `msg ${tipo}`;
+    div.className = `msg ${tipo}${cartao ? ' com-cartao' : ''}`;
     const corpo = document.createElement('div');
     corpo.className = 'corpo';
-    corpo.innerHTML = Formatar.formatarMensagem(texto);
+    corpo.innerHTML = cartao   // M28: compra em cartão, entre a abertura e o pedido de confirmação
+        ? Formatar.formatarMensagem(cartao.antes || '') + Formatar.cartaoCompra(cartao, 6) + Formatar.formatarMensagem(cartao.depois || '')
+        : Formatar.formatarMensagem(texto);
     div.appendChild(corpo);
     if (tipo !== 'usuario') {
         desativarBotoes();
-        const botoes = Formatar.botoesDeResposta(texto);
+        const botoes = cartao && cartao.confirmar
+            ? [{ rotulo: 'Sim, gravar', envio: 'sim', estilo: 'confirmar' }, CORRIGIR, { rotulo: 'Não', envio: 'não', estilo: 'cancelar' }]
+            : Formatar.botoesDeResposta(cartao ? cartao.texto : texto);
         if (botoes.length) {
             const barra = document.createElement('div');
             barra.className = 'resposta-rapida';
@@ -37,7 +49,11 @@ function adicionar(tipo, texto, extra) {
                 botao.type = 'button';
                 botao.className = b.estilo;
                 botao.textContent = b.rotulo;
-                botao.addEventListener('click', () => { desativarBotoes(); enviarTexto(b.envio); });
+                botao.addEventListener('click', () => {
+                    if (b.envio === null) { pedirCorrecao(); return; }   // Corrigir: a compra continua esperando
+                    desativarBotoes();
+                    enviarTexto(b.envio);
+                });
                 barra.appendChild(botao);
             }
             div.appendChild(barra);
@@ -76,7 +92,7 @@ function tratar(evento) {
             break;
         case 'assistant_message':
             if (bolhaEmFluxo) { bolhaEmFluxo.remove(); bolhaEmFluxo = null; }
-            adicionar('assistente', p.text);
+            adicionar('assistente', p.text, '', p.cartao);
             break;
         case 'error':
             if (bolhaEmFluxo) { bolhaEmFluxo.remove(); bolhaEmFluxo = null; }

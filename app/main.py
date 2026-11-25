@@ -19,6 +19,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
 # 2. UTF-8 nos fluxos e pipe do Electron isolado, antes de qualquer outra importação (ver app/ipc.py)
+from app import cartao  # noqa: E402
 from app.ipc import ENTRADA_IPC, emitir_electron  # noqa: E402
 from app.sessao import GerenciadorDeSessao  # noqa: E402
 from app.voz import ModoVoz  # noqa: E402
@@ -505,7 +506,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
         """Fala e exibe a resposta e devolve o sistema à espera de entrada."""
         logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
         self._falar_se_permitido(fala_texto or resposta_texto)
-        emitir_electron("assistant_message", {"text": resposta_texto})
+        emitir_electron("assistant_message", cartao.payload(resposta_texto, self.pendencia))
         self._set_estado("WAITING_INPUT")
         return resposta_texto
 
