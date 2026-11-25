@@ -29,6 +29,11 @@ Detalhes e passo a passo em `Sobre a Versão/09 - Servidor, Celular e Painel (V5
 - Segundo servidor na mesma porta: sai sem iniciar outro núcleo (evita Telegram e pasta de entrada em dobro).
 - Dispositivo criado com o servidor ligado só valia depois de reiniciar (e podia ser apagado): o servidor relê o arquivo quando ele muda.
 
+### Repositório
+- Branch `v5.5` criada a partir da `v4.1` (que fica como histórico); integração contínua também roda nela.
+- Tags de versão: `v4.2.0`, `v4.3.0` e `v5.5.0`, no último commit de cada versão.
+- `enviar-github.bat` (fora do Git) envia a branch atual e as tags.
+
 ### Decisões
 - Fechar a janela do PC não desliga o servidor (o celular é o uso principal fora de casa).
 - SSE em vez de WebSocket: o fluxo é do servidor para os clientes; funciona no navegador sem biblioteca e passa pelo `tailscale serve`.

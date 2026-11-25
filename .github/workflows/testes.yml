@@ -2,7 +2,7 @@ name: Testes
 
 on:
   push:
-    branches: [V4, v4.1]
+    branches: [V4, v4.1, v5.5]
   pull_request:
 
 permissions:
