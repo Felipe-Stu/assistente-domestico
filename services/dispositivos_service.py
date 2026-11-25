@@ -27,26 +27,42 @@ class Dispositivos:
         self.arquivo = Path(arquivo)
         self._agora = agora
         self._lock = threading.Lock()
-        self._lista: List[Dict] = self._ler()
+        self._marca = None
+        self._lista: List[Dict] = []
+        self._recarregar()
 
-    def _ler(self) -> List[Dict]:
+    def _marca_do_arquivo(self):
+        try:
+            estado = self.arquivo.stat()
+            return (estado.st_mtime_ns, estado.st_size)
+        except OSError:
+            return None
+
+    def _recarregar(self) -> None:
+        """Relê o arquivo se ele mudou por fora (ex.: novo-dispositivo.bat com o servidor aberto). Chamar com o lock."""
+        marca = self._marca_do_arquivo()
+        if marca == self._marca:
+            return
         try:
             dados = json.loads(self.arquivo.read_text(encoding="utf-8"))
-            return dados if isinstance(dados, list) else []
+            self._lista = dados if isinstance(dados, list) else []
         except (OSError, ValueError):
-            return []
+            self._lista = [] if marca is None else self._lista
+        self._marca = marca
 
     def _gravar(self) -> None:
         self.arquivo.parent.mkdir(parents=True, exist_ok=True)
         temporario = self.arquivo.with_suffix(".tmp")
         temporario.write_text(json.dumps(self._lista, ensure_ascii=False, indent=1), encoding="utf-8")
         temporario.replace(self.arquivo)
+        self._marca = self._marca_do_arquivo()
 
     def criar(self, nome: str, escopo: str = "remoto") -> str:
         if escopo not in ESCOPOS:
             raise ValueError(f"Escopo inválido: {escopo}")
         token = secrets.token_urlsafe(32)
         with self._lock:
+            self._recarregar()
             ident = secrets.token_hex(3)
             self._lista.append({"id": ident, "nome": " ".join(str(nome).split())[:60] or "dispositivo", "escopo": escopo,
                                 "hash": _hash(token), "criado_em": self._agora().isoformat(timespec="seconds"),
@@ -59,6 +75,7 @@ class Dispositivos:
             return None
         procurado = _hash(token)
         with self._lock:
+            self._recarregar()
             for item in self._lista:
                 if not item.get("revogado") and hmac.compare_digest(item["hash"], procurado):
                     agora = self._agora().isoformat(timespec="minutes")
@@ -70,6 +87,7 @@ class Dispositivos:
 
     def revogar(self, ident_ou_nome: str) -> int:
         with self._lock:
+            self._recarregar()
             n = 0
             for item in self._lista:
                 if not item.get("revogado") and ident_ou_nome in (item["id"], item["nome"]):
@@ -81,6 +99,7 @@ class Dispositivos:
 
     def listar(self) -> List[Dict]:
         with self._lock:
+            self._recarregar()
             return [{k: v for k, v in item.items() if k != "hash"} for item in self._lista]
 
     def token_local(self, arquivo_token: Path) -> str:

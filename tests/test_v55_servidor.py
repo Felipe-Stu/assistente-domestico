@@ -82,6 +82,16 @@ class TestDispositivos(unittest.TestCase):
             with self.assertRaises(ValueError):
                 d.criar("x", "admin")
 
+    def test_aparelho_criado_por_fora_vale_sem_reiniciar_e_nao_se_perde(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            arquivo = Path(pasta) / "d.json"
+            servidor = Dispositivos(arquivo)                 # o servidor aberto
+            pc = servidor.token_local(Path(pasta) / "t.txt")
+            celular = Dispositivos(arquivo).criar("Celular", "remoto")   # novo-dispositivo.bat em outro processo
+            self.assertEqual(servidor.validar(celular)["nome"], "Celular")
+            self.assertIsNotNone(servidor.validar(pc))       # grava "último uso" sem apagar o celular
+            self.assertEqual({i["nome"] for i in Dispositivos(arquivo).listar()}, {"PC (Electron)", "Celular"})
+
 
 def _porta_livre():
     with socket.socket() as s:
