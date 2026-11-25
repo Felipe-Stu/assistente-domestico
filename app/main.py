@@ -11,6 +11,7 @@ import queue
 import re
 import sys
 import threading
+import time
 from pathlib import Path
 
 # 1. sys.path primeiro: os módulos do app vêm da raiz do projeto
@@ -484,6 +485,22 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
         self._set_estado("WAITING_INPUT")
         return MSG_OLLAMA_FORA
 
+    def _emissor_de_fluxo(self, intervalo_s: float = 0.12):
+        """M22: repassa o texto parcial da resposta às telas (no máximo a cada 120 ms); a primeira parte muda o estado."""
+        estado = {"ultimo": 0.0, "primeiro": True}
+
+        def emitir_parcial(texto: str):
+            agora = time.monotonic()
+            if estado["primeiro"]:
+                estado["primeiro"] = False
+                self._set_estado("RESPONDING")
+            elif agora - estado["ultimo"] < intervalo_s:
+                return
+            estado["ultimo"] = agora
+            emitir_electron("assistant_delta", {"text": texto})
+
+        return emitir_parcial
+
     def _entregar_resposta(self, resposta_texto: str, fala_texto: str = None):
         """Fala e exibe a resposta e devolve o sistema à espera de entrada."""
         logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
@@ -600,6 +617,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
                     resposta_texto = execute_with_retry(
                         func=custom_logger.cronometrado("assistente_local", executar_assistente_local),
                         args=(contexto, self.sessao.historico, self._enriquecer_com_memoria(solicitacao_original, contexto)),
+                        kwargs={"ao_parcial": self._emissor_de_fluxo()},
                         max_tentativas=MAX_TENTATIVAS,
                         tempo_espera=TEMPO_RETRY,
                         voice_service=self.voice_service if self.voice_mode_active else None,

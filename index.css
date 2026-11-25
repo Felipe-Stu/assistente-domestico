@@ -601,3 +601,17 @@ body {
     outline: 2px dashed var(--color-primary);
     outline-offset: -6px;
 }
+
+/* M28: mensagens formatadas, erros no chat, botões de resposta e resposta em fluxo */
+.msg-texto ul { margin: 0.3rem 0 0.3rem 1.1rem; padding: 0; }
+.msg-texto li { margin: 0.1rem 0; }
+.msg-texto code { background: rgba(255, 255, 255, 0.08); padding: 0 0.25rem; border-radius: 4px; font-size: 0.9em; }
+.erro-msg .msg-content { border: 1px solid rgba(239, 68, 68, 0.6); background: rgba(239, 68, 68, 0.12); }
+.resposta-rapida { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.btn-rapido { border: none; border-radius: 6px; padding: 0.4rem 1rem; cursor: pointer; font-weight: 600; color: white; }
+.btn-rapido:disabled { opacity: 0.4; cursor: default; }
+.btn-confirmar { background: #16a34a; }
+.btn-cancelar { background: #dc2626; }
+.btn-neutro { background: #475569; }
+.em-fluxo .msg-texto::after { content: "▍"; animation: piscar 1s steps(1) infinite; }
+@keyframes piscar { 50% { opacity: 0; } }

@@ -75,6 +75,10 @@ contextBridge.exposeInMainWorld('api', {
             callback(data);
         });
     },
+    // M22: texto parcial da resposta enquanto o modelo escreve
+    onAssistantDelta: (callback) => {
+        ipcRenderer.on('assistant-delta', (event, data) => callback(data));
+    },
     // Alias mantido para retrocompatibilidade se necessário
     onRespostaBackend: (callback) => {
         ipcRenderer.on('assistant-message', (event, data) => {

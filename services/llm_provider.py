@@ -2,7 +2,7 @@ import json
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 import ollama
 
 try:
@@ -264,23 +264,33 @@ class LocalLLMProvider(BaseLLMProvider):
         self,
         prompt_sistema: str,
         mensagem_usuario: str,
-        historico: Optional[List[Dict[str, str]]] = None
+        historico: Optional[List[Dict[str, str]]] = None,
+        ao_parcial: Optional[Callable[[str], None]] = None
     ) -> str:
+        """Texto puro. Com ao_parcial (M22), a resposta vem em fluxo: o callback recebe o texto acumulado."""
         _atualizar_timestamp_atividade()
         garantir_ollama_disponivel()
         mensagens = self._construir_mensagens(prompt_sistema, mensagem_usuario, historico)
 
         cliente_ollama = ollama.Client(timeout=OLLAMA_TIMEOUT)
+        parametros = {"model": self.modelo, "messages": mensagens, "keep_alive": OLLAMA_KEEP_ALIVE,
+                      "options": {"temperature": self.temperatura}}
         try:
-            response = cliente_ollama.chat(
-                model=self.modelo,
-                messages=mensagens,
-                keep_alive=OLLAMA_KEEP_ALIVE,
-                options={"temperature": self.temperatura}
-            )
+            if ao_parcial is None:
+                response = cliente_ollama.chat(**parametros)
+                return response['message']['content'].strip()
+            partes = []
+            for pedaco in cliente_ollama.chat(stream=True, **parametros):
+                trecho = (pedaco.get("message") or {}).get("content") or ""
+                if trecho:
+                    partes.append(trecho)
+                    try:
+                        ao_parcial("".join(partes))
+                    except Exception:   # tela fechada no meio: a resposta continua
+                        pass
+            return "".join(partes).strip()
         except _ERROS_CONEXAO as e:
             raise _converter_erro_conexao(e) from e
-        return response['message']['content'].strip()
 
     def gerar_texto_imagem(self, prompt_sistema: str, mensagem_usuario: str, imagens: List[Any],
                            max_tokens: int = 1500) -> str:

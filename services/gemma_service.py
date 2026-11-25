@@ -139,9 +139,10 @@ def _orquestrar_pelo_catalogo(texto_transcrito: str, contexto_atual: Optional[st
 
 
 def executar_assistente_local(
-    contexto: str, 
-    historico_mensagens: List[Dict[str, str]], 
-    instrucao_usuario: str
+    contexto: str,
+    historico_mensagens: List[Dict[str, str]],
+    instrucao_usuario: str,
+    ao_parcial=None,
 ) -> str:
     """Responde em texto com o modelo ativo (conversa geral e skills sem roteiro)."""
     _atualizar_timestamp_atividade()
@@ -156,4 +157,6 @@ def executar_assistente_local(
         prompt_sistema = catalogo.skill("conversa-geral").prompt("sistema")
 
     provedor = obter_provedor_local(temperatura=0.2)
+    if ao_parcial is not None:   # M22: resposta em fluxo
+        return provedor.gerar_texto(prompt_sistema, instrucao_usuario, historico_mensagens, ao_parcial=ao_parcial)
     return provedor.gerar_texto(prompt_sistema, instrucao_usuario, historico_mensagens)

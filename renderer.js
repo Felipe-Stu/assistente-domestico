@@ -41,21 +41,51 @@ function escapeHTML(str) {
 // =============================================================================
 // Chat UI
 // =============================================================================
-function appendMessage(sender, text, retryText = null) {
+// M28: botões de resposta rápida ficam só na última mensagem que os pede
+function desativarBotoesAntigos() {
+    document.querySelectorAll('.resposta-rapida button').forEach((b) => { b.disabled = true; });
+}
+
+function adicionarBotoes(msgElement, text) {
+    const botoes = window.Formatar ? window.Formatar.botoesDeResposta(text) : [];
+    if (!botoes.length) return;
+    const barra = document.createElement('div');
+    barra.className = 'resposta-rapida';
+    for (const botao of botoes) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `btn-rapido btn-${botao.estilo}`;
+        b.textContent = botao.rotulo;
+        b.addEventListener('click', () => {
+            desativarBotoesAntigos();
+            window.api.sendText(botao.envio);
+        });
+        barra.appendChild(b);
+    }
+    msgElement.querySelector('.msg-content').insertBefore(barra, msgElement.querySelector('.msg-time'));
+}
+
+function appendMessage(sender, text, retryText = null, opcoes = {}) {
     const msgElement = document.createElement('div');
     msgElement.classList.add('message');
     msgElement.classList.add(sender === 'user' ? 'user-msg' : 'assistant-msg');
+    if (sender === 'erro') msgElement.classList.add('erro-msg');
 
-    const avatar = sender === 'user' ? '👤' : '🤖';
+    const avatar = sender === 'user' ? (opcoes.canal === 'celular' ? '📱' : '👤') : (sender === 'erro' ? '⚠️' : '🤖');
     const timeStr = getFormattedTime();
+    const corpo = window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text);
 
     msgElement.innerHTML = `
         <div class="msg-avatar">${avatar}</div>
         <div class="msg-content">
-            <p>${escapeHTML(text)}</p>
-            <span class="msg-time">${timeStr}</span>
+            <div class="msg-texto">${corpo}</div>
+            <span class="msg-time">${timeStr}${opcoes.canal === 'celular' ? ' · pelo celular' : ''}</span>
         </div>
     `;
+    if (sender !== 'user') {
+        desativarBotoesAntigos();
+        adicionarBotoes(msgElement, text);
+    }
 
     // Botão "Tentar de novo" quando a IA local estava indisponível (reenvia o mesmo texto)
     if (retryText) {
@@ -239,7 +269,7 @@ window.api.onStateChanged((data) => {
             break;
         case 'RESPONDING':
             statusDot.classList.add('dot-responding');
-            statusText.textContent = 'Respondendo por voz...';
+            statusText.textContent = 'Respondendo...';
             chatInput.disabled = true;
             sendBtn.disabled = true;
             break;
@@ -260,14 +290,35 @@ window.api.onStateChanged((data) => {
 // IPC Callbacks — Mensagens do Chat
 // =============================================================================
 window.api.onUserMessage((data) => {
+    const isObj = typeof data === 'object' && data !== null;
+    const text = isObj ? data.text : data;
+    if (text) appendMessage('user', text, null, { canal: isObj ? data.canal : null });
+});
+
+// M22: resposta em fluxo — a mesma bolha é atualizada até chegar a mensagem final
+let bolhaEmFluxo = null;
+
+window.api.onAssistantDelta((data) => {
     const text = typeof data === 'object' && data !== null ? data.text : data;
-    if (text) appendMessage('user', text);
+    if (!text) return;
+    if (!bolhaEmFluxo) {
+        appendMessage('assistant', '');
+        bolhaEmFluxo = chatMessages.lastElementChild;
+        bolhaEmFluxo.classList.add('em-fluxo');
+    }
+    bolhaEmFluxo.querySelector('.msg-texto').innerHTML = window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
 window.api.onAssistantMessage((data) => {
     const isObj = typeof data === 'object' && data !== null;
     const text = isObj ? data.text : data;
-    if (text) appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null);
+    if (!text) return;
+    if (bolhaEmFluxo) {   // troca o texto parcial pelo final
+        bolhaEmFluxo.remove();
+        bolhaEmFluxo = null;
+    }
+    appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null);
 });
 
 // =============================================================================
@@ -338,7 +389,10 @@ window.api.onDebugLog((data) => {
 
 window.api.onError((data) => {
     const message = typeof data === 'object' && data !== null ? data.message : data;
-    if (message) appendDebug(`Erro: ${message}`, 'error');
+    if (!message) return;
+    appendDebug(`Erro: ${message}`, 'error');
+    if (bolhaEmFluxo) { bolhaEmFluxo.remove(); bolhaEmFluxo = null; }
+    appendMessage('erro', message);   // M28: o erro aparece no chat, não só no terminal interno
 });
 
 window.api.onSystemReady(() => {
