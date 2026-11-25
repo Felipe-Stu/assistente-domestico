@@ -63,7 +63,15 @@ Perdeu o celular? `python scripts/dispositivos.py revogar "Celular do Felipe"`. 
 Sem Tailscale, só na rede de casa: `API_HOST=0.0.0.0` no `.env` e o link `http://<IP-do-PC>:8765/entrar?token=…` (sem HTTPS, a página não instala, mas funciona no navegador).
 
 ### Painel de gastos
-Botão **📊 Gastos** na janela do PC, ou 📊 na página do celular. Total, média mensal, gastos por mês, categoria e loja e as últimas compras, com 3, 6, 12 ou 24 meses.
+Botão **📊 Gastos** na janela do PC, ou 📊 na página do celular. Total, média por mês com compras, gastos por mês, por loja e as últimas compras, com 3, 6, 12 ou 24 meses.
+
+**Para onde foi o dinheiro** (detalhamento): gráfico de rosca e lista por categoria. Tocar numa categoria abre os grupos dela; tocar num grupo mostra os itens (data, produto, loja, quantidade, valor). Tocar num mês do gráfico "Por mês" restringe tudo a esse mês. O caminho fica no topo e cada parte volta ao nível dela, por exemplo **Março de 2026 › Carnes e peixes › Frango**.
+
+Grupos por palavras do nome do produto (`SUBGRUPOS` em `services/consultas_service.py`): Carnes (Frango, Bovina, Suína, Peixes), Hortifrúti (Frutas, Legumes, Verduras), Bebidas (Refrigerantes, Cervejas, Sucos, Águas, Vinhos) e Laticínios (Leite, Queijos, Iogurtes, Manteiga, Frios). Nas demais categorias, cada produto é um grupo.
+
+Rota: `GET /api/gastos/detalhe?meses=12&mes=AAAA-MM&categoria=carnes&grupo=Frango` (mês e categoria validados).
+
+**Compras fictícias no banco real** (para testar com volume): `python scripts/compras_ficticias.py inserir | remover | contar`. Ficam ligadas a uma entrada com canal `ficticia` e saem todas de uma vez com `remover` (o estoque perde o que elas somaram).
 
 ### Modo demonstração
 `iniciar-demo.bat`: banco, memória, anexos e ideias separados (`core/database/demo/`), ~140 compras fictícias em lojas inventadas, porta 8766, bot do Telegram desligado. Serve para gravar vídeos sem mostrar dados reais. Recriar os dados: `set ASSISTENTE_DEMO=1 && python scripts/criar_demo.py --recriar`.

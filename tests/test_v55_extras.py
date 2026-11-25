@@ -37,6 +37,36 @@ class TestPainelEMcp(fase1.BaseBanco):
         self.assertEqual(r["por_categoria"][0], {"categoria": "Bebidas", "centavos": 4000})
         self.assertEqual(r["ultimas"][0]["loja"], "Moreschi")
 
+    def test_detalhe_categorias_grupos_e_itens(self):
+        from services.consultas_service import detalhe_gastos
+        gravar(self.assistente(), "2026-11-12", "Moreschi", [("peito de frango", 1, 20.0, "carnes"), ("picanha bovina", 1, 80.0, "carnes"),
+                                                            ("filé de tilápia", 1, 50.0, "carnes"), ("coxa de frango", 2, 10.0, "carnes")])
+        hoje = date(2026, 11, 24)
+        r = detalhe_gastos(self.db, mes="2026-11", hoje=hoje)
+        self.assertEqual(r["nivel"], "categorias")
+        self.assertEqual(r["trilha"][0]["rotulo"], "Novembro de 2026")
+        self.assertEqual(r["linhas"][0]["chave"], "carnes")
+        self.assertEqual((r["total_centavos"], r["compras"]), (19500, 2))
+        r = detalhe_gastos(self.db, mes="2026-11", categoria="carnes", hoje=hoje)
+        self.assertEqual([(l["rotulo"], l["centavos"], l["itens"]) for l in r["linhas"]],
+                         [("Bovina", 8000, 1), ("Peixes e frutos do mar", 5000, 1), ("Frango", 4000, 2)])
+        r = detalhe_gastos(self.db, mes="2026-11", categoria="carnes", grupo="Frango", hoje=hoje)
+        self.assertEqual(r["nivel"], "itens")
+        self.assertEqual([t["rotulo"] for t in r["trilha"]], ["Novembro de 2026", "Carnes e peixes", "Frango"])
+        self.assertEqual(sorted(i["produto"] for i in r["itens"]), ["coxa de frango", "peito de frango"])
+        # sem mês: período inteiro; outubro entra
+        r = detalhe_gastos(self.db, meses=3, hoje=hoje)
+        self.assertEqual(r["total_centavos"], 24100)
+        self.assertEqual(detalhe_gastos(self.db, mes="2026-09", hoje=hoje)["linhas"], [])
+
+    def test_subgrupos(self):
+        from services.consultas_service import subgrupo
+        self.assertEqual(subgrupo("Contra-filé bovino", "carnes"), "Bovina")
+        self.assertEqual(subgrupo("Linguiça toscana", "carnes"), "Suína")
+        self.assertEqual(subgrupo("refrigerante guaraná 2L", "bebidas"), "Refrigerantes")
+        self.assertEqual(subgrupo("banana prata", "hortifruti"), "Frutas")
+        self.assertEqual(subgrupo("detergente 500ml", "limpeza"), "Detergente 500ml")
+
     def test_consultas_do_mcp(self):
         import app.mcp_casa as mcp_casa
         with mock.patch.object(mcp_casa, "_db", self.db):

@@ -16,6 +16,7 @@ Rotas
   POST /api/anexos             multipart, campo "arquivo" (HTML da nota, PDF ou foto)
   GET  /api/eventos            SSE: histórico recente e depois cada evento do núcleo
   GET  /api/gastos/resumo      números do painel (I06)
+  GET  /api/gastos/detalhe     categorias > grupos > itens (mes=AAAA-MM, categoria, grupo)
   GET  /entrar?token=...       grava o token num cookie e abre a página (celular)
   GET  /  e  /painel           página instalável (I04) e painel de gastos (I06)
 """
@@ -106,7 +107,10 @@ def _nome_seguro(nome: str) -> str:
 def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, pasta_recebidos: Path,
               pasta_web: Optional[Path] = None, tamanho_max_mb: float = 20,
               resumo_gastos: Optional[Callable[[int], Dict]] = None,
+              detalhe_gastos: Optional[Callable[..., Dict]] = None,
               ao_desligar: Optional[Callable[[], None]] = None, ping_s: float = 15) -> Starlette:
+    from services.produtos_service import CATEGORIAS
+
     pasta_recebidos = Path(pasta_recebidos)
     limite_bytes = int(tamanho_max_mb * 1024 * 1024)
 
@@ -239,6 +243,27 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
         dados = await asyncio.get_running_loop().run_in_executor(None, resumo_gastos, meses)
         return JSONResponse(dados)
 
+    async def gastos_detalhe(request: Request):
+        if not autenticar(request):
+            return negado()
+        if detalhe_gastos is None:
+            return JSONResponse({"erro": "painel indisponível"}, status_code=503)
+        q = request.query_params
+        try:
+            meses = int(q.get("meses", "12"))
+        except ValueError:
+            meses = 12
+        mes = q.get("mes") or None
+        if mes and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", mes):
+            return JSONResponse({"erro": "mês inválido (AAAA-MM)"}, status_code=400)
+        categoria = q.get("categoria") or None
+        if categoria and categoria not in CATEGORIAS:
+            return JSONResponse({"erro": "categoria desconhecida"}, status_code=400)
+        grupo = (q.get("grupo") or "")[:120] or None
+        dados = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: detalhe_gastos(meses=meses, mes=mes, categoria=categoria, grupo=grupo))
+        return JSONResponse(dados)
+
     async def entrar(request: Request):
         token = request.query_params.get("token", "")
         if not dispositivos.validar(token):
@@ -269,6 +294,7 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
         Route("/api/anexos", anexos, methods=["POST"]),
         Route("/api/eventos", eventos),
         Route("/api/gastos/resumo", gastos),
+        Route("/api/gastos/detalhe", gastos_detalhe),
         Route("/entrar", entrar),
         Route("/sair", sair),
         Route("/", pagina("index.html")),
@@ -289,7 +315,7 @@ def main() -> int:
     import core.config as config
     from app.eventos import barramento
     from app.main import AssistenteRuntime
-    from services.consultas_service import resumo_para_painel
+    from services.consultas_service import detalhe_gastos, resumo_para_painel
     from services.dispositivos_service import Dispositivos
 
     if _ja_rodando(config.API_PORTA):
@@ -312,9 +338,14 @@ def main() -> int:
             raise RuntimeError("banco ainda não aberto")
         return resumo_para_painel(runtime.db_service, meses)
 
+    def detalhe(**filtros):
+        if runtime.db_service is None:
+            raise RuntimeError("banco ainda não aberto")
+        return detalhe_gastos(runtime.db_service, **filtros)
+
     app = criar_app(runtime.fila.put, dispositivos, barramento, pasta_recebidos=config.RECEBIDOS_DIR,
                     pasta_web=config.WEB_DIR, tamanho_max_mb=config.ENTRADAS_TAMANHO_MAX_MB,
-                    resumo_gastos=resumo, ao_desligar=desligar)
+                    resumo_gastos=resumo, detalhe_gastos=detalhe, ao_desligar=desligar)
     configuracao = uvicorn.Config(app, host=config.API_HOST, port=config.API_PORTA, log_level="warning")
     servidor = uvicorn.Server(configuracao)
     servidor_holder["servidor"] = servidor

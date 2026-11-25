@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [V5.5, parte 2] — Painel: para onde foi o dinheiro (2026-11-25)
+
+### Adicionado
+- `consultas_service.detalhe_gastos`: categorias > grupos > itens, no período ou num mês; `subgrupo` com `SUBGRUPOS` (Carnes: Frango, Bovina, Suína, Peixes; Hortifrúti; Bebidas; Laticínios). Rota `GET /api/gastos/detalhe` (mês e categoria validados).
+- Painel: rosca e lista clicável por categoria; grupos; tabela de itens; trilha (ex.: Março de 2026 › Carnes e peixes › Frango); tocar num mês filtra o detalhamento; gráfico de meses na largura real do quadro, com o valor sobre cada barra quando cabe.
+- `scripts/compras_ficticias.py` (inserir, remover, contar): compras inventadas em lojas reais, ligadas a uma entrada com canal `ficticia`.
+- Testes: detalhamento, subgrupos e validação da rota. Suíte: 360 (6 pulados sem as dependências do servidor; com elas, os 10 testes do servidor passaram).
+
+### Corrigido
+- Barras "Por loja" do painel apareciam vazias (faltava `display: block`).
+- "Média por mês" passou a contar só os meses com compras.
+
+### Dados (banco de teste)
+- Removidas as compras #8 e #9 (moto repetida); mantida a #10, a última. Cópia antes: `core/database/backups/antes-compras-ficticias.db`.
+- 94 compras fictícias inseridas (março a novembro de 2026; Irmãos Muffato, Moreschi, Max Atacadista, Engenho Santo Mário, Costela de Chão).
+
+### Roadmap
+- V5 (Olhos) em espera: foco nas consultas de gastos.
+
 ## [V5.5] — Servidor: o núcleo como serviço de rede (2026-11-25)
 
 Detalhes e passo a passo em `Sobre a Versão/09 - Servidor, Celular e Painel (V5.5).md`.

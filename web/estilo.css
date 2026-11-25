@@ -44,8 +44,41 @@ body { display: flex; flex-direction: column; }
 .bloco h2 { font-size: 1rem; margin: 0 0 .7rem; }
 .barra-h { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; gap: .5rem; align-items: center; margin: .3rem 0; font-size: .85rem; }
 .barra-h .trilho { background: var(--fundo); border-radius: 6px; height: 12px; overflow: hidden; }
-.barra-h .cheio { background: var(--azul); height: 100%; }
+.barra-h .cheio { display: block; background: var(--azul); height: 100%; }
 .tabela { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .tabela td { padding: .35rem .2rem; border-bottom: 1px solid var(--borda); }
 .tabela td.num { text-align: right; white-space: nowrap; }
 svg text { fill: var(--suave); font-size: 10px; }
+/* Painel: detalhamento categorias > grupos > itens */
+.dica { font-weight: 400; font-size: .75rem; color: var(--suave); margin-left: .4rem; }
+.mes-clicavel { cursor: pointer; outline: none; }
+.mes-clicavel:focus rect + rect, .mes-clicavel:hover rect + rect { filter: brightness(1.2); }
+.trilha { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; font-size: .9rem; margin-bottom: .3rem; }
+.trilha button { background: none; border: none; color: var(--azul); padding: .1rem 0; font: inherit; cursor: pointer; text-decoration: underline; }
+.trilha .atual { font-weight: 700; }
+.trilha .sep { color: var(--suave); }
+.trilha .limpar-mes { margin-left: auto; text-decoration: none; color: var(--suave); border: 1px solid var(--borda); border-radius: 999px; padding: .1rem .6rem; }
+.resumo-nivel { font-size: .8rem; color: var(--suave); margin-bottom: .8rem; }
+.grafico-nivel { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 560px) { .grafico-nivel { grid-template-columns: 1fr; } .rosca { max-width: 200px; margin: 0 auto; } }
+.rosca { width: 100%; height: auto; display: block; }
+.rosca .rosca-rotulo { font-size: 10px; fill: var(--suave); }
+.rosca .rosca-valor { font-size: 13px; font-weight: 700; fill: var(--texto); }
+.lista-nivel { display: flex; flex-direction: column; gap: .2rem; }
+.linha-nivel { display: grid; grid-template-columns: 10px minmax(90px, 34%) 1fr auto 12px; gap: .5rem; align-items: center;
+    background: none; border: 1px solid transparent; border-radius: 8px; padding: .45rem .4rem; color: var(--texto); font: inherit;
+    font-size: .85rem; text-align: left; cursor: pointer; }
+.linha-nivel:hover, .linha-nivel:focus-visible { background: var(--fundo); border-color: var(--borda); outline: none; }
+.linha-nivel .ponto { width: 10px; height: 10px; border-radius: 50%; }
+.linha-nivel small { display: block; color: var(--suave); font-size: .72rem; }
+.linha-nivel .trilho { background: var(--fundo); border-radius: 6px; height: 10px; overflow: hidden; }
+.linha-nivel .cheio { display: block; height: 100%; }
+.linha-nivel .valor { text-align: right; white-space: nowrap; }
+.linha-nivel .seta { color: var(--suave); font-size: 1.1rem; }
+.tabela.itens th { text-align: left; font-size: .75rem; color: var(--suave); font-weight: 600; padding: .3rem .2rem; border-bottom: 1px solid var(--borda); }
+.tabela.itens th.num { text-align: right; }
+.tabela.itens td small { display: block; color: var(--suave); font-size: .72rem; }
+#por-mes svg { display: block; max-width: 100%; }
+svg text.valor-mes { font-size: 10px; fill: var(--texto); }
+svg text.mes-ativo { fill: #f59e0b; font-weight: 700; }
+svg text { font-size: 11px; }

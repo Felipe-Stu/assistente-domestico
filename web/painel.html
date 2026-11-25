@@ -20,8 +20,13 @@
     <main class="painel">
         <div id="aviso" class="aviso" hidden></div>
         <section class="cartoes" id="cartoes"></section>
-        <section class="bloco"><h2>Por mês</h2><div id="por-mes"></div></section>
-        <section class="bloco"><h2>Por categoria</h2><div id="por-categoria"></div></section>
+        <section class="bloco"><h2>Por mês <small class="dica">toque num mês para ver só ele</small></h2><div id="por-mes"></div></section>
+        <section class="bloco" id="bloco-detalhe">
+            <h2>Para onde foi o dinheiro</h2>
+            <nav class="trilha" id="trilha" aria-label="Caminho"></nav>
+            <div class="resumo-nivel" id="resumo-nivel"></div>
+            <div class="detalhe" id="detalhe"></div>
+        </section>
         <section class="bloco"><h2>Por loja</h2><div id="por-loja"></div></section>
         <section class="bloco"><h2>Últimas compras</h2><table class="tabela" id="ultimas"></table></section>
     </main>

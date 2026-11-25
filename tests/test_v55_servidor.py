@@ -124,7 +124,7 @@ class TestApi(unittest.TestCase):
         web.mkdir()
         (web / "index.html").write_text("<h1>pwa</h1>", encoding="utf-8")
         app = criar_app(enfileirar, cls.disp, cls.bar, pasta_recebidos=pasta / "rec", pasta_web=web, tamanho_max_mb=1,
-                        resumo_gastos=lambda m: {"meses": m}, ao_desligar=lambda: cls.desligado.append(1), ping_s=2)
+                        resumo_gastos=lambda m: {"meses": m}, detalhe_gastos=lambda **f: f, ao_desligar=lambda: cls.desligado.append(1), ping_s=2)
         cls.porta = _porta_livre()
         cls.servidor = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=cls.porta, log_level="warning"))
         threading.Thread(target=cls.servidor.run, daemon=True).start()
@@ -189,6 +189,14 @@ class TestApi(unittest.TestCase):
                 if linha.startswith("data:"):
                     self.assertEqual(json.loads(linha[5:])["instancia"], self.bar.instancia)
                     break
+
+    def test_detalhe_de_gastos_valida_filtros(self):
+        h = self.h(self.celular)
+        r = requests.get(self.U + "/api/gastos/detalhe?mes=2026-03&categoria=carnes&grupo=Frango", headers=h)
+        self.assertEqual(r.json(), {"meses": 12, "mes": "2026-03", "categoria": "carnes", "grupo": "Frango"})
+        self.assertEqual(requests.get(self.U + "/api/gastos/detalhe?mes=2026-13", headers=h).status_code, 400)
+        self.assertEqual(requests.get(self.U + "/api/gastos/detalhe?categoria=x';--", headers=h).status_code, 400)
+        self.assertEqual(requests.get(self.U + "/api/gastos/detalhe").status_code, 401)
 
     def test_ja_rodando(self):
         from app.servidor import _ja_rodando

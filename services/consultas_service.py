@@ -257,3 +257,89 @@ def resumo_para_painel(db, meses: int = 12, hoje=None) -> Dict:
         "ultimas": [{"data": c["data"], "loja": c["loja"], "centavos": c["centavos"], "itens": c["itens"], "obs": c.get("obs")}
                     for c in compras[:10]],
     }
+
+
+# Painel: subgrupos dentro de algumas categorias ("Carnes e peixes" > Frango, Bovina...). Palavras do nome do produto,
+# sem acento; vale o primeiro grupo que casar. Produto que não casa fica pelo próprio nome.
+SUBGRUPOS = {
+    "carnes": [("Frango", ["frango", "galinha", "peito", "coxa", "sobrecoxa", "asa", "chester", "peru"]),
+               ("Suína", ["suino", "suina", "porco", "lombo", "pernil", "costelinha", "bacon", "toucinho", "linguica", "calabresa"]),
+               ("Peixes e frutos do mar", ["peixe", "tilapia", "salmao", "sardinha", "atum", "merluza", "camarao", "bacalhau"]),
+               ("Bovina", ["bovino", "bovina", "boi", "patinho", "alcatra", "picanha", "contra", "file", "acem", "costela", "maminha",
+                           "fraldinha", "cupim", "musculo", "moida", "moido", "carne"])],
+    "hortifruti": [("Frutas", ["banana", "maca", "laranja", "limao", "mamao", "manga", "uva", "abacaxi", "melancia", "melao", "morango",
+                               "pera", "abacate", "goiaba", "maracuja", "kiwi"]),
+                   ("Verduras", ["alface", "couve", "rucula", "agriao", "espinafre", "repolho", "cheiro", "salsinha", "cebolinha"]),
+                   ("Legumes", ["tomate", "batata", "cebola", "alho", "cenoura", "abobrinha", "abobora", "pepino", "pimentao",
+                                "beterraba", "chuchu", "mandioca", "berinjela", "milho", "quiabo"])],
+    "bebidas": [("Refrigerantes", ["refrigerante", "coca", "guarana", "fanta", "pepsi", "sprite", "soda"]),
+                ("Cervejas", ["cerveja", "chopp"]), ("Sucos", ["suco", "nectar"]), ("Águas", ["agua"]),
+                ("Vinhos e destilados", ["vinho", "espumante", "cachaca", "vodka", "whisky"])],
+    "laticinios": [("Leite", ["leite"]), ("Queijos", ["queijo", "mucarela", "mussarela", "requeijao", "parmesao", "ricota"]),
+                   ("Iogurtes", ["iogurte", "coalhada"]), ("Manteiga e margarina", ["manteiga", "margarina"]),
+                   ("Frios", ["presunto", "mortadela", "salame", "peito de peru", "apresuntado"])],
+}
+
+
+def subgrupo(produto: str, categoria: str) -> str:
+    """Grupo do produto dentro da categoria (para o painel); sem regra, o nome do produto."""
+    nome = _norm(produto).lower()
+    palavras = set(nome.split())
+    for rotulo, chaves in SUBGRUPOS.get(categoria, []):
+        for chave in chaves:
+            if (" " in chave and chave in nome) or chave in palavras or any(p.startswith(chave) for p in palavras):
+                return rotulo
+    return (produto or "Sem nome").strip()[:1].upper() + (produto or "Sem nome").strip()[1:]
+
+
+NOMES_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+               "novembro", "dezembro"]
+
+
+def detalhe_gastos(db, meses: int = 12, mes: Optional[str] = None, categoria: Optional[str] = None,
+                   grupo: Optional[str] = None, hoje=None) -> Dict:
+    """
+    Painel: gastos em níveis — categorias > grupos (ex.: Carnes > Frango) > itens.
+    `mes` (AAAA-MM) restringe a um mês; sem ele, vale o período dos últimos `meses`.
+    """
+    import calendar
+    from datetime import date
+    hoje = hoje or date.today()
+    if mes:
+        ano, m = int(mes[:4]), int(mes[5:7])
+        inicio, fim = date(ano, m, 1), date(ano, m, calendar.monthrange(ano, m)[1])
+        rotulo_periodo = f"{NOMES_MESES[m - 1].capitalize()} de {ano}"
+    else:
+        meses = max(1, min(int(meses), 36))
+        ano, m = hoje.year, hoje.month - (meses - 1)
+        while m <= 0:
+            ano, m = ano - 1, m + 12
+        inicio, fim = date(ano, m, 1), hoje
+        rotulo_periodo = f"Últimos {meses} meses" if meses > 1 else "Este mês"
+    itens = ConsultasGastos(db)._itens(Filtro(periodo=Periodo(inicio, fim, rotulo_periodo)))
+    trilha = [{"nivel": "periodo", "rotulo": rotulo_periodo}]
+    if categoria:
+        itens = [i for i in itens if i.categoria == categoria]
+        trilha.append({"nivel": "categoria", "chave": categoria, "rotulo": CATEGORIAS.get(categoria, categoria)})
+    if categoria and grupo:
+        itens = [i for i in itens if subgrupo(i.produto, i.categoria) == grupo]
+        trilha.append({"nivel": "grupo", "chave": grupo, "rotulo": grupo})
+    total = sum(i.total_centavos for i in itens)
+    resposta = {"periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat(), "mes": mes}, "trilha": trilha,
+                "total_centavos": total, "compras": len({i.compra_id for i in itens})}
+    if categoria and grupo:
+        resposta["nivel"] = "itens"
+        resposta["itens"] = [{"data": i.data, "loja": i.loja, "produto": i.produto, "quantidade": i.quantidade,
+                              "unidade": i.unidade, "unitario_centavos": i.unitario_centavos, "centavos": i.total_centavos,
+                              "obs": i.obs_item} for i in sorted(itens, key=lambda i: (i.data, i.compra_id), reverse=True)]
+        return resposta
+    grupos: Dict[str, Dict] = {}
+    for i in itens:
+        chave = subgrupo(i.produto, i.categoria) if categoria else i.categoria
+        g = grupos.setdefault(chave, {"chave": chave, "rotulo": chave if categoria else CATEGORIAS.get(chave, chave),
+                                      "centavos": 0, "itens": 0})
+        g["centavos"] += i.total_centavos
+        g["itens"] += 1
+    resposta["nivel"] = "grupos" if categoria else "categorias"
+    resposta["linhas"] = sorted(grupos.values(), key=lambda g: g["centavos"], reverse=True)
+    return resposta
