@@ -20,3 +20,12 @@ pygame>=2.5.0
 PyYAML>=6.0
 # Leitura de notas fiscais em PDF (services/documentos_service.py)
 pypdf>=4.0
+# V5.5: núcleo como serviço de rede (app/servidor.py): HTTP, eventos do servidor (SSE) e envio de arquivos
+starlette>=0.40
+uvicorn>=0.30
+sse-starlette>=2.0
+python-multipart>=0.0.9
+# V5.5 (I05): servidor MCP somente leitura com as consultas da casa (app/mcp_casa.py)
+mcp>=1.2
+# Imagens de nota (recorte e faixas, services/imagem_service.py)
+Pillow>=10.0

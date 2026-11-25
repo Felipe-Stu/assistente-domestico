@@ -218,3 +218,42 @@ class ConsultasGastos:
             pct = f" ({round(100 * diferenca / menor_v)}% a mais)" if menor_v else ""
             linhas.append(f"Gastou mais {maior[0].rotulo}: {formatar(diferenca)} de diferença{pct}.")
         return Resultado("\n".join(linhas), {"totais": [(p.rotulo, v) for p, v in totais]})
+
+
+def resumo_para_painel(db, meses: int = 12, hoje=None) -> Dict:
+    """I06: números do painel web, em centavos. Por mês (os últimos `meses`), por categoria, por loja e as últimas compras."""
+    from datetime import date
+    hoje = hoje or date.today()
+    ano, mes = hoje.year, hoje.month
+    rotulos = []
+    for _ in range(max(1, min(int(meses), 36))):
+        rotulos.append(f"{ano:04d}-{mes:02d}")
+        mes -= 1
+        if mes == 0:
+            ano, mes = ano - 1, 12
+    rotulos.reverse()
+    consultas = ConsultasGastos(db)
+    inicio = date.fromisoformat(rotulos[0] + "-01")
+    periodo = Periodo(inicio, hoje, f"desde {inicio:%m/%Y}")
+    itens = consultas._itens(Filtro(periodo=periodo))
+    por_mes = {r: 0 for r in rotulos}
+    por_categoria: Dict[str, int] = {}
+    por_loja: Dict[str, int] = {}
+    for i in itens:
+        chave = i.data[:7]
+        if chave in por_mes:
+            por_mes[chave] += i.total_centavos
+        por_categoria[i.categoria] = por_categoria.get(i.categoria, 0) + i.total_centavos
+        por_loja[i.loja] = por_loja.get(i.loja, 0) + i.total_centavos
+    compras = sorted(consultas._compras(itens), key=lambda c: (c["data"], c["id"]), reverse=True)
+    return {
+        "periodo": {"inicio": periodo.inicio_iso, "fim": periodo.fim_iso},
+        "total_centavos": sum(por_mes.values()),
+        "compras": len(compras),
+        "por_mes": [{"mes": r, "centavos": v} for r, v in por_mes.items()],
+        "por_categoria": [{"categoria": CATEGORIAS.get(c, c), "centavos": v}
+                          for c, v in sorted(por_categoria.items(), key=lambda x: x[1], reverse=True)],
+        "por_loja": [{"loja": l, "centavos": v} for l, v in sorted(por_loja.items(), key=lambda x: x[1], reverse=True)[:10]],
+        "ultimas": [{"data": c["data"], "loja": c["loja"], "centavos": c["centavos"], "itens": c["itens"], "obs": c.get("obs")}
+                    for c in compras[:10]],
+    }

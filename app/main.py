@@ -1,6 +1,9 @@
 """
-AssistenteRuntime: ciclo de vida, filas e pipeline de cada solicitação
-(orquestrador → skill → resposta). IPC em app/ipc.py, sessão em app/sessao.py, modo voz em app/voz.py.
+AssistenteRuntime: serviços e pipeline de cada solicitação (orquestrador → skill → resposta).
+
+Módulos do núcleo (M25): app/laco.py (partida e laço de comandos), app/documentos_app.py (notas fiscais),
+app/voz.py (modo voz), app/sessao.py (histórico), app/eventos.py (barramento), app/ipc.py (ponte stdin),
+app/servidor.py (API).
 """
 import logging
 import json
@@ -18,6 +21,8 @@ sys.path.append(str(ROOT_DIR))
 from app.ipc import ENTRADA_IPC, emitir_electron  # noqa: E402
 from app.sessao import GerenciadorDeSessao  # noqa: E402
 from app.voz import ModoVoz  # noqa: E402
+from app.documentos_app import ImportacaoDeDocumentos  # noqa: E402
+from app.laco import LacoDeComandos  # noqa: E402
 
 # 3. Importações organizadas — apenas serviços essenciais no topo
 from services.ai_service import AIService, ServiceUnavailableException, TokenExhaustedException
@@ -91,22 +96,10 @@ MSG_OLLAMA_FORA = (
 
 
 # =============================================================================
-# EMISSÃO IPC PADRONIZADA
-# =============================================================================
-
-
-
-# =============================================================================
-# GERENCIADOR DE SESSÃO
-# =============================================================================
-
-
-
-# =============================================================================
 # RUNTIME PRINCIPAL — TEXT-FIRST COM ATIVAÇÃO DINÂMICA DE VOZ
 # =============================================================================
 
-class AssistenteRuntime(ModoVoz):
+class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
     """
     Runtime unificado do Assistente Doméstico.
     
@@ -149,6 +142,10 @@ class AssistenteRuntime(ModoVoz):
     # -------------------------------------------------------------------------
     # Estado & Emissão
     # -------------------------------------------------------------------------
+
+    def _emitir(self, tipo, payload=None):
+        """Eventos dos módulos do núcleo passam por aqui (o nome é resolvido neste módulo: testes o substituem)."""
+        emitir_electron(tipo, payload)
 
     def _set_estado(self, novo_estado: str):
         self.estado = novo_estado
@@ -422,83 +419,6 @@ class AssistenteRuntime(ModoVoz):
         telegram.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
         emitir_electron("debug_log", {"message": "✓ Bot do Telegram ativo para receber ideias."})
 
-    def _iniciar_pasta_entradas(self):
-        if self.documentos is None:
-            return
-        self.pasta_entradas = PastaEntradas(
-            config_app.ENTRADAS_DIR,
-            ao_encontrar=lambda caminho, canal: self.fila.put({"type": "documento", "payload": {"caminho": str(caminho), "canal": canal}}),
-            intervalo_s=config_app.ENTRADAS_INTERVALO_S,
-        )
-        self.pasta_entradas.iniciar_em_segundo_plano(deve_parar=lambda: self.deve_encerrar)
-        emitir_electron("debug_log", {"message": f"✓ Pasta de notas fiscais vigiada: {config_app.ENTRADAS_DIR}"})
-
-    def _importar_documento(self, caminho: str, canal: str = "pasta", aguardando: bool = False):
-        """Nota fiscal encontrada na pasta de entrada: vira compra aguardando "sim" ou "não"."""
-        arquivo = Path(caminho)
-        if self.pendencia is not None:
-            # Já há uma confirmação esperando: a nota volta para a fila daqui a pouco
-            if canal == "app" and not aguardando:
-                emitir_electron("assistant_message", {"text": f"Recebi {arquivo.name}. Mostro o resumo depois que você responder a confirmação atual (sim ou não)."})
-            threading.Timer(10, lambda: self.fila.put({"type": "documento", "payload": {"caminho": caminho, "canal": canal, "aguardando": True}})).start()
-            return None
-        if canal == "app":
-            self._set_estado("PROCESSING")
-        chat = self._chat_do_arquivo(arquivo)
-        ok = False
-        try:
-            with custom_logger.requisicao(canal=canal, caracteres=0):
-                preparada = self.documentos.importar(arquivo, canal)
-            aberta = perguntas_compra.abrir(f"📄 Nota fiscal recebida ({arquivo.name}):",
-                                            self.documentos.resumo(preparada, com_duvidas=False),
-                                            preparada["compras"], preparada["origem"], preparada.get("duvidas"))
-            self.pendencia = ("compras", aberta["pendencia"])
-            texto = aberta["texto"]
-            ok = True
-        except DocumentoError as erro:
-            texto = f"Não consegui importar {arquivo.name}: {erro}"
-        except Exception as erro:
-            logger.error(f"Falha ao importar documento: {erro}")
-            texto = f"Não consegui importar {arquivo.name} ({type(erro).__name__})."
-        finally:
-            # Só arquivos da pasta de entrada são movidos; o anexo do app fica onde o usuário o guardou
-            if self.pasta_entradas is not None and arquivo.exists() and self._na_pasta_entradas(arquivo):
-                self.pasta_entradas.mover(arquivo, ok)
-            if canal == "app":
-                self._set_estado("WAITING_INPUT")
-        emitir_electron("assistant_message", {"text": texto})
-        if chat is not None and self.telegram is not None:
-            aviso = texto.replace(perguntas_compra.PEDIR_CONFIRMACAO, "Confirme no assistente do PC (sim ou não).")
-            if self.pendencia and self.pendencia[1].get("perguntas"):
-                aviso += "\n\nResponda a pergunta no assistente do PC."
-            self.telegram.enviar(chat, aviso)
-        return texto
-
-    @staticmethod
-    def _na_pasta_entradas(arquivo: Path) -> bool:
-        try:
-            return Path(arquivo).resolve().parent == Path(config_app.ENTRADAS_DIR).resolve()
-        except OSError:
-            return False
-
-    @staticmethod
-    def _chat_do_arquivo(arquivo: Path):
-        partes = arquivo.name.split("_", 2)
-        return int(partes[1]) if len(partes) == 3 and partes[0] == "telegram" and partes[1].lstrip("-").isdigit() else None
-
-    def _receber_arquivo_telegram(self, chat: int, mensagem: dict) -> str:
-        """Arquivo ou foto mandado ao bot: vai para a pasta de entrada e é importado no PC."""
-        documento = mensagem.get("document") or (mensagem.get("photo") or [None])[-1]
-        if not documento:
-            return "Por enquanto eu entendo texto, arquivos (HTML da nota, PDF) e fotos."
-        if (documento.get("file_size") or 0) > 20 * 1024 * 1024:
-            return "Arquivo grande demais: o Telegram só deixa o bot baixar até 20 MB."
-        nome = documento.get("file_name") or f"foto_{mensagem.get('message_id', 'cupom')}.jpg"
-        nome = "".join(c if c.isalnum() or c in "._-" else "_" for c in nome)[-80:]
-        destino = config_app.ENTRADAS_DIR / f"telegram_{chat}_{nome}"
-        self.telegram.baixar(documento["file_id"], destino)
-        return "Recebi o arquivo. O resumo da compra vai aparecer aqui e no assistente do PC para você confirmar."
-
     def _contexto_skill(self, skill=None) -> Contexto:
         """O que as skills podem usar: serviços e a política de repetição. Nada de runtime ou IPC."""
         servicos = {
@@ -735,253 +655,6 @@ class AssistenteRuntime(ModoVoz):
         # Depois da resposta: gravar a memória pode aguardar a carga do modelo de embeddings
         self._registrar_memoria(solicitacao_original, contexto)
         return resposta_texto
-
-    # -------------------------------------------------------------------------
-    # Threads de Leitura
-    # -------------------------------------------------------------------------
-
-    def _leitor_stdin(self):
-        """Thread daemon para ler comandos do Electron (pipe isolado em ENTRADA_IPC)."""
-        while not self.deve_encerrar:
-            try:
-                linha = ENTRADA_IPC.readline()
-                if not linha:
-                    logger.info("Stdin fechado (EOF). Encerrando processo Python.")
-                    self.deve_encerrar = True
-                    self.fila.put({"type": "shutdown"})
-                    break
-
-                conteudo = linha.strip()
-                if not conteudo:
-                    continue
-
-                try:
-                    cmd = json.loads(conteudo)
-                    self.fila.put(cmd)
-                except json.JSONDecodeError:
-                    # Se não for JSON, trata como texto puro (entrada manual no terminal)
-                    self.fila.put({"type": "send_text", "payload": {"text": conteudo}})
-            except Exception as e:
-                logger.error(f"Erro ao processar stdin: {e}")
-
-    # -------------------------------------------------------------------------
-    # Loop Principal
-    # -------------------------------------------------------------------------
-
-    def _iniciar_backup_diario(self):
-        if not BACKUP_ATIVO:
-            emitir_electron("debug_log", {"message": "Cópia de segurança automática desativada (BACKUP_ATIVO=0)."})
-            return
-        servico = BackupService(
-            db_path=DB_PATH,
-            chroma_dir=CHROMA_DIR,
-            pasta_backups=BACKUP_DIR,
-            diarios=BACKUP_DIARIOS,
-            semanais=BACKUP_SEMANAIS,
-        )
-        servico.iniciar_em_segundo_plano(
-            deve_parar=lambda: self.deve_encerrar,
-            ao_gravar=lambda pasta: emitir_electron("debug_log", {"message": f"✓ Cópia de segurança do dia gravada em '{pasta}'."}),
-            ao_falhar=lambda erro: emitir_electron("debug_log", {"message": f"⚠️ Cópia de segurança falhou: {erro}"}),
-        )
-
-    def rodar(self):
-        """Entrypoint principal do runtime."""
-        logger.info("Iniciando Assistente Doméstico (Modelo Text-First)")
-
-        # =====================================================================
-        # FASE 1: Serviços Essenciais (Chat disponível imediatamente depois)
-        # =====================================================================
-        self._inicializar_servicos_essenciais()
-
-        # Inicia thread de leitura do stdin
-        t_stdin = threading.Thread(target=self._leitor_stdin, daemon=True)
-        t_stdin.start()
-
-        # Inicia thread do microfone (ficará em espera até voice_mode_active=True)
-        t_mic = threading.Thread(target=self._loop_microfone, daemon=True)
-        t_mic.start()
-
-        # Varredura inicial do estoque (em background para não bloquear)
-        def _varredura_background():
-            try:
-                emitir_electron("debug_log", {"message": "Executando varredura preditiva de estoque inicial..."})
-                self.inventory_assistant.verificar_itens_expirados_inicializacao()
-                emitir_electron("debug_log", {"message": "✓ Varredura inicial de estoque concluída."})
-            except Exception as e:
-                logger.error(f"Erro na varredura inicial de estoque: {e}")
-                emitir_electron("debug_log", {"message": f"⚠️ Erro na varredura de estoque: {e}"})
-
-        t_varredura = threading.Thread(target=_varredura_background, daemon=True)
-        t_varredura.start()
-
-        # Avisa logo no início se o Ollama estiver fechado (M17), sem atrasar o chat
-        def _verificar_ollama_inicio():
-            erro = llm_provider_estado.verificar_ollama()
-            if erro:
-                emitir_electron("debug_log", {"message": "⚠️ Ollama não respondeu. Abra o Ollama antes de conversar com a IA local."})
-            else:
-                emitir_electron("debug_log", {"message": "✓ Ollama em execução."})
-
-        threading.Thread(target=_verificar_ollama_inicio, daemon=True).start()
-
-        # Cópia de segurança do dia (M11), em segundo plano: o chat não espera por ela
-        self._iniciar_backup_diario()
-
-        # Fila de análise das ideias e bot do Telegram, em segundo plano
-        self._iniciar_ideias_e_telegram()
-
-        # Pasta de entrada de notas fiscais (HTML da NFC-e, PDF, foto)
-        self._iniciar_pasta_entradas()
-
-        # =====================================================================
-        # SISTEMA PRONTO PARA TEXTO — Chat desbloqueado!
-        # =====================================================================
-        self._set_estado("READY")
-        emitir_electron("system_ready")
-        if getattr(self, "_aviso_retomada", False):
-            trocas = sum(1 for m in self.sessao.historico if m["role"] == "user" and not m["content"].startswith("Resumo da conversa"))
-            emitir_electron("assistant_message", {"text": f"Continuei a conversa anterior ({trocas} troca(s) recentes na memória). "
-                                                          "Diga \"nova conversa\" para começar do zero."})
-        self._set_estado("WAITING_INPUT")
-
-        logger.info("🟢 Assistente pronto no MODO TEXTO. Chat desbloqueado para o usuário.")
-        emitir_electron("debug_log", {"message": "Sistema pronto! Modo texto ativo. Digite suas mensagens."})
-
-        # =====================================================================
-        # EVENT LOOP PRINCIPAL
-        # =====================================================================
-        while not self.deve_encerrar:
-            try:
-                cmd = self.fila.get(timeout=1.0)
-            except queue.Empty:
-                continue
-
-            tipo = cmd.get("type")
-            payload = cmd.get("payload", {})
-
-            logger.info(f"Comando recebido: {cmd}")
-
-            # -----------------------------------------------------------------
-            # SHUTDOWN
-            # -----------------------------------------------------------------
-            if tipo == "shutdown":
-                logger.info("Comando de shutdown recebido do Electron. Encerrando...")
-                self.deve_encerrar = True
-                break
-
-            # -----------------------------------------------------------------
-            # TEXTO DO CHAT
-            # -----------------------------------------------------------------
-            elif tipo in ["send_text", "user_message", "text"]:
-                text = payload.get("text", "").strip()
-                if not text:
-                    continue
-
-                # Comandos manuais de saída
-                if text.lower() in ["sair", "exit", "quit"]:
-                    logger.info("Encerrando o Assistente Doméstico...")
-                    self.deve_encerrar = True
-                    break
-
-                # Aborta captura de áudio se houver uma em andamento
-                if self.audio_service:
-                    self.audio_service.abortar_captura()
-
-                # Echo para a UI
-                emitir_electron("user_message", {"text": text})
-
-                try:
-                    self._processar_solicitacao(text)
-                except TokenExhaustedException as e:
-                    logger.warning(f"AVISO DE TOKENS: {e}")
-                    self._falar_se_permitido("Limite de cota atingido para processamento na nuvem.")
-                    emitir_electron("error", {"message": f"Limite de cota atingido: {e}"})
-                except Exception as e:
-                    logger.error(f"Falha ao processar solicitação: {e}")
-                    emitir_electron("error", {"message": f"Falha ao processar solicitação: {e}"})
-                finally:
-                    self._set_estado("WAITING_INPUT")
-
-            # -----------------------------------------------------------------
-            # INPUT DE VOZ (vindo da thread do microfone)
-            # -----------------------------------------------------------------
-            elif tipo == "documento":
-                self._importar_documento(payload.get("caminho", ""), payload.get("canal", "pasta"),
-                                         bool(payload.get("aguardando")))
-
-            elif tipo == "voice_input":
-                text = payload.get("text", "").strip()
-                if not text:
-                    continue
-
-                # Echo para a UI (transcrição de voz)
-                emitir_electron("user_message", {"text": text})
-
-                if self.audio_service:
-                    self.audio_service.abortar_captura()
-
-                try:
-                    self._processar_solicitacao(text, canal="voz")
-                except TokenExhaustedException as e:
-                    logger.warning(f"AVISO DE TOKENS: {e}")
-                    self._falar_se_permitido("Limite de cota atingido para processamento na nuvem.")
-                except Exception as e:
-                    logger.error(f"Falha ao processar solicitação por voz: {e}")
-                    emitir_electron("error", {"message": f"Falha ao processar: {e}"})
-                finally:
-                    self._set_estado("WAITING_INPUT")
-
-            # -----------------------------------------------------------------
-            # TOGGLE MODO VOZ (ativação/desativação dinâmica)
-            # -----------------------------------------------------------------
-            elif tipo == "toggle_voice_mode":
-                enabled = payload.get("enabled", False)
-
-                if enabled:
-                    status = self._ativar_modo_voz()
-                else:
-                    status = self._desativar_modo_voz()
-
-                emitir_electron("voice_mode_status", status)
-
-            # -----------------------------------------------------------------
-            # TOGGLE MUTE (apenas controla TTS, não afeta microfone)
-            # -----------------------------------------------------------------
-            elif tipo == "toggle_mute":
-                self.is_muted = payload.get("muted", not self.is_muted)
-                logger.info(f"🔊 Estado do Áudio alterado: Mudo = {self.is_muted}")
-                emitir_electron("debug_log", {
-                    "message": f"{'🔇 Áudio silenciado.' if self.is_muted else '🔊 Áudio ativado.'}"
-                })
-
-            # -----------------------------------------------------------------
-            # COMPATIBILIDADE: toggle_microphone antigo → redireciona
-            # -----------------------------------------------------------------
-            elif tipo == "toggle_microphone":
-                enabled = payload.get("enabled", False)
-                logger.info(f"toggle_microphone recebido (compatibilidade) → redirecionando para toggle_voice_mode")
-                self.fila.put({"type": "toggle_voice_mode", "payload": {"enabled": enabled}})
-
-            else:
-                logger.warning(f"Comando desconhecido recebido: {tipo}")
-
-        # =====================================================================
-        # SHUTDOWN GRACEFUL
-        # =====================================================================
-        logger.info("Iniciando shutdown graceful...")
-        self._set_estado("STOPPING")
-
-        if self.audio_service:
-            self.audio_service.abortar_captura()
-        if self.voice_service:
-            self.voice_service.encerrar()
-
-        AudioService.remover_callbacks()
-        VoiceService.remover_callbacks()
-
-        logger.info("Runtime finalizado com sucesso.")
-
 
 if __name__ == "__main__":
     runtime = AssistenteRuntime()

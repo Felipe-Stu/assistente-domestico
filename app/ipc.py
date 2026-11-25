@@ -42,9 +42,16 @@ def _isolar_entrada_ipc():
 ENTRADA_IPC = _isolar_entrada_ipc()
 
 
+# Ponte antiga (Electron lendo a saída padrão). O servidor (app/servidor.py) desliga: lá os eventos vão pela rede.
+SAIDA_STDOUT = True
+
+
 def emitir_electron(tipo, payload=None):
-    """Auxiliar para padronizar o envio de mensagens JSON ao Electron."""
-    msg = {"type": tipo}
-    if payload is not None:
-        msg["payload"] = payload
-    print(json.dumps(msg, ensure_ascii=False), flush=True)
+    """Publica um evento do núcleo no barramento e, na ponte antiga, imprime em JSON para o Electron."""
+    from app.eventos import barramento
+    barramento.publicar(tipo, payload)
+    if SAIDA_STDOUT:
+        msg = {"type": tipo}
+        if payload is not None:
+            msg["payload"] = payload
+        print(json.dumps(msg, ensure_ascii=False), flush=True)

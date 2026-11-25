@@ -44,3 +44,9 @@ core/database/biblioteca_indice.json
 /Ideias/
 core/database/estado_claude_assinatura.json
 core/database/telegram_offset.json
+
+# V5.5: tokens dos dispositivos (só os hashes) e token do Electron deste PC
+core/database/dispositivos.json
+core/database/token-local.txt
+# Modo demonstração (I07)
+core/database/demo/

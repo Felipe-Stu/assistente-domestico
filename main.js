@@ -2,6 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { ClienteApi } = require('./cliente-api');
+
+// M23: por padrão o Electron é cliente da API do núcleo. ASSISTENTE_PONTE=stdin volta à ponte antiga.
+const MODO_PONTE = process.env.ASSISTENTE_PONTE === 'stdin';
+let clienteApi = null;
 
 let mainWindow;
 let pythonProcess;
@@ -106,7 +111,25 @@ function startPythonBackend() {
     });
 }
 
+function startBackend() {
+    if (MODO_PONTE) return startPythonBackend();
+    clienteApi = new ClienteApi({
+        python: resolverPython(),
+        aoEvento: (tipo, payload) => sendToRenderer(tipo.replace(/_/g, '-'), payload),
+        aoLog: (mensagem) => sendToRenderer('debug-log', { message: mensagem }),
+        aoErro: (mensagem) => { sendToRenderer('error', mensagem); },
+    });
+    clienteApi.iniciar().catch((erro) => {
+        sendToRenderer('error', erro.message);
+        sendToRenderer('state-changed', 'ERROR');
+    });
+}
+
 function sendToPython(type, payload = {}) {
+    if (clienteApi) {
+        clienteApi.enviar(type, payload);
+        return;
+    }
     if (pythonProcess && !pythonProcess.killed) {
         const msg = JSON.stringify({ type, payload }) + '\n';
         pythonProcess.stdin.write(msg);
@@ -174,6 +197,12 @@ function cleanupAndExit() {
     if (cleanupDone) return;
     cleanupDone = true;
 
+    if (clienteApi) {
+        console.log("Encerramento solicitado. Desligando o servidor do assistente (se foi aberto por esta janela)...");
+        clienteApi.encerrar().finally(() => app.quit());
+        return;
+    }
+
     console.log("Encerramento solicitado. Desconectando back-end Python...");
     sendToPython('shutdown');
 
@@ -199,7 +228,7 @@ function cleanupAndExit() {
 
 app.whenReady().then(() => {
     createWindow();
-    startPythonBackend();
+    startBackend();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

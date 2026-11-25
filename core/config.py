@@ -39,6 +39,14 @@ ENTRADAS_DIR = Path(os.getenv("ENTRADAS_DIR", str(BASE_DIR.parent / "Entradas"))
 ANEXOS_DIR = Path(os.getenv("ANEXOS_DIR", str(BASE_DIR.parent / "Anexos")))         # originais guardados
 ENTRADAS_INTERVALO_S = float(os.getenv("ENTRADAS_INTERVALO_S", "5"))
 
+# M23: API do núcleo (servidor). Fica em 127.0.0.1; o acesso de fora de casa passa pelo Tailscale ("tailscale serve").
+API_HOST = os.getenv("API_HOST", "127.0.0.1")
+API_PORTA = int(os.getenv("API_PORTA", "8765"))
+DISPOSITIVOS_ARQUIVO = Path(os.getenv("DISPOSITIVOS_ARQUIVO", str(DB_DIR / "dispositivos.json")))
+TOKEN_LOCAL_ARQUIVO = Path(os.getenv("TOKEN_LOCAL_ARQUIVO", str(DB_DIR / "token-local.txt")))
+RECEBIDOS_DIR = Path(os.getenv("RECEBIDOS_DIR", str(ANEXOS_DIR / "_recebidos")))   # fotos e arquivos enviados pela API
+WEB_DIR = BASE_DIR / "web"
+
 # M20: histórico da conversa (gravado no SQLite local)
 HISTORICO_JANELA_TROCAS = int(os.getenv("HISTORICO_JANELA_TROCAS", "6"))      # trocas inteiras que vão ao modelo
 HISTORICO_RETOMAR_HORAS = float(os.getenv("HISTORICO_RETOMAR_HORAS", "12"))   # reabrir o app continua a conversa
