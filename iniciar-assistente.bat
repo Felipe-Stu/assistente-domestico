@@ -28,12 +28,19 @@ goto iniciar
 echo Ollama em execucao.
 
 :iniciar
-rem 2. Dependencias do Electron (so na primeira vez)
+rem 2. Bibliotecas do servidor (V5.5): instala na primeira vez
+python -c "import starlette, uvicorn, sse_starlette, multipart" >nul 2>&1
+if errorlevel 1 (
+  echo Instalando as bibliotecas novas do servidor (so desta vez^)...
+  python -m pip install -r requirements.txt
+)
+
+rem 3. Dependencias do Electron (so na primeira vez)
 if exist "node_modules\.bin\electron.cmd" goto abrir
 echo Instalando dependencias do Electron...
 call npm install
 
 :abrir
-rem 3. Abre o assistente (o bot do Telegram e a fila de ideias iniciam junto)
+rem 4. Abre o assistente (o Electron sobe o servidor; o bot do Telegram e a fila de ideias iniciam junto)
 echo Abrindo o assistente. Deixe esta janela aberta (pode minimizar); fechar o assistente encerra tudo.
 call npm start

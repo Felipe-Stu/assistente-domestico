@@ -33,12 +33,17 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from starlette.applications import Starlette  # noqa: E402
-from starlette.middleware import Middleware  # noqa: E402
-from starlette.requests import Request  # noqa: E402
-from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response  # noqa: E402
-from starlette.routing import Mount, Route  # noqa: E402
-from starlette.staticfiles import StaticFiles  # noqa: E402
+try:
+    from starlette.applications import Starlette
+    from starlette.middleware import Middleware
+    from starlette.requests import Request
+    from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response
+    from starlette.routing import Mount, Route
+    from starlette.staticfiles import StaticFiles
+except ImportError as erro:   # dependências da V5.5 ainda não instaladas
+    print(f"FALTAM_DEPENDENCIAS: {erro}. Rode instalar-dependencias.bat (ou: pip install -r requirements.txt).",
+          file=sys.stderr, flush=True)
+    raise SystemExit(3)
 
 COOKIE = "assistente_token"
 LIMITE_TEXTO = 4000

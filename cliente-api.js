@@ -53,16 +53,28 @@ class ClienteApi {
             this.processo = spawn(this.python, ['-u', 'app/servidor.py'], { cwd: RAIZ });
             this.processo.on('error', (erro) => this.aoErro(`Não foi possível iniciar o Python ("${this.python}"): ${erro.message}`));
             this.processo.stdout.on('data', (d) => console.log(`[servidor] ${d.toString().trim()}`));
-            this.processo.stderr.on('data', (d) => console.error(`[servidor] ${d.toString().trim()}`));
+            let faltamDependencias = false;
+            let saiu = false;
+            this.processo.stderr.on('data', (d) => {
+                const texto = d.toString();
+                if (texto.includes('FALTAM_DEPENDENCIAS')) faltamDependencias = true;
+                console.error(`[servidor] ${texto.trim()}`);
+            });
             this.processo.on('exit', (codigo) => {
-                if (!this.encerrando) this.aoErro(`O servidor do assistente encerrou (código ${codigo}).`);
+                saiu = true;
+                if (!this.encerrando && !faltamDependencias) this.aoErro(`O servidor do assistente encerrou (código ${codigo}).`);
             });
             let pronto = false;
-            for (let i = 0; i < 240 && !pronto; i++) {   // até 2 minutos
+            for (let i = 0; i < 240 && !pronto && !saiu; i++) {   // até 2 minutos, ou até o processo sair
                 await esperar(500);
                 pronto = await this.saudavel();
             }
-            if (!pronto) throw new Error('O servidor do assistente não respondeu em 2 minutos.');
+            if (faltamDependencias) {
+                throw new Error('Faltam as bibliotecas do servidor (V5.5). Feche, rode instalar-dependencias.bat e abra de novo. '
+                              + 'Para usar o modo antigo enquanto isso: defina ASSISTENTE_PONTE=stdin.');
+            }
+            if (!pronto) throw new Error(saiu ? 'O servidor do assistente fechou ao iniciar (veja o terminal).'
+                                              : 'O servidor do assistente não respondeu em 2 minutos.');
         }
         for (let i = 0; i < 40 && !this.token; i++) {
             try { this.token = fs.readFileSync(ARQUIVO_TOKEN, 'utf-8').trim(); } catch (e) { await esperar(250); }
