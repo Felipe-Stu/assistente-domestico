@@ -12,7 +12,7 @@ from services.dinheiro import formatar
 from services.periodos import Periodo
 from services.produtos_service import CATEGORIAS, _sem_acentos, chave_produto, normalizar_categoria
 
-TIPOS = ("listar", "total", "por_categoria", "por_loja", "preco_produto", "comparar")
+TIPOS = ("listar", "total", "por_categoria", "por_loja", "preco_produto", "comparar", "detalhe")
 LIMITE_LISTA = 10
 
 

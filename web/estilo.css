@@ -159,3 +159,13 @@ svg text.mes-ativo { fill: var(--acento-texto); }
 .cartao-mais { border-top: 1px solid var(--borda); }
 .cartao-mais summary { cursor: pointer; padding: 8px 14px; font-size: 13px; color: var(--suave); }
 .msg.com-cartao { max-width: 96%; width: 100%; }
+
+/* Gráfico de barras na conversa */
+.cartao-grafico { margin-top: 8px; background: var(--cartao-2); border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.grafico-linha { display: grid; grid-template-columns: minmax(90px, 36%) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.grafico-trilho { height: 10px; border-radius: 5px; background: var(--fundo); overflow: hidden; }
+.grafico-cheio { display: block; height: 100%; border-radius: 5px; }
+.grafico-valor { text-align: right; white-space: nowrap; font-weight: 600; }
+.grafico-valor small { display: block; font-weight: 400; font-size: 11px; color: var(--suave); }
+.grafico-rodape { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--borda); padding-top: 8px; font-size: 13px; color: var(--suave); }
+.abrir-painel { min-height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--borda); background: transparent; color: var(--acento-texto); font-weight: 600; cursor: pointer; }

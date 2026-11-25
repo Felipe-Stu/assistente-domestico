@@ -20,7 +20,7 @@ gatilhos:
       - '\b(?:corrig\w*|corrija|edit\w*|alter\w*)\b.{0,40}\b(?:compra|item|valor|preco|nome|data|loja|mercado)\b'
       - '\b(?:renomei\w*|renomear)\b'
       - '\bna verdade\b.{0,40}\b(?:custou|custaram|saiu|sairam|eram|foram|era|foi)\b'
-      - '\b(?:tire|tira|remova|exclua)\b.{0,30}\bda\s+(?:ultima\s+)?compra\b'
+      - '\b(?:tire|tira|remova|exclua)\b.{0,30}\bd(?:a|essa|esta)\s+(?:ultima\s+)?compra\b'
       - '\b(?:observacao|observacoes|obs)\b'
   - acao: consultar
     prioridade: 20
@@ -31,6 +31,8 @@ gatilhos:
       - '\bmeus gastos\b'
       - '\bgastos\s+(?:de|do|da|com|no|na)\b'
       - '\bultimas?\s+compras?\b'
+      - '\b(?:itens|detalhes?|detalhe)\b.{0,40}\bcompras?\b'
+      - '\b(?:mostr\w*|consult\w*|ver|veja|cite|liste|abr\w*)\b.{0,30}\b(?:ultima|essa|dessa|esta|desta)\s+compra\b'
       - '\b(?:o que|quais\b.{0,30})\s*(?:eu\s+)?(?:preciso|tenho que|devo)\s+comprar\b'
       - '\blista de compras\b'
   - acao: criar
@@ -64,6 +66,7 @@ Registra o que a pessoa comprou: estabelecimento, data e itens (produto, quantid
    Observação (anotação livre) vale para a compra inteira ou para um item; acrescenta, troca ou apaga.
    Enquanto uma compra ou correção espera o "sim", novos pedidos de ajuste se somam a ela.
 5. Consultas (M19): o modelo preenche o formulário `prompts/consulta.md` (tipo, categoria, loja, produto); o período é lido por `services/periodos.py`; `services/consultas_service.py` faz a consulta pronta.
+6. Detalhe de uma compra (M38): "o que comprei no Muffato dia 22", "me mostre a última compra", "itens dessa compra". A compra mostrada, gravada ou corrigida fica em foco: "essa compra" se refere a ela (também nas correções, como "tire o detergente dessa compra").
 
 ## Regras
 

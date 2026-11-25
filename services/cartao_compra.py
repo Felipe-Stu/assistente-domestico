@@ -1,5 +1,5 @@
 """
-Cartão de compra (M28): a compra que espera "sim" ou "não" vai também em forma estruturada, para as telas
+Cartão de compra (M28, M38): a compra que espera "sim" ou "não" vai também em forma estruturada, para as telas
 desenharem um cartão (loja, data, total, itens e botões Sim / Corrigir / Não) em vez do bloco de texto.
 
 O texto completo continua em "text" (telas antigas, Telegram, voz e histórico usam ele); o cartão leva
@@ -64,9 +64,34 @@ def montar(texto: str, pendencia) -> Optional[Dict]:
     }
 
 
-def payload(texto: str, pendencia) -> Dict:
+def de_compra(compra: Dict, antes: str = "", depois: str = "") -> Dict:
+    """M38: cartão só para leitura de uma compra já gravada (detalhe), sem botões de confirmação."""
+    return {"tipo": "compra", "antes": antes, "depois": depois, "texto": f"{antes}\n\n{depois}".strip(),
+            "confirmar": False, "compras": [_compra(compra)]}
+
+
+def grafico(titulo: str, ranking, total_centavos: int, periodo=None, rotulos: Optional[Dict] = None, limite: int = 8) -> Dict:
+    """Gráfico de barras para a conversa (consultas por categoria ou por loja), com atalho para o painel."""
+    rotulos = rotulos or {}
+    linhas = [{"rotulo": rotulos.get(chave, chave), "chave": chave, "centavos": int(valor),
+               "pct": round(100 * valor / total_centavos, 1) if total_centavos else 0} for chave, valor in ranking[:limite]]
+    resto = sum(v for _, v in ranking[limite:])
+    if resto:
+        linhas.append({"rotulo": f"Outras ({len(ranking) - limite})", "chave": None, "centavos": int(resto),
+                       "pct": round(100 * resto / total_centavos, 1) if total_centavos else 0})
+    painel = {}
+    if periodo is not None:
+        # Período de um mês inteiro: o painel abre direto nesse mês
+        if periodo.inicio.day == 1 and periodo.inicio.strftime("%Y-%m") == periodo.fim.strftime("%Y-%m"):
+            painel["mes"] = periodo.inicio.strftime("%Y-%m")
+    return {"tipo": "grafico", "antes": titulo, "depois": "", "texto": titulo, "total_centavos": int(total_centavos),
+            "linhas": linhas, "painel": painel}
+
+
+def payload(texto: str, pendencia, cartao: Optional[Dict] = None) -> Dict:
+    """Corpo do assistant_message: o texto e, quando houver, o cartão (dado pela skill ou montado da compra pendente)."""
     corpo = {"text": texto}
-    cartao = montar(texto, pendencia)
+    cartao = cartao or montar(texto, pendencia)
     if cartao:
         corpo["cartao"] = cartao
     return corpo

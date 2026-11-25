@@ -170,7 +170,7 @@ ipcMain.handle('resumo-gastos', async () => {
     }
 });
 
-ipcMain.on('abrir-painel', async (event, tema) => {
+ipcMain.on('abrir-painel', async (event, tema, filtros) => {
     if (!clienteApi || !clienteApi.token) {
         sendToRenderer('error', 'O painel precisa do servidor do assistente (modo API).');
         return;
@@ -183,7 +183,9 @@ ipcMain.on('abrir-painel', async (event, tema) => {
                                        backgroundColor: claro ? '#f4f5f2' : '#101413',
                                        webPreferences: { contextIsolation: true, nodeIntegration: false } });
     janela.setMenuBarVisibility(false);
-    janela.loadURL(`${BASE}/painel?tema=${claro ? 'claro' : 'escuro'}`);   // mesmo tema da janela principal
+    // mesmo tema da janela principal; vindo de um gráfico da conversa, já abre no mês dele
+    const mes = filtros && /^\d{4}-(0[1-9]|1[0-2])$/.test(filtros.mes || '') ? `&mes=${filtros.mes}` : '';
+    janela.loadURL(`${BASE}/painel?tema=${claro ? 'claro' : 'escuro'}${mes}`);
 });
 
 // Mensagem de texto do chat

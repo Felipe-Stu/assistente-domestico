@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 import core.config as config_app
-from app import cartao
+from services import cartao_compra as cartao
 from services import perguntas_compra
 from services.documentos_service import DocumentoError
 from services.logger_service import logger as custom_logger

@@ -32,9 +32,12 @@ function adicionar(tipo, texto, extra, cartao) {
     div.className = `msg ${tipo}${cartao ? ' com-cartao' : ''}`;
     const corpo = document.createElement('div');
     corpo.className = 'corpo';
-    corpo.innerHTML = cartao   // M28: compra em cartão, entre a abertura e o pedido de confirmação
-        ? Formatar.formatarMensagem(cartao.antes || '') + Formatar.cartaoCompra(cartao, 6) + Formatar.formatarMensagem(cartao.depois || '')
+    const desenho = cartao && cartao.tipo === 'grafico' ? Formatar.cartaoGrafico(cartao) : (cartao ? Formatar.cartaoCompra(cartao, 6) : '');
+    corpo.innerHTML = cartao   // M28: compra em cartão (ou gráfico), entre a abertura e o pedido de confirmação
+        ? Formatar.formatarMensagem(cartao.antes || '') + desenho + Formatar.formatarMensagem(cartao.depois || '')
         : Formatar.formatarMensagem(texto);
+    const abrir = corpo.querySelector('.abrir-painel');
+    if (abrir) abrir.addEventListener('click', () => { location.href = '/painel' + (abrir.dataset.mes ? `?mes=${abrir.dataset.mes}` : ''); });
     div.appendChild(corpo);
     if (tipo !== 'usuario') {
         desativarBotoes();

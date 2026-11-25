@@ -396,7 +396,8 @@ class ShoppingAssistant:
         return {
             "status": "sucesso",
             "mensagem": "\n".join(["Compra registrada."] + [f"- {linha}" for linha in linhas]),
-            "compras_processadas": len(compra_ids)
+            "compras_processadas": len(compra_ids),
+            "ids": list(compra_ids),
         }
 
     def _vetorizar_compra(self, compra_id: int, dados_validados: Dict[str, Any]) -> None:

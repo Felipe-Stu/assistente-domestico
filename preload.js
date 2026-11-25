@@ -79,7 +79,7 @@ contextBridge.exposeInMainWorld('api', {
     desligarAssistente: () => ipcRenderer.send('desligar-assistente'),
 
     // I06: abre o painel de gastos numa janela
-    abrirPainel: (tema) => ipcRenderer.send('abrir-painel', tema),
+    abrirPainel: (tema, filtros) => ipcRenderer.send('abrir-painel', tema, filtros || {}),
     // M28: { resumo, mes } para a coluna da direita, ou null
     resumoGastos: () => ipcRenderer.invoke('resumo-gastos'),
 

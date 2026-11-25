@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [V5.5, parte 5] — M38: detalhe de uma compra e "essa compra"; gráficos na conversa (2026-11-25)
+
+### Adicionado
+- **Detalhe de uma compra** (consulta `detalhe`): "me mostre a última compra", "o que comprei no Muffato", "a compra do Max", "itens dessa compra", "compra 7". Responde com o cartão da compra (loja, data, NF, itens), sem botões. O tipo vale também quando o modelo devolve "listar" para um pedido de uma compra só (caso do teste do usuário em 24/11); "o que comprei em novembro" continua listando.
+- **Compra em foco**: a última mostrada, gravada ou corrigida fica em foco na conversa; "essa compra", "dessa compra" e "nessa compra" se referem a ela, também nas correções ("tire o detergente dessa compra").
+- **Gráfico na conversa** para "gastos por categoria" e "por loja": barras com valor e porcentagem e o botão **Abrir no painel**, que abre o painel já no mês perguntado (`/painel?mes=AAAA-MM`).
+- `Resposta.cartao` (motor de skills): a skill pode mandar dados para a tela desenhar; `services/cartao_compra.py` (antes `app/cartao.py`) monta cartões de compra e gráficos.
+- Testes: `tests/test_m38.py` (7). Suíte: 370 (6 pulados sem as dependências do servidor).
+
 ## [V5.5, parte 4] — Cartão de compra (2026-11-25)
 
 ### Adicionado

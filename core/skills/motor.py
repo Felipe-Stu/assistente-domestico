@@ -32,6 +32,7 @@ class Resposta:
     fala: Optional[str] = None          # texto para a voz, quando diferente do chat
     pendencia: Any = None               # dados aguardando confirmação; a próxima mensagem volta para a skill
     encaminhar: Optional[str] = None    # nome de outra skill (de execução "nucleo") que deve responder ao pedido
+    cartao: Any = None                  # dados para a tela desenhar (ex.: cartão de uma compra, M38)
 
 
 @dataclass

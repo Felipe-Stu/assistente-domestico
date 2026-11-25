@@ -10,6 +10,10 @@ const CORES = ['#14b8a6', '#f59e0b', '#60a5fa', '#f87171', '#a78bfa', '#f472b6',
 const $ = (id) => document.getElementById(id);
 
 const estado = { meses: '12', mes: null, categoria: null, grupo: null };
+try {   // vindo de um gráfico da conversa: abre direto no mês
+    const mesUrl = new URLSearchParams(location.search).get('mes');
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(mesUrl || '')) estado.mes = mesUrl;
+} catch (e) { /* sem URL */ }
 const dataBr = (iso) => iso.split('-').reverse().join('/');
 const qtd = (q, u) => `${Number(q).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${esc(u)}`;
 

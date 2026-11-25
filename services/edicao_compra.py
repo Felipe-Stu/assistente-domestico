@@ -211,7 +211,7 @@ def _qtd(valor: float) -> str:
 # Plano B sem modelo: frases comuns de correção
 _REGRAS = [
     ("produto", re.compile(r"\b(?:renome\w*|troqu\w* o nome d[eoa]s?|mud\w* o nome d[eoa]s?)\s+(?:o\s+|a\s+)?(?P<item>.+?)\s+(?:para|por|pra)\s+(?P<valor>.+)$")),
-    ("remover_item", re.compile(r"\b(?:tire|tira|remova|remove|apague|apaga|exclua|exclui)\s+(?:o\s+|a\s+|os\s+|as\s+)?(?P<item>.+?)\s+da\s+(?:ultima\s+)?compra\b")),
+    ("remover_item", re.compile(r"\b(?:tire|tira|remova|remove|apague|apaga|exclua|exclui)\s+(?:o\s+|a\s+|os\s+|as\s+)?(?P<item>.+?)\s+d(?:a|essa|esta|aquela)\s+(?:ultima\s+)?compra\b")),
     ("loja", re.compile(r"\b(?:a\s+)?(?:loja|mercado)\s+(?:certa\s+|correta\s+)?(?:era|e|foi|eh)\s+(?:o\s+|a\s+)?(?P<valor>.+)$")),
     ("data", re.compile(r"\b(?:foi|era)\s+(?:no\s+|em\s+)?(?:dia\s+)?(?P<valor>\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b")),
     ("quantidade", re.compile(r"\b(?:eram|foram|era|foi)\s+(?P<valor>\d+(?:[.,]\d+)?)\s*(?:un\w*|kg|quilos?|litros?|l|g|gramas?|pacotes?|caixas?)?\s+(?:de\s+)?(?P<item>[a-z].+?)(?:\s+e\s+nao\b.*)?$")),
@@ -247,7 +247,8 @@ def mudancas_por_regra(texto: str) -> List[Dict]:
         return observacao
     normal = _norm(texto).strip(" .!?")
     normal = re.sub(r"^(?:na verdade|corrija|corrigir|corrige|edite|editar|altere|alterar)[,:]?\s+", "", normal)
-    normal = re.sub(r"^(?:na|da)\s+(?:ultima\s+)?compra(?:\s+(?:n(?:umero|o)?\s*)?\d+|\s+d[oa]\s+\S+)?[,:]?\s+", "", normal)
+    normal = re.sub(r"^(?:na|da|nessa|dessa|nesta|desta)\s+(?:ultima\s+)?compra(?:\s+(?:n(?:umero|o)?\s*)?\d+|\s+d[oa]\s+\S+)?[,:]?\s+", "", normal)
+    normal = re.sub(r"\s+(?:n|d)(?:essa|esta|aquela)\s+compra\b", "", normal) if not re.search(r"\b(?:tire|tira|remova|remove|apague|apaga|exclua|exclui)\b", normal) else normal
     for campo, padrao in _REGRAS:
         m = padrao.search(normal)
         if m:

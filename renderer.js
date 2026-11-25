@@ -86,7 +86,8 @@ function appendMessage(sender, text, retryText = null, opcoes = {}) {
     const avatar = sender === 'user' ? (opcoes.canal === 'celular' ? ICONE_CELULAR : ICONE_PESSOA) : (sender === 'erro' ? '!' : '');
     const timeStr = getFormattedTime();
     const cartao = opcoes.cartao && window.Formatar && window.Formatar.cartaoCompra ? opcoes.cartao : null;
-    const corpo = cartao ? window.Formatar.formatarMensagem(cartao.antes || '') + window.Formatar.cartaoCompra(cartao)
+    const desenho = cartao && cartao.tipo === 'grafico' ? window.Formatar.cartaoGrafico(cartao) : (cartao ? window.Formatar.cartaoCompra(cartao) : '');
+    const corpo = cartao ? window.Formatar.formatarMensagem(cartao.antes || '') + desenho
                            + window.Formatar.formatarMensagem(cartao.depois || '')
                          : (window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text));
 
@@ -115,6 +116,9 @@ function appendMessage(sender, text, retryText = null, opcoes = {}) {
         });
         msgElement.querySelector('.msg-content').insertBefore(retryBtn, msgElement.querySelector('.msg-time'));
     }
+
+    const abrir = msgElement.querySelector('.abrir-painel');
+    if (abrir) abrir.addEventListener('click', () => window.api.abrirPainel(temaAtual(), { mes: abrir.dataset.mes || null }));
 
     chatMessages.appendChild(msgElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;

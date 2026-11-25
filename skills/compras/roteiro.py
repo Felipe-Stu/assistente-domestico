@@ -3,7 +3,8 @@ Roteiro da skill compras (SK3): passos em ordem fixa.
 
 registrar: extrair (modelo, uma chamada) → validar (código) → gravar, ou pedir confirmação se houver dúvida
 desfazer:  apagar o último registro
-consultar: formulário do modelo (tipo, categoria, loja, produto) + período lido pelo código → consulta pronta (M19)
+consultar: formulário do modelo (tipo, categoria, loja, produto) + período lido pelo código → consulta pronta (M19);
+           "detalhe" mostra os itens de uma compra (M38)
 corrigir:  formulário do modelo (o que mudar) → o código localiza a compra, refaz as contas e pede "sim" (M10)
 """
 import json
@@ -12,13 +13,14 @@ import re
 from core.skills.motor import Resposta
 from services.intent_router import normalizar_texto
 from core.skills import obter_catalogo
-from services import edicao_compra, perguntas_compra
+from services import cartao_compra, edicao_compra, perguntas_compra
 from services.consultas_service import TIPOS, ConsultasGastos, Filtro
 from services.esquemas import ESQUEMA_CONSULTA_GASTOS, ESQUEMA_EDICAO_COMPRA
 from services.periodos import encontrar_periodos
-from services.produtos_service import normalizar_categoria
+from services.produtos_service import CATEGORIAS, normalizar_categoria
 from services.nfce_service import parece_nfce_texto, parece_nfe_texto
 from services.logger_service import logger as custom_logger
+from services.dinheiro import formatar_reais
 
 RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "pode", "pode gravar", "pode salvar",
                        "gravar", "salvar", "grava", "salva"}
@@ -26,6 +28,39 @@ RESPOSTAS_CONFIRMAR = {"sim", "s", "ok", "confirmo", "confirmar", "correto", "po
 _RE_PARECE_AJUSTE = re.compile(r"\b(?:observa\w*|obs|anot\w*|adicion\w*|acrescent\w*|corrij\w*|corrig\w*|alter\w*|"
                                r"renomei\w*|tire|tira|remova|troqu\w*|mude|custou|custaram|a data|a loja)\b")
 RESPOSTAS_CANCELAR = {"nao", "n", "cancela", "cancelar", "descarta", "descartar", "nao grava", "nao gravar", "nao salve"}
+
+
+# ---------------------------------------------------------------------------
+# Compra em foco (M38): "essa compra" é a última mostrada, gravada ou corrigida nesta conversa
+# ---------------------------------------------------------------------------
+_RE_ESSA_COMPRA = re.compile(r"\b(?:essa|dessa|nessa|esta|desta|nesta|aquela|daquela|naquela|mesma)\s+compra\b")
+
+
+def _foco(ctx) -> dict:
+    foco = ctx.servicos.get("foco_compra")
+    return foco if isinstance(foco, dict) else {}
+
+
+def _marcar_foco(ctx, compra_id) -> None:
+    if compra_id:
+        _foco(ctx)["id"] = int(compra_id)
+
+
+def _compra_em_foco(ctx, normal: str):
+    """Id da compra em foco, se a frase se refere a ela ("essa compra") e ela ainda existe."""
+    compra_id = _foco(ctx).get("id")
+    if not compra_id or not _RE_ESSA_COMPRA.search(normal):
+        return None
+    linha = ctx.servico("db_service").executar_consulta_uma_linha("SELECT id FROM compras WHERE id = ?", (compra_id,))
+    return linha[0] if linha else None
+
+
+def _registrar(ctx, compras_para_gravar, origem) -> str:
+    resultado = ctx.servico("shopping_assistant").registrar_compras(compras_para_gravar, origem)
+    ids = resultado.get("ids") if isinstance(resultado, dict) else None
+    if ids:
+        _marcar_foco(ctx, ids[-1])
+    return resultado["mensagem"]
 
 
 def executar(ctx, texto, decisao):
@@ -75,7 +110,7 @@ def executar(ctx, texto, decisao):
         return Resposta(aberta["texto"], fala="Tenho uma dúvida sobre esta compra. Confira no chat.",
                         pendencia=aberta["pendencia"])
 
-    return Resposta(compras.registrar_compras(preparada["compras"], origem)["mensagem"])
+    return Resposta(_registrar(ctx, preparada["compras"], origem))
 
 
 def responder_pendencia(ctx, texto, pendente):
@@ -115,7 +150,7 @@ def responder_pendencia(ctx, texto, pendente):
         return Resposta(f"Ficou assim:\n{servico.formatar_resumo(compras_pendentes)}\n\n{perguntas_compra.PEDIR_CONFIRMACAO}",
                         fala="Confira o resumo no chat e responda sim ou não.", pendencia=novo)
     if resposta in RESPOSTAS_CONFIRMAR:
-        return Resposta(servico.registrar_compras(compras_pendentes, origem)["mensagem"])
+        return Resposta(_registrar(ctx, compras_pendentes, origem))
     if resposta in RESPOSTAS_CANCELAR:
         servico.descartar(origem)
         return Resposta("Compra descartada. Nada foi gravado.")
@@ -130,6 +165,44 @@ def responder_pendencia(ctx, texto, pendente):
 # ---------------------------------------------------------------------------
 
 _RE_LISTA_DE_COMPRAS = re.compile(r"\b(lista de compras|(?:preciso|tenho que|devo) comprar)\b")
+
+
+# Pedido de uma compra só: itens, detalhe, "essa compra", "última compra", "compra 7"
+_RE_DETALHE = re.compile(r"\b(?:itens|detalh\w*|(?:essa|dessa|nessa|esta|desta|nesta|aquela|daquela)\s+compra|"
+                         r"ultima compra|compra\s+(?:n(?:umero|o|º)?\s*)?\d+|(?:a|essa)\s+compra\s+(?:do|da|no|na|de)\s+(?!mes\b|dia\b|semana\b|ano\b|hoje\b|ontem\b)\w+)\b")
+_RE_O_QUE_COMPREI = re.compile(r"\bo que (?:eu )?comprei\b")
+_RE_COMPREI_NA_LOJA = re.compile(r"\bcomprei\s+(?:no|na)\s+(?!dia\b)([a-z0-9][a-z0-9 ]{1,30}?)(?=[,.:!?]|\s+(?:dia|em|ontem|hoje|semana|mes)\b|$)")
+
+
+def _e_detalhe(normal: str, periodos, loja) -> bool:
+    if _RE_DETALHE.search(normal):
+        return True
+    # "o que comprei no Muffato" ou "o que comprei dia 22": uma compra; "o que comprei em novembro": várias (listar)
+    um_dia = bool(periodos) and periodos[0].inicio_iso == periodos[0].fim_iso
+    return bool(_RE_O_QUE_COMPREI.search(normal)) and (bool(loja) or um_dia or bool(_RE_COMPREI_NA_LOJA.search(normal)))
+
+
+def detalhar(ctx, texto: str, loja=None) -> Resposta:
+    """M38: itens, valores, NF e observações de uma compra; ela passa a ser a compra em foco."""
+    db = ctx.servico("db_service")
+    normal = normalizar_texto(texto)
+    compra_id = _compra_em_foco(ctx, normal)
+    if compra_id is None:
+        if not loja:
+            citada = _RE_LOJA_CITADA.search(normal) or _RE_COMPREI_NA_LOJA.search(normal)
+            loja = citada.group(1).strip() if citada else None
+        compra_id = edicao_compra.localizar_compra(db, texto, [], loja)
+    if compra_id is None:
+        return Resposta("Não achei essa compra. Diga a loja, a data ou o número da compra.")
+    compra = db.obter_compra(compra_id)
+    from services.shopping_assistant import ShoppingAssistant
+    _marcar_foco(ctx, compra_id)
+    custom_logger.evento("compras", "consulta", tipo="detalhe", compra=compra_id)
+    antes = f"🧾 Compra #{compra_id}:"
+    depois = "Para mudar algo, é só pedir (ex.: \"tire o detergente dessa compra\")."
+    return Resposta(f"{antes}\n{ShoppingAssistant.formatar_resumo([compra])}\n\n{depois}",
+                    fala=f"Compra de {compra['estabelecimento']}, total de {formatar_reais(compra['valor_total_compra'])}. Os itens estão no chat.",
+                    cartao=cartao_compra.de_compra(compra, antes, depois))
 
 
 def _tipo_por_regra(normal: str, periodos) -> str:
@@ -188,6 +261,9 @@ def consultar(ctx, texto: str) -> Resposta:
         categoria = None   # o produto já define o que procurar; a categoria do modelo só restringiria (medição de 24/11)
     if tipo == "comparar" and len(periodos) < 2:
         tipo = "total"
+    # M38: pedido de uma compra só (o modelo às vezes devolve "listar": medição do usuário em 24/11)
+    if tipo == "detalhe" or (tipo in ("listar", "total") and _e_detalhe(normal, periodos, loja) and not categoria and not produto):
+        return detalhar(ctx, texto, loja)
     filtro = Filtro(periodo=periodos[0] if periodos and tipo != "comparar" else None,
                     categoria=categoria, loja=loja, produto=produto)
     consultas = ConsultasGastos(ctx.servico("db_service"))
@@ -197,7 +273,13 @@ def consultar(ctx, texto: str) -> Resposta:
         resultado = getattr(consultas, tipo)(filtro)
     custom_logger.evento("compras", "consulta", tipo=tipo, categoria=categoria, loja=bool(loja), produto=bool(produto),
                          periodos=len(periodos))
-    return Resposta(resultado.texto)
+    grafico = None
+    if tipo in ("por_categoria", "por_loja") and resultado.dados.get("ranking"):
+        # Gráfico na própria conversa, com atalho para o painel (o texto completo segue para voz e telas antigas)
+        grafico = cartao_compra.grafico(resultado.texto.split("\n", 1)[0], resultado.dados["ranking"],
+                                        resultado.dados["total_centavos"], filtro.periodo,
+                                        rotulos=CATEGORIAS if tipo == "por_categoria" else None)
+    return Resposta(resultado.texto, cartao=grafico)
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +363,7 @@ def editar(ctx, texto: str) -> Resposta:
     if not loja:
         citada = _RE_LOJA_CITADA.search(normalizar_texto(texto))
         loja = citada.group(1).strip() if citada else None
-    compra_id = edicao_compra.localizar_compra(db, texto, mudancas, loja)
+    compra_id = _compra_em_foco(ctx, normalizar_texto(texto)) or edicao_compra.localizar_compra(db, texto, mudancas, loja)
     if compra_id is None:
         return Resposta("Não achei a compra para corrigir. Diga a loja, a data ou o número da compra. Nada foi alterado.")
     compra = db.obter_compra(compra_id)
@@ -321,6 +403,7 @@ def _responder_edicao(ctx, texto: str, pendente: dict) -> Resposta:
     except Exception as erro:
         return Resposta(f"Não consegui gravar a correção ({type(erro).__name__}). A compra continua como estava.")
     nova = dados["nova"]
+    _marcar_foco(ctx, dados["compra_id"])
     return Resposta(f"✅ Compra corrigida: {_rotulo_compra(nova)}, total "
                     f"{edicao_compra.formatar_reais(nova['valor_total_compra'])}.")
 

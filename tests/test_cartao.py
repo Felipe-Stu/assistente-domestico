@@ -1,4 +1,4 @@
-"""M28: cartão da compra aguardando confirmação (app/cartao.py)."""
+"""M28: cartão da compra aguardando confirmação (services/cartao_compra.py)."""
 import sys
 import unittest
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from app import cartao  # noqa: E402
+from services import cartao_compra as cartao  # noqa: E402
 from services.perguntas_compra import PEDIR_CONFIRMACAO  # noqa: E402
 from services.shopping_assistant import ShoppingAssistant  # noqa: E402
 

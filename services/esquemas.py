@@ -51,7 +51,7 @@ ESQUEMA_COMPRAS: Dict[str, Any] = {
 ESQUEMA_CONSULTA_GASTOS: Dict[str, Any] = {
     "type": "object",
     "properties": {
-        "tipo": {"type": "string", "enum": ["listar", "total", "por_categoria", "por_loja", "preco_produto", "comparar"]},
+        "tipo": {"type": "string", "enum": ["listar", "total", "por_categoria", "por_loja", "preco_produto", "comparar", "detalhe"]},
         "categoria": {"type": ["string", "null"], "enum": list(CATEGORIAS) + [None]},
         "loja": {"type": ["string", "null"]},
         "produto": {"type": ["string", "null"]},

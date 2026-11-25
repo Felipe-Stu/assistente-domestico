@@ -75,7 +75,21 @@
         }).join('');
     }
 
-    const api = { escapar, formatarMensagem, botoesDeResposta, cartaoCompra };
+    // Gráfico de barras na conversa (consultas por categoria ou por loja)
+    const CORES = ['#14b8a6', '#f59e0b', '#60a5fa', '#f87171', '#a78bfa', '#f472b6', '#84cc16', '#fb923c', '#94a3b8'];
+    function cartaoGrafico(cartao) {
+        const maior = Math.max(1, ...(cartao.linhas || []).map((l) => l.centavos));
+        const linhas = (cartao.linhas || []).map((l, i) => `
+            <div class="grafico-linha"><span class="grafico-rotulo">${escapar(l.rotulo)}</span>
+              <span class="grafico-trilho"><span class="grafico-cheio" style="width:${(100 * l.centavos / maior).toFixed(1)}%;background:${CORES[Math.min(i, CORES.length - 1)]}"></span></span>
+              <span class="grafico-valor">${reais(l.centavos)}<small>${Number(l.pct).toLocaleString('pt-BR')}%</small></span></div>`).join('');
+        const mes = cartao.painel && /^\d{4}-\d{2}$/.test(cartao.painel.mes || '') ? cartao.painel.mes : '';
+        return `<div class="cartao-grafico">${linhas}
+            <div class="grafico-rodape"><span>Total ${reais(cartao.total_centavos)}</span>
+            <button type="button" class="abrir-painel" data-mes="${mes}">Abrir no painel</button></div></div>`;
+    }
+
+    const api = { escapar, formatarMensagem, botoesDeResposta, cartaoCompra, cartaoGrafico };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     raiz.Formatar = api;
 })(typeof window !== 'undefined' ? window : globalThis);

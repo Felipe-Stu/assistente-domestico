@@ -19,7 +19,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
 # 2. UTF-8 nos fluxos e pipe do Electron isolado, antes de qualquer outra importação (ver app/ipc.py)
-from app import cartao  # noqa: E402
+from services import cartao_compra as cartao  # noqa: E402
 from app.ipc import ENTRADA_IPC, emitir_electron  # noqa: E402
 from app.sessao import GerenciadorDeSessao  # noqa: E402
 from app.voz import ModoVoz  # noqa: E402
@@ -119,6 +119,8 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
         self.sessao = GerenciadorDeSessao(janela_trocas=config_app.HISTORICO_JANELA_TROCAS)
         # (nome da skill, dados) aguardando confirmação: a próxima mensagem volta para essa skill
         self.pendencia = None
+        # M38: compra em foco na conversa ("essa compra")
+        self.foco_compra = {"id": None}
 
         # Serviços essenciais (inicializados na Fase 1)
         self.db_service = None
@@ -434,6 +436,8 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
             "documentos": getattr(self, "documentos", None),
             # Modelo local residente, para qualquer skill (SK6): uma skill nova não precisa mudar o núcleo
             "llm_local": LocalLLMProvider(temperatura=0.1),
+            # M38: compra em foco na conversa ("essa compra"): a última mostrada, gravada ou corrigida
+            "foco_compra": self.__dict__.setdefault("foco_compra", {"id": None}),
         }
         if skill is not None and skill.nome == "programacao":
             servicos.update({
@@ -463,7 +467,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
         resposta = motor_skills.responder_pendencia(skill, self._contexto_skill(skill), texto, dados)
         if resposta.pendencia is not None:
             self.pendencia = (nome, resposta.pendencia)
-        return self._entregar_resposta(resposta.texto, resposta.fala)
+        return self._entregar_resposta(resposta.texto, resposta.fala, resposta.cartao)
 
     # -------------------------------------------------------------------------
     # Processamento de Solicitação (Orquestração)
@@ -502,11 +506,11 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
 
         return emitir_parcial
 
-    def _entregar_resposta(self, resposta_texto: str, fala_texto: str = None):
+    def _entregar_resposta(self, resposta_texto: str, fala_texto: str = None, cartao_skill=None):
         """Fala e exibe a resposta e devolve o sistema à espera de entrada."""
         logger.info(f"🗣️ [Resposta Final]: {resposta_texto}")
         self._falar_se_permitido(fala_texto or resposta_texto)
-        emitir_electron("assistant_message", cartao.payload(resposta_texto, self.pendencia))
+        emitir_electron("assistant_message", cartao.payload(resposta_texto, self.pendencia, cartao_skill))
         self._set_estado("WAITING_INPUT")
         return resposta_texto
 
@@ -584,6 +588,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
 
         resposta_texto = ""
         fala_texto = None
+        cartao_skill = None
         # M16: a nuvem só entra quando a pessoa pede (ou na falha local, mais abaixo), nunca pela "dificuldade"
         usar_nuvem = pede_nuvem(solicitacao_original) and self._pode_usar_nuvem(contexto)
 
@@ -606,7 +611,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
                         contexto = destino.contexto
                         resposta = None
                     else:
-                        resposta_texto, fala_texto = resposta.texto, resposta.fala
+                        resposta_texto, fala_texto, cartao_skill = resposta.texto, resposta.fala, resposta.cartao
                         if resposta.pendencia is not None:
                             self.pendencia = (skill.nome, resposta.pendencia)
 
@@ -667,7 +672,7 @@ class AssistenteRuntime(LacoDeComandos, ImportacaoDeDocumentos, ModoVoz):
         # PASSO 3: Resposta
         # =====================================================================
         if resposta_texto:
-            self._entregar_resposta(resposta_texto, fala_texto)
+            self._entregar_resposta(resposta_texto, fala_texto, cartao_skill)
         else:
             self._set_estado("WAITING_INPUT")
 
