@@ -1,6 +1,6 @@
 # 04 - Integrações
 
-Este documento identifica e mapeia todos os fluxos de integração e conexões — externas, internas e com hardware — que o **Assistente Doméstico Inteligente** realiza para viabilizar suas funções, no estado da **V4.1 (atualizado em 23/11/2026)**. A V4.1 acrescentou o Claude (seção 2.D), o bot do Telegram (2.E) e as tabelas `compromissos` e `ideias`.
+Este documento identifica e mapeia todos os fluxos de integração e conexões — externas, internas e com hardware — que o **Assistente Doméstico Inteligente** realiza para viabilizar suas funções, no estado da **V5.5 (atualizado em 25/11/2026)**. A V4.1 acrescentou o Claude (seção 2.D), o bot do Telegram (2.E) e as tabelas `compromissos` e `ideias`. A V4.3 trouxe as notas fiscais e a V5.5 a API local, o celular pelo Tailscale e o MCP (seção 7).
 
 ---
 
@@ -148,6 +148,8 @@ Este documento identifica e mapeia todos os fluxos de integração e conexões �
 
 O `main.js` converte os nomes de `snake_case` para `kebab-case` ao repassá-los ao renderer. Linhas do stdout que não sejam JSON são tratadas como log.
 
+> Desde a V5.5, este protocolo só é usado com `ASSISTENTE_PONTE=stdin`. O padrão é a API HTTP descrita na seção 7; os tipos de evento são os mesmos, acrescidos de `assistant_delta` (resposta em fluxo).
+
 ---
 
 ## 5. Integração com Hardware
@@ -214,3 +216,44 @@ O `main.js` converte os nomes de `snake_case` para `kebab-case` ao repassá-los 
 *   **WebSocket:** Não identificado.
 *   **OCR / Visão Computacional:** Não identificado.
 *   **STT Local (Whisper):** Não identificado. A transcrição de voz utiliza API externa Google.
+
+---
+
+## 7. Integrações da V4.3 e da V5.5
+
+### A. Notas fiscais (V4.3)
+| Origem | Como entra | Leitura |
+|---|---|---|
+| HTML da NFC-e (página da Sefaz) | 📎, arrastar, pasta `Entradas`, Telegram, celular | Leitor exato, sem IA |
+| Texto da NFC-e ou NF-e colado | Chat | Leitor exato |
+| PDF | 📎, arrastar, pasta, Telegram, celular | Texto via `pypdf`; PDF de imagem vai para o leitor de foto |
+| Foto | 📎, arrastar, pasta, Telegram, celular (📷/📎) | Modelo de imagem local transcreve; leitor exato ou modelo de texto estrutura |
+
+O original vai para `Anexos/AAAA-MM/`. Dados do consumidor (CPF, nome, destinatário) não são lidos nem guardados.
+
+### B. API local (V5.5)
+| Rota | Uso | Acesso |
+|---|---|---|
+| `GET /api/saude` | O servidor está no ar? | livre |
+| `GET /api/eu` | Qual aparelho é este | token |
+| `POST /api/mensagens` | Enviar texto | token |
+| `POST /api/comandos` | Voz, mudo, documento pelo caminho, desligar | só o PC (`local`) |
+| `POST /api/anexos` | Foto, PDF ou HTML (até 20 MB, 5 por vez) | token |
+| `GET /api/eventos` | Histórico recente + fluxo de eventos (SSE, com identificador de instância) | token |
+| `GET /api/gastos/resumo` | Números do painel | token |
+| `GET /entrar?token=…` | Grava o token num cookie HttpOnly e abre a página | link gerado no PC |
+
+Token no cabeçalho `Authorization: Bearer`, no cookie `assistente_token` ou na URL (`?token=`, usado pelo SSE).
+
+### C. Tailscale (V5.5)
+`tailscale serve --bg 8765` publica o servidor em `https://<pc>.<rede>.ts.net` apenas para os aparelhos da conta. Nenhuma porta é aberta no roteador. Detalhes em `09 - Servidor, Celular e Painel (V5.5).md`.
+
+### D. MCP (V5.5, desligado)
+`app/mcp_casa.py` expõe 6 consultas somente leitura ao Claude. Ligar é uma exceção à regra de que compras não saem do PC e depende de decisão do usuário.
+
+### E. Arquivos novos no sistema de arquivos
+- `Anexos/AAAA-MM/` — originais das notas; `Anexos/_recebidos/` — temporários do celular (apagados após importar).
+- `E:\Agente IA\Entradas` — pasta vigiada, com `processados/` e `com_erro/`.
+- `core/database/dispositivos.json` (hashes dos tokens) e `core/database/token-local.txt` (token do PC); fora do Git.
+- `core/database/demo/` — banco e arquivos do modo demonstração.
+

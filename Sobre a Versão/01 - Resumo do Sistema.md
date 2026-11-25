@@ -1,6 +1,6 @@
 # 01 - Resumo do Sistema
 
-Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 4.1 - V4.1, atualizado em 23/11/2026)**. A V4 trouxe a base descrita abaixo; a V4.1 reorganizou o sistema em **skills** escolhidas por catálogo e acrescentou agenda, ideias de projetos analisadas pelo Claude e um bot do Telegram (seção 2.1). O sistema representa uma evolução arquitetural significativa em relação à V3, introduzindo uma **Interface Gráfica Desktop via Electron**, um **Banco Vetorial (ChromaDB)** com **embeddings locais na CPU**, **Memória Semântica de Longo Prazo**, um **Modo Qwen** para programação, a **Skill ProjectAnalyzer** e um modelo de inicialização **Text-First** com ativação dinâmica de voz.
+Este documento apresenta uma visão geral do **Assistente Doméstico Inteligente (Versão 5.5 - V5.5, atualizado em 25/11/2026)**. A V4 trouxe a base descrita abaixo; a V4.1 reorganizou o sistema em **skills** escolhidas por catálogo e acrescentou agenda, ideias de projetos analisadas pelo Claude e um bot do Telegram (seção 2.1); a V4.2 e a V4.3 trouxeram notas fiscais, consultas, correções e estoque (seção 2.2); a V5.5 transformou o núcleo num servidor usado pelo PC e pelo celular (seção 2.3). O sistema representa uma evolução arquitetural significativa em relação à V3, introduzindo uma **Interface Gráfica Desktop via Electron**, um **Banco Vetorial (ChromaDB)** com **embeddings locais na CPU**, **Memória Semântica de Longo Prazo**, um **Modo Qwen** para programação, a **Skill ProjectAnalyzer** e um modelo de inicialização **Text-First** com ativação dinâmica de voz.
 
 > [!IMPORTANT]
 > A gestão preditiva de estoque ainda não funciona de ponta a ponta, porque as compras gravadas não alimentam `controle_consumo`. A situação real de cada funcionalidade está em `08 - Estado Atual da V4.md`.
@@ -65,6 +65,25 @@ O objetivo central do sistema na **Versão 4** permanece: **gerenciar de forma a
 *   **Inicialização por `.bat`:** `iniciar-assistente.bat` abre o Ollama se preciso e inicia o app; `instalar-claude-code.bat` instala e confere o Claude Code.
 
 ---
+
+## 2.2. Funcionalidades da V4.2 e V4.3 (compras completas, 23 e 24/11/2026)
+
+*   **Notas fiscais:** HTML da NFC-e, texto da NFC-e ou da NF-e colado no chat, PDF e foto (📎 ou arrastar no app, pasta `Entradas`, Telegram). Leitores exatos para o que tem estrutura conhecida; o modelo de imagem (`qwen2.5vl:7b`) só transcreve a foto. Código NF, Série NF e Emissão gravados; a emissão é a data da compra.
+*   **Conferência antes do "sim":** o assistente pergunta a loja que faltou, o nome de produto cortado ("C...") e confere loja e data lidas de foto. Nota com a mesma chave de acesso não entra duas vezes; nota sem chave com o mesmo valor recente recebe aviso de possível repetida.
+*   **Consultas de gastos:** total, por categoria, por loja, preço de um produto, lista de compras e comparação de períodos, com períodos em português ("mês passado", "de 01/10 a 15/11").
+*   **Correções e observações:** "o vinho custou 35", "a loja era o Moreschi", "tire o detergente", observações na compra ou num item; tudo com antes e depois e confirmação.
+*   **Catálogo e estoque:** 15 categorias fechadas, produtos unificados, dinheiro em centavos; cada compra soma ao estoque em unidade base.
+*   **Histórico da conversa:** gravado no SQLite, janela das últimas 6 trocas com resumo das anteriores; ao reabrir em até 12 horas, a conversa continua.
+*   **Origem de cada registro e medições:** tabela `entradas` com texto original, modelo e versão do prompt; `scripts/avaliar.py` com histórico.
+
+## 2.3. Funcionalidades da V5.5 (servidor, 25/11/2026)
+
+*   **Servidor local:** o núcleo roda em `app/servidor.py` (127.0.0.1:8765). A janela do PC é um cliente; fechá-la não desliga o assistente. Desligar: botão ⏻ ou `desligar-assistente.bat`.
+*   **Celular:** página instalável (PWA) com conversa, foto da nota (📷 câmera, 📎 arquivo) e painel, acessada fora de casa pelo Tailscale. Cada aparelho recebe um token próprio e revogável (`novo-dispositivo.bat`).
+*   **Painel de gastos:** `/painel` com total, média, gastos por mês, categoria e loja e últimas compras; botão 📊 na janela do PC.
+*   **Resposta em fluxo** na conversa geral, Markdown seguro e botões de sim/não/pular.
+*   **Modo demonstração:** `iniciar-demo.bat` usa um banco separado com ~140 compras fictícias (porta 8766).
+*   **Servidor MCP (desligado):** 6 consultas somente leitura para o Claude, se o usuário decidir ligar.
 
 ## 3. Responsabilidades Gerais
 

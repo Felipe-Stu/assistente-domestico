@@ -1,6 +1,6 @@
 # 02 - Tecnologias Utilizadas
 
-Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)** do **Assistente Doméstico Inteligente**, registrando as tecnologias herdadas da V3 e as novas tecnologias incorporadas nesta versão.
+Este documento detalha o ecossistema tecnológico empregado do **Assistente Doméstico Inteligente**, registrando as tecnologias herdadas da V3, as incorporadas na V4 e V4.1 e as da V4.3 e V5.5 (seção 2.2, atualizado em 25/11/2026).
 
 ---
 
@@ -228,11 +228,25 @@ Este documento detalha o ecossistema tecnológico empregado na **Versão 4 (V4)*
 
 ---
 
+## 2.2. Tecnologias Adicionadas na V4.3 e na V5.5
+
+*   **pypdf** — texto de notas em PDF (`services/documentos_service.py`). **V4.3.**
+*   **Pillow** — recorte de margens, faixas e ampliação de fotos de notas (`services/imagem_service.py`). **V4.3 (M34).**
+*   **Modelo de imagem local `qwen2.5vl:7b` (Ollama)** — transcreve fotos de notas; configurável em `OLLAMA_MODELO_VISAO`. Escolhido por medição contra o `gemma3:4b`; o `gemma4:e4b` não lê imagens no Ollama para Windows. **V4.3.**
+*   **Starlette + uvicorn** — servidor HTTP do núcleo (`app/servidor.py`), em 127.0.0.1. **V5.5 (M23).**
+*   **sse-starlette (Server-Sent Events)** — fluxo de eventos do servidor para o PC e o celular. **V5.5.**
+*   **python-multipart** — recebimento de fotos e arquivos enviados pelo celular. **V5.5.**
+*   **mcp** — servidor MCP somente leitura (`app/mcp_casa.py`), desligado por padrão. **V5.5 (I05).**
+*   **PWA (HTML, CSS, JavaScript, service worker, manifesto)** — página do celular e painel em `web/`, sem framework. **V5.5 (I04, I06).**
+*   **Tailscale (`tailscale serve`)** — acesso de fora de casa com HTTPS, só para os aparelhos da conta; instalado à parte no PC e no celular. **V5.5.**
+
+---
+
 ## 3. Status de Outras Categorias
 
 *   **Interface Gráfica:** **Implementada na V4** via Electron com HTML/CSS/JavaScript e comunicação IPC bidirecional com o back-end Python.
-*   **OCR / Visão Computacional:** **Não identificado nesta versão.**
-*   **WebSocket / API REST Local:** **Não identificado nesta versão.** A comunicação entre Electron e Python utiliza stdin/stdout.
+*   **OCR / Visão Computacional:** **Implementado na V4.3** com modelo de imagem local (transcrição de fotos de notas fiscais).
+*   **WebSocket / API REST Local:** **API HTTP local implementada na V5.5** (Starlette, SSE em vez de WebSocket). A ponte stdin/stdout continua disponível com `ASSISTENTE_PONTE=stdin`.
 *   **Whisper Local (STT):** **Não identificado nesta versão.** A transcrição de voz ainda depende da API Google Speech Recognition (serviço web externo).
 *   **Segunda LLM (Qwen2.5-Coder):** **Implementada parcialmente na V4.** A troca por comando e o retorno por inatividade funcionam; o botão no Electron e a troca por intenção não estão concluídos (ver documento 08). Na V4.1, a skill de programação usa o Qwen como reserva do Claude.
 *   **LLM na nuvem:** Gemini (perguntas gerais) e, desde a V4.1, Claude (programação e ideias), cada um restrito pela política de privacidade das skills.

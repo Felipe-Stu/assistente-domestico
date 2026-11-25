@@ -1,6 +1,6 @@
 # 05 - Engenharia do Software
 
-Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente**, no estado da **V4.1**.
+Este documento apresenta os diagramas técnicos de arquitetura, comunicação, fluxo e sequência do **Assistente Doméstico Inteligente**, no estado da **V4.1**, com os diagramas da V5.5 na seção 7.
 
 > [!NOTE]
 > Os diagramas abaixo foram revisados a partir do código-fonte da V4.1 em 23/11/2026 (branch `v4.1`, depois do commit `e9441bf`). Linhas tracejadas indicam código existente que não é acionado pelo fluxo atual.
@@ -342,4 +342,65 @@ flowchart TD
 | **Fila com Reteste** (V4.1) | `IdeiasService.iniciar_em_segundo_plano` | Ideia salva na hora; análise tentada de novo enquanto o Claude estiver indisponível |
 | **Circuit Breaker Simples** (V4.1) | `indisponivel_ate` no estado do Claude | Sem cota ou sem login, não insiste até o horário de reteste |
 | **Lista de Permissões** (V4.1) | `TELEGRAM_CHAT_IDS` | O bot ignora qualquer chat fora da lista |
+
+---
+
+## 7. V5.5 — Diagramas do servidor (25/11/2026)
+
+### 7.1. Componentes
+
+```mermaid
+flowchart LR
+    subgraph PC["PC de casa"]
+        EL["Electron<br/>(main.js + cliente-api.js)"]
+        subgraph SRV["app/servidor.py (127.0.0.1:8765)"]
+            API["Rotas HTTP + SSE"]
+            BAR["Barramento<br/>(app/eventos.py)"]
+            NUC["Núcleo<br/>(AssistenteRuntime)"]
+        end
+        DISP["dispositivos.json<br/>(hashes)"]
+        DB[("SQLite + ChromaDB")]
+        OLL["Ollama"]
+    end
+    CEL["Celular (PWA)"] -- "HTTPS" --> TS["tailscale serve"]
+    TS --> API
+    EL -- "POST / SSE (token local)" --> API
+    API -- "fila de comandos" --> NUC
+    NUC -- "publicar" --> BAR
+    BAR -- "eventos" --> API
+    API --- DISP
+    NUC --- DB
+    NUC --- OLL
+```
+
+### 7.2. Sequência — foto da nota pelo celular
+
+```mermaid
+sequenceDiagram
+    participant C as Celular
+    participant A as API
+    participant N as Núcleo
+    participant D as DocumentosService
+    C->>A: POST /api/anexos (foto)
+    A->>A: valida token, tamanho e tipo; grava em _recebidos/
+    A->>N: comando documento (canal celular)
+    N->>D: importar
+    D->>D: transcreve (modelo de imagem) e lê (leitor exato ou modelo de texto)
+    D-->>N: resumo + perguntas
+    N-->>A: eventos (barramento)
+    A-->>C: SSE: resumo, "Está certo?"
+    N->>N: apaga o temporário (cópia em Anexos/)
+    C->>A: POST /api/mensagens "sim"
+    N-->>C: SSE: compra registrada
+```
+
+### 7.3. Padrões da V5.5
+
+| Padrão | Onde | Para quê |
+|---|---|---|
+| **Publish/Subscribe** | `Barramento` | Um evento, vários clientes (PC, celular) |
+| **Cliente/Servidor** | `app/servidor.py` × `cliente-api.js` e `web/app.js` | Interface separada do núcleo |
+| **Mixin** | `LacoDeComandos`, `ImportacaoDeDocumentos`, `ModoVoz` | Dividir o `AssistenteRuntime` sem mudar a interface |
+| **Token com hash** | `Dispositivos` | Vazamento do arquivo não revela tokens |
+| **Watchdog** | thread `vigia-nucleo` | Servidor não fica no ar com o núcleo parado |
 

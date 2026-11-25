@@ -1,6 +1,6 @@
 # 03 - Arquitetura Geral
 
-Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência do **Assistente Doméstico Inteligente**, no estado da **V4.1 (atualizado em 23/11/2026)**.
+Este documento detalha a estrutura de diretórios, os módulos constituintes, suas responsabilidades, o fluxo principal e as relações de dependência do **Assistente Doméstico Inteligente**, no estado da **V5.5 (atualizado em 25/11/2026)**. As mudanças da V4.3 e da V5.5 estão na seção 2.F.
 
 > [!NOTE]
 > **V4.1 (fase das skills):** cada capacidade virou uma skill em `skills/`, escolhida por gatilhos ou pelo orquestrador a partir do catálogo (`core/skills/`), e executada pelo próprio roteiro. Entraram também o Claude (programação e ideias), a fila de ideias, o bot do Telegram e a biblioteca de contexto.
@@ -214,6 +214,34 @@ assistente-domestico/
 | `conversa-geral` | geral, outro | nuvem-permitida | nucleo | Assistente local; Gemini nas difíceis |
 
 ---
+
+### F. V4.3 e V5.5 — módulos novos
+
+#### F.1. Núcleo como servidor (V5.5)
+| Módulo | Responsabilidade |
+|---|---|
+| `app/servidor.py` | Starlette + uvicorn em 127.0.0.1:8765: saúde, mensagens, comandos, anexos, eventos (SSE), resumo de gastos, `/entrar`, páginas `web/`. Cabeçalhos de segurança em toda resposta. Encerra se o núcleo parar; não sobe um segundo núcleo na mesma porta. |
+| `app/eventos.py` | Barramento: cada evento é publicado uma vez e entregue aos ouvintes; guarda os últimos 60 da conversa e o estado atual; identificador de instância para o cliente perceber reinício. |
+| `app/ipc.py` | `emitir_electron` publica no barramento; só imprime na saída padrão na ponte antiga. |
+| `app/laco.py` | Partida dos serviços e laço de comandos (`send_text`, voz, mudo, documento, shutdown), com o canal de origem (`app`, `celular`). |
+| `app/documentos_app.py` | Importação de notas pelo app, pasta de entrada, Telegram e celular; apaga o temporário do celular depois de importar. |
+| `services/dispositivos_service.py` | Token por aparelho (só o hash SHA-256), escopos `local` e `remoto`, revogação, token local do PC; relê o arquivo quando ele muda. |
+| `cliente-api.js` | Electron como cliente: sobe o servidor separado da janela se ele não estiver no ar, lê o SSE com reconexão e envia por POST. |
+| `web/` | Página do celular (PWA), painel de gastos, `formatar.js` (Markdown seguro, usado também pela janela do PC). |
+| `app/mcp_casa.py` | Servidor MCP somente leitura (desligado). |
+
+#### F.2. Compras completas (V4.2 e V4.3)
+| Módulo | Responsabilidade |
+|---|---|
+| `services/nfce_service.py` | Leitores exatos de NFC-e (HTML e texto) e NF-e (texto); Código NF, Série e Emissão; chave de acesso com dígito verificador; remove os dados do consumidor. |
+| `services/documentos_service.py` | Importa HTML, PDF e foto; foto em duas etapas (transcrição + leitor); cópia em `Anexos/`; nota repetida pela chave; aviso de possível repetida. |
+| `services/imagem_service.py` | Prepara a foto: recorte, faixas, ampliação. |
+| `services/pasta_entradas_service.py` | Vigia a pasta `Entradas`. |
+| `services/perguntas_compra.py` | Perguntas antes do "sim": loja, produto cortado, conferência de loja e data. |
+| `services/consultas_service.py` + `services/periodos.py` | Consultas de gastos em centavos e períodos em português; resumo do painel. |
+| `services/edicao_compra.py` | Correções e observações em compras já gravadas. |
+| `services/produtos_service.py`, `services/estoque_service.py`, `services/dinheiro.py` | Catálogo, estoque alimentado pelas compras, valores em centavos. |
+| `app/sessao.py` | Histórico com janela, resumo e gravação no SQLite. |
 
 ## 3. Ciclo de Execução da Aplicação (Fluxo Principal V4)
 
