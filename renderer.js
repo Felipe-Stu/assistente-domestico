@@ -142,9 +142,10 @@ function handleSendMessage() {
 
 sendBtn.addEventListener('click', handleSendMessage);
 const painelBtn = document.getElementById('painel-btn');
-if (painelBtn) painelBtn.addEventListener('click', () => window.api.abrirPainel());
+const temaAtual = () => (document.documentElement.dataset.tema === 'claro' ? 'claro' : 'escuro');
+if (painelBtn) painelBtn.addEventListener('click', () => window.api.abrirPainel(temaAtual()));
 const resumoPainelBtn = document.getElementById('resumo-painel');
-if (resumoPainelBtn) resumoPainelBtn.addEventListener('click', () => window.api.abrirPainel());
+if (resumoPainelBtn) resumoPainelBtn.addEventListener('click', () => window.api.abrirPainel(temaAtual()));
 
 // =============================================================================
 // M28: tema escuro (padrão) / claro, guardado nesta janela

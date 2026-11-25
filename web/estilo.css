@@ -1,4 +1,15 @@
-:root { --fundo: #0f172a; --cartao: #1e293b; --borda: #334155; --texto: #e2e8f0; --suave: #94a3b8; --azul: #3b82f6; }
+:root, :root[data-tema="escuro"] {
+    color-scheme: dark;
+    --fundo: #101413; --cartao: #171c1a; --cartao-2: #1d2421; --borda: #2a332f; --borda-forte: #3a4540;
+    --texto: #e7ece9; --suave: #a3ada7; --azul: #0f766e; --acento-texto: #5eead4; --acento-fundo: #12302b;
+    --barra: #24433d; --destaque: #fbbf24; --perigo: #f87171; --perigo-fundo: rgba(248, 113, 113, .12); --ok: #4ade80;
+}
+:root[data-tema="claro"] {
+    color-scheme: light;
+    --fundo: #f4f5f2; --cartao: #ffffff; --cartao-2: #f8f9f6; --borda: #e3e5df; --borda-forte: #d0d4cb;
+    --texto: #1c1f1a; --suave: #565c52; --azul: #0f766e; --acento-texto: #0f5f58; --acento-fundo: #e6f2ef;
+    --barra: #b7dcd5; --destaque: #b45309; --perigo: #b42318; --perigo-fundo: #fdecea; --ok: #15803d;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--texto);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -82,3 +93,52 @@ svg text { fill: var(--suave); font-size: 10px; }
 svg text.valor-mes { font-size: 10px; fill: var(--texto); }
 svg text.mes-ativo { fill: #f59e0b; font-weight: 700; }
 svg text { font-size: 11px; }
+
+/* ---------- Layout "Caderno de casa" (M28): mesmo desenho da janela do PC ---------- */
+html, body { font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; font-size: 15px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acento-texto); outline-offset: 2px; }
+.topo { gap: .7rem; padding: .7rem 1rem; }
+.marca-icone { width: 34px; height: 34px; border-radius: 10px; background: var(--azul); color: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+.titulo { font-weight: 800; font-size: 1.05rem; display: flex; flex-direction: column; line-height: 1.15; }
+.titulo small { font-weight: 500; font-size: .78rem; color: var(--suave); }
+.botao-topo { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--borda); background: transparent; color: var(--suave);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; flex: none; }
+.botao-topo:hover { color: var(--texto); background: var(--cartao-2); }
+:root[data-tema="escuro"] .icone-lua, :root:not([data-tema]) .icone-lua, :root[data-tema="claro"] .icone-sol { display: none; }
+.estado.ok { color: var(--ok); } .estado.erro { color: var(--perigo); } .estado.ocupado { color: var(--destaque); }
+
+/* Conversa (celular) */
+.msg { border-radius: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.msg.usuario { background: var(--azul); color: #fff; border-bottom-right-radius: 4px; }
+.msg.assistente { background: var(--cartao); border: 1px solid var(--borda); border-bottom-left-radius: 4px; }
+.msg.erro { background: var(--perigo-fundo); border: 1px solid var(--perigo); }
+.msg code { background: rgba(127, 127, 127, .18); }
+.resposta-rapida { padding-top: .6rem; border-top: 1px solid var(--borda); }
+.resposta-rapida button { min-height: 40px; border-radius: 10px; padding: 0 1.1rem; font-size: .95rem; border: 1px solid var(--borda-forte); background: var(--cartao); color: var(--texto); }
+.resposta-rapida .confirmar { background: var(--azul); border-color: var(--azul); color: #fff; }
+.resposta-rapida .cancelar, .resposta-rapida .neutro { background: var(--cartao); color: var(--texto); }
+.aviso { background: var(--acento-fundo); color: var(--texto); border: 1px solid var(--borda); }
+.envio { gap: .4rem; align-items: center; }
+.envio input[type=text] { min-height: 44px; border-radius: 12px; border: 1px solid var(--borda-forte); background: var(--cartao-2); }
+.envio input[type=text]:focus { border-color: var(--azul); outline: none; }
+.envio button, .botao-anexo { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 12px; flex: none; }
+.envio button { background: var(--azul); color: #fff; }
+.botao-anexo { background: var(--cartao-2); color: var(--suave); border: 1px solid var(--borda); }
+
+/* Painel de gastos */
+.painel { width: 100%; max-width: 1180px; margin: 0 auto; padding: 1.1rem; }
+.cartao, .bloco { border-radius: 16px; }
+.cartao .valor { font-size: 1.5rem; font-weight: 800; letter-spacing: -.01em; }
+.cartao.principal .valor span { background: #fde68a; color: #1c1f1a; padding: 0 .35rem; border-radius: 6px; }
+.bloco h2 { font-size: 1rem; font-weight: 700; }
+.barra-h .cheio { background: var(--azul); }
+.trilha button { color: var(--acento-texto); }
+.tabela td, .tabela.itens th { border-bottom-color: var(--borda); }
+.linha-nivel:hover, .linha-nivel:focus-visible { background: var(--cartao-2); }
+.barra-h .trilho, .linha-nivel .trilho { background: var(--cartao-2); }
+#meses { min-height: 40px; border-radius: 10px; border: 1px solid var(--borda); background: var(--cartao-2); padding: 0 .5rem; }
+svg rect.coluna-mes { fill: var(--barra); }
+svg rect.coluna-mes.ativa, .mes-clicavel:hover rect.coluna-mes { fill: var(--azul); }
+svg text.mes-ativo { fill: var(--acento-texto); }
+.selo { font-size: .78rem; color: var(--suave); text-align: center; margin: 0 0 .8rem; }

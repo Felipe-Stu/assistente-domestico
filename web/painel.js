@@ -6,7 +6,7 @@
 const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (t) => Formatar.escapar(t);
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const CORES = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'];
+const CORES = ['#14b8a6', '#f59e0b', '#60a5fa', '#f87171', '#a78bfa', '#f472b6', '#84cc16', '#fb923c', '#22d3ee', '#94a3b8'];
 const $ = (id) => document.getElementById(id);
 
 const estado = { meses: '12', mes: null, categoria: null, grupo: null };
@@ -49,7 +49,7 @@ function graficoMeses(el, porMes) {
         return `<g class="mes-clicavel" data-mes="${m.mes}" tabindex="0" role="button" aria-label="${MESES[+mes - 1]}/${ano}: ${reais(m.centavos)}">
                   <rect x="${(margem + i * passo).toFixed(1)}" y="0" width="${passo.toFixed(1)}" height="${altura}" fill="transparent"/>
                   <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barra.toFixed(1)}" height="${h.toFixed(1)}" rx="3"
-                        fill="${ativo ? '#f59e0b' : '#3b82f6'}" opacity="${apagado ? 0.35 : 1}"><title>${MESES[+mes - 1]}/${ano}: ${reais(m.centavos)}</title></rect>
+                        class="coluna-mes${ativo ? ' ativa' : ''}" opacity="${apagado ? 0.45 : 1}"><title>${MESES[+mes - 1]}/${ano}: ${reais(m.centavos)}</title></rect>
                   <text x="${(x + barra / 2).toFixed(1)}" y="${altura - 6}" text-anchor="middle" class="${ativo ? 'mes-ativo' : ''}">${MESES[+mes - 1]}</text>
                   ${comValor && m.centavos ? `<text x="${(x + barra / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" class="valor-mes">${reais(m.centavos).replace(',00', '').replace(/,\d\d$/, '')}</text>` : ''}
                 </g>`;
@@ -126,7 +126,7 @@ async function carregarResumo() {
     const comGasto = d.por_mes.filter((m) => m.centavos > 0).length;
     const media = comGasto ? d.total_centavos / comGasto : 0;
     $('cartoes').innerHTML = `
-        <div class="cartao"><div class="rotulo">Total no período</div><div class="valor">${reais(d.total_centavos)}</div></div>
+        <div class="cartao principal"><div class="rotulo">Total no período</div><div class="valor"><span>${reais(d.total_centavos)}</span></div></div>
         <div class="cartao"><div class="rotulo">Média por mês com compras</div><div class="valor">${reais(Math.round(media))}</div></div>
         <div class="cartao"><div class="rotulo">Compras</div><div class="valor">${d.compras}</div></div>`;
     estado.porMes = d.por_mes;

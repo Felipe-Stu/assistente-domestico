@@ -7,6 +7,7 @@
 - **Tema escuro por padrão**, com botão para o claro; a escolha fica guardada na janela (`tema.js` aplica antes de desenhar, sem piscar).
 - Ícones desenhados no lugar de emoji nos botões, avatares e envio; botão de desligar não aparece mais como quadrado (o Windows não tem o símbolo ⏻ na fonte da janela).
 - Resumo do mês vem do servidor (`resumo-gastos` no `main.js`, `obterJson` no `cliente-api.js`); atualiza ao abrir, a cada minuto e após cada resposta. Na ponte antiga (`ASSISTENTE_PONTE=stdin`) a coluna some.
+- Páginas do servidor (conversa do celular e painel de gastos) no mesmo layout e paleta, com tema escuro por padrão e botão de tema (`web/tema.js`); o painel aberto pela janela do PC segue o tema dela (`/painel?tema=`). Ícones desenhados no lugar de emoji.
 - `package.json`: Electron `^31.0.0` → `^45.3.3` (31 sem suporte); `atualizar-electron.bat` roda o `npm install` e grava o resultado em `Planejamento/medicoes/electron-ultimo.txt`.
 
 ## [V5.5, parte 2] — Painel: para onde foi o dinheiro (2026-11-25)
