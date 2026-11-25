@@ -177,6 +177,7 @@ ipcMain.on('abrir-painel', async (event, tema) => {
     }
     await session.defaultSession.cookies.set({ url: BASE, name: 'assistente_token', value: clienteApi.token,
                                                httpOnly: true, sameSite: 'strict' });
+    await session.defaultSession.clearCache();   // páginas e estilos do servidor sempre na versão atual
     const claro = tema === 'claro';
     const janela = new BrowserWindow({ width: 1000, height: 820, title: 'Gastos — Assistente Doméstico',
                                        backgroundColor: claro ? '#f4f5f2' : '#101413',

@@ -157,6 +157,7 @@ class TestApi(unittest.TestCase):
         self.assertEqual(s.get(self.U + "/api/eu").status_code, 200)
         r = requests.get(self.U + "/")
         self.assertIn("default-src 'self'", r.headers["content-security-policy"])
+        self.assertEqual(r.headers["cache-control"], "no-cache")   # estilo novo aparece sem limpar o cache
 
     def test_mensagem_e_eventos(self):
         resultado = {}

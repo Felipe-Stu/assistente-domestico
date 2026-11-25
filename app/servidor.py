@@ -58,7 +58,7 @@ CSP = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-
 
 
 class CabecalhosDeSeguranca:
-    """Middleware ASGI puro (não atrapalha o fluxo de eventos): cabeçalhos de segurança em toda resposta."""
+    """Middleware ASGI puro (não atrapalha o fluxo de eventos): cabeçalhos de segurança e de cache em toda resposta."""
 
     def __init__(self, app):
         self.app = app
@@ -71,8 +71,10 @@ class CabecalhosDeSeguranca:
             if mensagem["type"] == "http.response.start":
                 cabecalhos = list(mensagem.get("headers") or [])
                 existentes = {k.lower() for k, _ in cabecalhos}
+                # no-cache: o navegador sempre confere a versão (página ou estilo atualizado aparece na hora)
                 extras = [(b"x-content-type-options", b"nosniff"), (b"referrer-policy", b"no-referrer"),
-                          (b"x-frame-options", b"DENY"), (b"content-security-policy", CSP.encode())]
+                          (b"x-frame-options", b"DENY"), (b"content-security-policy", CSP.encode()),
+                          (b"cache-control", b"no-cache")]
                 cabecalhos += [(k, v) for k, v in extras if k not in existentes]
                 mensagem = dict(mensagem, headers=cabecalhos)
             await send(mensagem)
