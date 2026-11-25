@@ -140,6 +140,19 @@ function sendToPython(type, payload = {}) {
 // Listeners IPC: Renderer → Main → Python
 // =============================================================================
 
+// Desligar o assistente inteiro (servidor incluído), com confirmação
+ipcMain.on('desligar-assistente', async () => {
+    if (!clienteApi) { cleanupAndExit(); return; }
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'question', buttons: ['Desligar', 'Cancelar'], defaultId: 1, cancelId: 1, title: 'Desligar o assistente',
+        message: 'Desligar o assistente?', detail: 'O celular e o painel ficam sem acesso até você abrir o assistente de novo.',
+    });
+    if (response !== 0) return;
+    await clienteApi.desligarServidor();
+    cleanupDone = true;
+    app.quit();
+});
+
 // I06: painel de gastos numa janela própria; o token do PC vai num cookie desta sessão (não aparece em URL)
 ipcMain.on('abrir-painel', async () => {
     if (!clienteApi || !clienteApi.token) {
@@ -212,8 +225,9 @@ function cleanupAndExit() {
     cleanupDone = true;
 
     if (clienteApi) {
-        console.log("Encerramento solicitado. Desligando o servidor do assistente (se foi aberto por esta janela)...");
-        clienteApi.encerrar().finally(() => app.quit());
+        // Fechar a janela não desliga o servidor: o celular e o painel continuam funcionando
+        clienteApi.encerrar();
+        app.quit();
         return;
     }
 

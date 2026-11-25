@@ -10,7 +10,7 @@ Detalhes e passo a passo em `Sobre a Versão/09 - Servidor, Celular e Painel (V5
   - `services/dispositivos_service.py`: token por aparelho, só o hash SHA-256 gravado, revogável; escopo `local` (PC: voz, mudo, arquivo pelo caminho, desligar) e `remoto` (celular: conversa, foto, painel).
   - `scripts/dispositivos.py` (novo, listar, revogar) e `novo-dispositivo.bat`, que monta o link pelo nome do PC no Tailscale.
   - `iniciar-servidor.bat`: assistente no ar sem a janela.
-- **Electron como cliente** (`cliente-api.js`): inicia o servidor se ele não estiver no ar, lê os eventos por SSE (com reconexão e sem duplicar o histórico) e envia por POST. `ASSISTENTE_PONTE=stdin` volta à ponte antiga. Só desliga o servidor ao fechar se foi ele que o iniciou.
+- **Electron como cliente** (`cliente-api.js`): inicia o servidor se ele não estiver no ar, lê os eventos por SSE (com reconexão e sem duplicar o histórico) e envia por POST. `ASSISTENTE_PONTE=stdin` volta à ponte antiga. Fechar a janela não desliga o servidor (o celular continua funcionando); desligar é pelo botão ⏻ (com confirmação) ou por `desligar-assistente.bat`.
 - **M22 — resposta em fluxo** na conversa geral: `assistant_delta` a cada 120 ms no máximo, estado `RESPONDING`.
 - **M28 — interface:** Markdown seguro (`web/formatar.js`, usado pelo PC e pelo celular), botões de sim/não/pular, erros no chat, mensagens do celular marcadas (📱), CSP na janela e fonte local (saiu o Google Fonts).
 - **I04 — página do celular (PWA):** `web/` com conversa, foto/arquivo pela câmera, botões, fluxo, instalável (manifesto, ícones, service worker que não guarda dados da API).
@@ -18,9 +18,19 @@ Detalhes e passo a passo em `Sobre a Versão/09 - Servidor, Celular e Painel (V5
 - **I07 — modo demonstração:** `ASSISTENTE_DEMO=1` usa `core/database/demo/` (banco, memória, anexos, ideias), desliga o Telegram e roda na porta 8766; `scripts/criar_demo.py` cria ~140 compras fictícias com semente fixa; `iniciar-demo.bat`.
 - **I05 — servidor MCP** (`app/mcp_casa.py`): 6 consultas somente leitura para o Claude; desligado por padrão (ligar abre exceção à regra de que compras não saem do PC).
 - Dependências: starlette, uvicorn, sse-starlette, python-multipart, mcp, Pillow.
-- Testes: `tests/test_v55_servidor.py` (barramento, tokens e a API com uvicorn de verdade) e `tests/test_v55_extras.py` (painel, demonstração, MCP, formatação). Suíte: 353 (3 pulados sem as dependências do servidor). Fora da suíte: 25 verificações da API e 4 do cliente do Electron (Node) contra o servidor.
+- Testes: `tests/test_v55_servidor.py` (barramento, tokens e a API com uvicorn de verdade) e `tests/test_v55_extras.py` (painel, demonstração, MCP, formatação). Suíte: 357 (5 pulados sem as dependências do servidor; com elas, os 9 testes do servidor passaram). Fora da suíte: 25 verificações da API e 4 do cliente do Electron (Node) contra o servidor.
+
+### Corrigido (revisão antes do envio)
+- Servidor reiniciado com o celular ou a janela abertos: a numeração dos eventos recomeçava e as mensagens novas eram descartadas como repetidas. O barramento ganhou um identificador de instância; o cliente zera o contador quando ele muda.
+- Anexos enviados pelo celular ficavam acumulados em `_recebidos/`: agora são apagados depois de importados (a cópia fica em `Anexos/`).
+- Página do celular: 📷 forçava a câmera e impedia escolher da galeria, PDF ou HTML; agora há 📷 (câmera) e 📎 (arquivos). Sem conexão com o PC aparecia "aparelho sem acesso"; agora a mensagem diz que falta conexão e a página tenta de novo.
+- Se o núcleo parasse (ex.: banco inacessível), o servidor seguia aceitando pedidos sem resposta; agora encerra.
+- Corpo JSON que não é objeto em `/api/mensagens` e `/api/comandos` dava erro 500; agora 400.
+- Segundo servidor na mesma porta: sai sem iniciar outro núcleo (evita Telegram e pasta de entrada em dobro).
+- Dispositivo criado com o servidor ligado só valia depois de reiniciar (e podia ser apagado): o servidor relê o arquivo quando ele muda.
 
 ### Decisões
+- Fechar a janela do PC não desliga o servidor (o celular é o uso principal fora de casa).
 - SSE em vez de WebSocket: o fluxo é do servidor para os clientes; funciona no navegador sem biblioteca e passa pelo `tailscale serve`.
 - Starlette em vez de FastAPI: é a base do FastAPI, com menos dependências; a troca é direta se for preciso.
 - Acesso de fora de casa pelo Tailscale; servidor no PC atual; M18 marcado como substituído pelas skills.

@@ -47,14 +47,16 @@ Segurança: o servidor escuta só em `127.0.0.1`; nenhuma porta é aberta para a
 ### No PC
 Nada muda: `iniciar-assistente.bat`. O Electron sobe o servidor sozinho e se conecta. Para voltar à ponte antiga (stdin), defina `ASSISTENTE_PONTE=stdin`.
 
-Para deixar o assistente disponível **sem a janela** (só celular e painel): `iniciar-servidor.bat`. Se o Electron abrir depois, ele se conecta ao servidor que já está rodando e não o desliga ao fechar.
+**Fechar a janela não desliga o assistente:** o servidor continua no ar e o celular e o painel seguem funcionando. Para desligar tudo, use o botão **⏻** da janela (pede confirmação) ou `desligar-assistente.bat`.
+
+Para deixar o assistente disponível **sem a janela** (só celular e painel): `iniciar-servidor.bat`. Se o Electron abrir depois, ele se conecta ao servidor que já está rodando. Abrir o servidor duas vezes não cria um segundo núcleo: o segundo percebe o primeiro e sai.
 
 ### No celular (fora de casa), pelo Tailscale
 1. Instale o **Tailscale** no PC e no celular e entre com a **mesma conta** (https://tailscale.com/download).
 2. No PC, uma vez só, num terminal: `tailscale serve --bg 8765` — o Tailscale passa a entregar o assistente em `https://<nome-do-pc>.<sua-rede>.ts.net`, com certificado HTTPS, só para os seus aparelhos.
 3. No PC: `novo-dispositivo.bat`, dê um nome ("Celular do Felipe"). Ele mostra um link `https://…/entrar?token=…`.
 4. Abra esse link **no celular** (uma vez). No Chrome do Android: menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial").
-5. Pronto: conversa, foto da nota (📷 abre a câmera) e painel de gastos (📊).
+5. Pronto: conversa, foto da nota (📷 abre a câmera; 📎 escolhe foto da galeria, PDF ou HTML) e painel de gastos (📊). A cópia enviada fica em `Anexos/`; o temporário de `_recebidos/` é apagado depois da importação (fica só se der erro).
 
 Perdeu o celular? `python scripts/dispositivos.py revogar "Celular do Felipe"`. Ver os aparelhos: `python scripts/dispositivos.py listar`.
 

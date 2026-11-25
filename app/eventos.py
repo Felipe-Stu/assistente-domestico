@@ -8,6 +8,7 @@ Os últimos eventos de conversa ficam guardados para quem conecta depois ver o h
 """
 import asyncio
 import itertools
+import secrets
 import threading
 from collections import deque
 from typing import Callable, Deque, Dict, List, Optional
@@ -24,6 +25,8 @@ class Barramento:
         self._historico: Deque[Dict] = deque(maxlen=limite_historico)
         self._seq = itertools.count(1)
         self.ultimo_estado: Optional[str] = None
+        # Muda a cada início do servidor: o cliente que já estava conectado zera o contador de eventos vistos
+        self.instancia = secrets.token_hex(4)
 
     def publicar(self, tipo: str, payload=None) -> Dict:
         evento = {"id": next(self._seq), "type": tipo, "payload": payload}

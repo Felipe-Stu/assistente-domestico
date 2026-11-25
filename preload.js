@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('api', {
             callback(data);
         });
     },
+    // Desliga o assistente inteiro (pede confirmação)
+    desligarAssistente: () => ipcRenderer.send('desligar-assistente'),
+
     // I06: abre o painel de gastos numa janela
     abrirPainel: () => ipcRenderer.send('abrir-painel'),
 

@@ -79,6 +79,24 @@ class CabecalhosDeSeguranca:
         await self.app(scope, receive, enviar)
 
 
+async def _json_objeto(request) -> Optional[Dict]:
+    try:
+        dados = await request.json()
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return dados if isinstance(dados, dict) else None
+
+
+def _ja_rodando(porta: int) -> bool:
+    """Outro servidor do assistente já responde nesta porta? (dois núcleos duplicariam Telegram e pasta de entrada)"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{porta}/api/saude", timeout=1.5) as resposta:
+            return b'"versao_api"' in resposta.read()
+    except Exception:
+        return False
+
+
 def _nome_seguro(nome: str) -> str:
     nome = Path(str(nome or "arquivo")).name
     nome = "".join(c if c.isalnum() or c in "._-" else "_" for c in nome)[-80:]
@@ -117,10 +135,9 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
         dispositivo = autenticar(request)
         if not dispositivo:
             return negado()
-        try:
-            dados = await request.json()
-        except (ValueError, json.JSONDecodeError):
-            return JSONResponse({"erro": "JSON inválido"}, status_code=400)
+        dados = await _json_objeto(request)
+        if dados is None:
+            return JSONResponse({"erro": "JSON inválido (esperado um objeto)"}, status_code=400)
         texto = " ".join(str(dados.get("texto") or "").split("\x00")).strip()
         if not texto:
             return JSONResponse({"erro": "texto vazio"}, status_code=400)
@@ -134,10 +151,9 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
         dispositivo = autenticar(request)
         if not dispositivo:
             return negado()
-        try:
-            dados = await request.json()
-        except (ValueError, json.JSONDecodeError):
-            return JSONResponse({"erro": "JSON inválido"}, status_code=400)
+        dados = await _json_objeto(request)
+        if dados is None:
+            return JSONResponse({"erro": "JSON inválido (esperado um objeto)"}, status_code=400)
         tipo = dados.get("type")
         permitidos = COMANDOS_LOCAIS if dispositivo["escopo"] == "local" else COMANDOS_REMOTOS
         if tipo not in permitidos:
@@ -196,8 +212,8 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
 
         async def gerador():
             try:
-                yield {"event": "historico", "data": json.dumps({"eventos": barramento.historico(),
-                                                                 "estado": barramento.ultimo_estado}, ensure_ascii=False)}
+                yield {"event": "historico", "data": json.dumps({"eventos": barramento.historico(), "estado": barramento.ultimo_estado,
+                                                                 "instancia": barramento.instancia}, ensure_ascii=False)}
                 while True:
                     if await request.is_disconnected():
                         break
@@ -276,6 +292,9 @@ def main() -> int:
     from services.consultas_service import resumo_para_painel
     from services.dispositivos_service import Dispositivos
 
+    if _ja_rodando(config.API_PORTA):
+        print(f"O assistente já está rodando em http://127.0.0.1:{config.API_PORTA} — nada a fazer.", flush=True)
+        return 0
     dispositivos = Dispositivos(config.DISPOSITIVOS_ARQUIVO)
     dispositivos.token_local(config.TOKEN_LOCAL_ARQUIVO)
     runtime = AssistenteRuntime()
@@ -299,6 +318,13 @@ def main() -> int:
     configuracao = uvicorn.Config(app, host=config.API_HOST, port=config.API_PORTA, log_level="warning")
     servidor = uvicorn.Server(configuracao)
     servidor_holder["servidor"] = servidor
+
+    def vigiar_nucleo():
+        nucleo.join()
+        if not servidor.should_exit:   # o núcleo caiu (ex.: banco inacessível): não adianta seguir aceitando pedidos
+            print("O núcleo do assistente parou; encerrando o servidor.", file=sys.stderr, flush=True)
+            servidor.should_exit = True
+    threading.Thread(target=vigiar_nucleo, daemon=True, name="vigia-nucleo").start()
     print(f"Assistente em http://{config.API_HOST}:{config.API_PORTA}  (Ctrl+C encerra)", flush=True)
     try:
         servidor.run()

@@ -25,7 +25,7 @@ Projeto pessoal, desenvolvido em versões incrementais (V1 → V4) com apoio de 
 | **Núcleo como serviço** | API HTTP com eventos do servidor (SSE), token por dispositivo (só o hash gravado, revogável), sem porta aberta para a internet: o celular entra pelo Tailscale |
 | **Notas fiscais de verdade** | Leitor exato da NFC-e e da NF-e (HTML ou texto), foto lida em duas etapas (transcrição pelo modelo de imagem, estrutura pelo modelo de texto), conferência antes de gravar, chave de acesso com dígito verificador contra nota repetida |
 | **Consultas e correções** | "Quanto gastei com limpeza em novembro?", comparação de períodos, preço de produto; correções e observações pelo chat, com antes e depois e confirmação |
-| **Qualidade** | **353 testes automatizados** executados a cada push, avaliação dos prompts com histórico de medições, cópia de segurança diária, registro de eventos em JSON com tempo por etapa e documentação de cada versão, incluindo o que ainda não funciona |
+| **Qualidade** | **357 testes automatizados** executados a cada push, avaliação dos prompts com histórico de medições, cópia de segurança diária, registro de eventos em JSON com tempo por etapa e documentação de cada versão, incluindo o que ainda não funciona |
 
 ## Arquitetura
 
@@ -101,7 +101,7 @@ services/project_analyzer/         Skill de análise de projetos e documentaçã
 scripts/                           Banco vetorial, cópia de segurança, leitura dos logs e medições
 skills/                            Uma pasta por capacidade: instruções, prompts e gatilhos (formato em skills/README.md)
 evals/                             Conjunto de avaliação usado por scripts/avaliar.py
-tests/                             353 testes automatizados (LLM, ChromaDB e embeddings simulados; o servidor sobe de verdade quando as dependências estão instaladas)
+tests/                             357 testes automatizados (LLM, ChromaDB e embeddings simulados; o servidor sobe de verdade quando as dependências estão instaladas)
 Sobre a Versão/                    Documentação técnica e evolução V1 → V4
 ```
 

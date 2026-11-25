@@ -512,12 +512,14 @@ Fonte: `MEDIDO` com `comparar-modelos-visao.bat` na nota da moto. Com a chave li
 | Item | O que mudou | Evidência |
 |---|---|---|
 | M25 | `main.py` dividido (laço, documentos); barramento de eventos | `TESTADO` (suíte inteira passa sem mudar os testes do núcleo) |
-| M23 | API Starlette + SSE, tokens por dispositivo, anexos, resumo de gastos | `TESTADO` com uvicorn de verdade (25 verificações + `tests/test_v55_servidor.py`); no PC `NÃO TESTADO` |
+| M23 | API Starlette + SSE, tokens por dispositivo, anexos, resumo de gastos | `TESTADO` com uvicorn de verdade (`tests/test_v55_servidor.py`, 9 testes); no PC `TESTADO` pelo usuário (navegador em 127.0.0.1:8765) |
 | Electron | Cliente da API (`cliente-api.js`); ponte antiga com `ASSISTENTE_PONTE=stdin` | `TESTADO` com Node contra o servidor; na janela do PC `NÃO TESTADO` |
 | M22 / M28 | Resposta em fluxo; Markdown, botões, erros no chat, CSP | `TESTADO` (formatação); na janela `NÃO TESTADO` |
-| I04 / I06 | Página do celular e painel servidos pela API | `TESTADO` (rotas, tipos, CSP); no celular `NÃO TESTADO` |
+| I04 / I06 | Página do celular e painel servidos pela API | `TESTADO` (rotas, tipos, CSP); acesso pelo Chrome do celular via Tailscale `TESTADO` pelo usuário; foto pelo celular `NÃO TESTADO` |
 | I07 | Modo demonstração com banco próprio | `TESTADO` (140 compras fictícias criadas; consultas e painel sobre elas) |
 | I05 | Servidor MCP somente leitura (desligado) | `TESTADO` (6 ferramentas registradas no mcp 2.x; consultas sobre banco de teste) |
 
 **Dependências novas no PC:** rodar `instalar-dependencias.bat` antes de abrir (starlette, uvicorn, sse-starlette, python-multipart, mcp, Pillow). Sem elas, o Electron não consegue subir o servidor; `ASSISTENTE_PONTE=stdin` mantém o modo antigo.
+
+**Revisão antes do envio (25/11):** corrigidos eventos descartados após reinício do servidor, temporários do celular acumulando em `_recebidos/`, botão 📷 que impedia escolher arquivos, mensagem errada quando o PC está fora do ar, servidor que seguia no ar com o núcleo parado, JSON não-objeto com erro 500 e segundo servidor na mesma porta. Fechar a janela do PC não desliga mais o servidor; desligar é pelo ⏻ ou por `desligar-assistente.bat` (`CÓDIGO`; botão ⏻ e `.bat` `NÃO TESTADO` no PC).
 

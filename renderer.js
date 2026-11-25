@@ -140,6 +140,8 @@ function handleSendMessage() {
 sendBtn.addEventListener('click', handleSendMessage);
 const painelBtn = document.getElementById('painel-btn');
 if (painelBtn) painelBtn.addEventListener('click', () => window.api.abrirPainel());
+const desligarBtn = document.getElementById('desligar-btn');
+if (desligarBtn) desligarBtn.addEventListener('click', () => window.api.desligarAssistente());
 
 // =============================================================================
 // Anexos: botão 📎 e arrastar-e-soltar

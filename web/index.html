@@ -19,8 +19,11 @@
     <main id="mensagens" class="mensagens" aria-live="polite"></main>
     <div id="aviso" class="aviso" hidden></div>
     <form id="envio" class="envio" autocomplete="off">
-        <label class="botao-anexo" title="Foto ou arquivo da nota">
-            📷<input id="anexo" type="file" accept="image/*,.pdf,.html,.htm" capture="environment" multiple hidden>
+        <label class="botao-anexo" title="Tirar foto da nota">
+            📷<input id="camera" type="file" accept="image/*" capture="environment" hidden>
+        </label>
+        <label class="botao-anexo" title="Escolher foto, PDF ou HTML da nota">
+            📎<input id="anexo" type="file" accept="image/*,.pdf,.html,.htm" multiple hidden>
         </label>
         <input id="texto" type="text" placeholder="Mensagem ou compra…" enterkeyhint="send">
         <button id="enviar" type="submit">➤</button>

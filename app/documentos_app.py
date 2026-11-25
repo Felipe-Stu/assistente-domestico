@@ -61,6 +61,12 @@ class ImportacaoDeDocumentos:
             # Só arquivos da pasta de entrada são movidos; o anexo do app fica onde o usuário o guardou
             if self.pasta_entradas is not None and arquivo.exists() and self._na_pasta_entradas(arquivo):
                 self.pasta_entradas.mover(arquivo, ok)
+            # Enviado pelo celular: o original já foi copiado para Anexos/; o temporário sai (fica só se deu erro)
+            if ok and self._em_recebidos(arquivo):
+                try:
+                    arquivo.unlink()
+                except OSError as erro:
+                    logger.warning(f"Não consegui apagar o temporário {arquivo.name}: {erro}")
             if canal in CANAIS_INTERATIVOS:
                 self._set_estado("WAITING_INPUT")
         self._emitir("assistant_message", {"text": texto})
@@ -75,6 +81,13 @@ class ImportacaoDeDocumentos:
     def _na_pasta_entradas(arquivo: Path) -> bool:
         try:
             return Path(arquivo).resolve().parent == Path(config_app.ENTRADAS_DIR).resolve()
+        except OSError:
+            return False
+
+    @staticmethod
+    def _em_recebidos(arquivo: Path) -> bool:
+        try:
+            return Path(arquivo).resolve().parent == Path(config_app.RECEBIDOS_DIR).resolve()
         except OSError:
             return False
 

@@ -47,6 +47,7 @@ class TestBarramento(unittest.TestCase):
         b.cancelar(ident)
         b.publicar("assistant_message", {"text": "depois"})
         self.assertEqual(len(recebidos), 6)
+        self.assertNotEqual(Barramento().instancia, b.instancia)   # cliente sabe quando o servidor reiniciou
 
     def test_ponte_antiga_imprime_e_servidor_nao(self):
         import app.ipc as ipc
@@ -179,6 +180,20 @@ class TestApi(unittest.TestCase):
         self.assertEqual(self.fila[-1]["payload"]["canal"], "celular")
         t.join(5)
         self.assertEqual(resultado.get("resposta"), "ok: quanto gastei?")
+
+    def test_json_que_nao_e_objeto_e_historico_com_instancia(self):
+        r = requests.post(self.U + "/api/mensagens", data="[1,2]", headers=dict(self.h(self.celular), **{"Content-Type": "application/json"}))
+        self.assertEqual(r.status_code, 400)
+        with requests.get(self.U + "/api/eventos?token=" + self.celular, stream=True, timeout=5) as resp:
+            for linha in resp.iter_lines(decode_unicode=True):
+                if linha.startswith("data:"):
+                    self.assertEqual(json.loads(linha[5:])["instancia"], self.bar.instancia)
+                    break
+
+    def test_ja_rodando(self):
+        from app.servidor import _ja_rodando
+        self.assertTrue(_ja_rodando(self.porta))
+        self.assertFalse(_ja_rodando(_porta_livre()))
 
     def test_comandos_por_escopo_e_anexos(self):
         mudo = {"type": "toggle_mute", "payload": {"muted": True}}

@@ -340,6 +340,28 @@ class TestPeloApp(BaseDocs):
         estados = [p["state"] for tipo, p in mensagens if tipo == "state_changed"]
         self.assertEqual(estados, ["PROCESSING", "WAITING_INPUT"])
 
+    def test_anexo_do_celular_some_depois_de_importado(self):
+        mensagens = []
+        recebidos = Path(self._tmp.name) / "_recebidos"
+        recebidos.mkdir()
+        for patcher in (mock.patch.object(app_main, "emitir_electron", lambda tipo, p=None: mensagens.append((tipo, p))),
+                        mock.patch.object(app_main.config_app, "RECEBIDOS_DIR", recebidos),
+                        mock.patch.object(app_main.config_app, "ENTRADAS_DIR", self.entrada)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        runtime = app_main.AssistenteRuntime.__new__(app_main.AssistenteRuntime)
+        runtime.pendencia = None
+        runtime.telegram = None
+        runtime.documentos = self.servico(nomes=LLMNomes())
+        runtime.pasta_entradas = None
+        nota = recebidos / "20261125-nota.html"
+        nota.write_bytes(NOTA.read_bytes())
+        self.assertIn("Nota fiscal recebida", runtime._importar_documento(str(nota), "celular"))
+        self.assertFalse(nota.exists())                     # o original ficou em Anexos/
+        self.assertTrue(any(self.anexos.rglob("*nota.html")))
+        estados = [p["state"] for tipo, p in mensagens if tipo == "state_changed"]
+        self.assertEqual(estados, ["PROCESSING", "WAITING_INPUT"])
+
     def test_anexo_com_confirmacao_pendente_avisa_uma_vez(self):
         mensagens = []
         with mock.patch.object(app_main, "emitir_electron", lambda tipo, p=None: mensagens.append(p)), \

@@ -6,6 +6,7 @@
 const $ = (id) => document.getElementById(id);
 const lista = $('mensagens');
 let ultimoId = 0;
+let instancia = null;   // muda quando o servidor do PC reinicia (a numeração dos eventos recomeça)
 let bolhaEmFluxo = null;
 
 function hora() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
@@ -91,6 +92,10 @@ function conectar() {
     const fonte = new EventSource('/api/eventos');
     fonte.addEventListener('historico', (e) => {
         const dados = JSON.parse(e.data);
+        if (dados.instancia && dados.instancia !== instancia) {
+            if (instancia) ultimoId = 0;
+            instancia = dados.instancia;
+        }
         (dados.eventos || []).forEach(tratar);
         if (dados.estado) estado(dados.estado);
         mostrarAviso('');
@@ -135,14 +140,22 @@ $('envio').addEventListener('submit', (e) => {
     $('texto').value = '';
     enviarTexto(texto);
 });
-$('anexo').addEventListener('change', (e) => {
-    if (e.target.files && e.target.files.length) enviarArquivos(e.target.files);
-    e.target.value = '';
-});
+for (const id of ['camera', 'anexo']) {
+    $(id).addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length) enviarArquivos(e.target.files);
+        e.target.value = '';
+    });
+}
 
 (async () => {
     const r = await fetch('/api/eu').catch(() => null);
-    if (!r || r.status === 401) {
+    if (!r) {
+        mostrarAviso('Sem conexão com o PC de casa. Confira se o Tailscale está ligado neste aparelho e se o assistente está aberto no PC.');
+        estado('');
+        setTimeout(() => location.reload(), 15000);
+        return;
+    }
+    if (r.status === 401) {
         mostrarAviso('Este aparelho ainda não tem acesso. No PC, rode novo-dispositivo.bat e abra aqui o link gerado.');
         estado('');
         return;

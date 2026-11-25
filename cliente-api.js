@@ -2,13 +2,14 @@
  * M23: o Electron como cliente da API do núcleo (app/servidor.py).
  *
  * - Se o servidor já está rodando (por exemplo, iniciado sem janela para o celular), só conecta.
- * - Senão, inicia "python -u app/servidor.py" e espera ele responder em /api/saude.
+ * - Senão, inicia "python -u app/servidor.py" separado da janela e espera ele responder em /api/saude.
+ *   Fechar a janela não desliga o servidor (o celular continua funcionando); desligar é um pedido explícito.
  * - Eventos do núcleo chegam por SSE (/api/eventos) e viram os mesmos canais IPC de antes;
  *   comandos vão por POST (/api/mensagens e /api/comandos) com o token local do PC.
  */
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const RAIZ = __dirname;
 const ARQUIVO_TOKEN = path.join(RAIZ, 'core', 'database', 'token-local.txt');
@@ -49,31 +50,28 @@ class ClienteApi {
         if (await this.saudavel()) {
             this.aoLog('Servidor do assistente já estava rodando: conectando.');
         } else {
+            // Bibliotecas da V5.5 presentes? (o servidor roda separado: a saída dele não chega até aqui)
+            const teste = spawnSync(this.python, ['-c', 'import starlette, uvicorn, sse_starlette, multipart'], { cwd: RAIZ, windowsHide: true });
+            if (teste.error) throw new Error(`Não foi possível iniciar o Python ("${this.python}"): ${teste.error.message}`);
+            if (teste.status !== 0) {
+                throw new Error('Faltam as bibliotecas do servidor (V5.5). Feche, rode instalar-dependencias.bat e abra de novo. '
+                              + 'Para usar o modo antigo enquanto isso: defina ASSISTENTE_PONTE=stdin.');
+            }
             this.aoLog('Iniciando o servidor do assistente...');
-            this.processo = spawn(this.python, ['-u', 'app/servidor.py'], { cwd: RAIZ });
-            this.processo.on('error', (erro) => this.aoErro(`Não foi possível iniciar o Python ("${this.python}"): ${erro.message}`));
-            this.processo.stdout.on('data', (d) => console.log(`[servidor] ${d.toString().trim()}`));
-            let faltamDependencias = false;
+            this.processo = spawn(this.python, ['-u', 'app/servidor.py'], { cwd: RAIZ, detached: true, stdio: 'ignore', windowsHide: true });
             let saiu = false;
-            this.processo.stderr.on('data', (d) => {
-                const texto = d.toString();
-                if (texto.includes('FALTAM_DEPENDENCIAS')) faltamDependencias = true;
-                console.error(`[servidor] ${texto.trim()}`);
-            });
+            this.processo.on('error', (erro) => { saiu = true; this.aoErro(`Não foi possível iniciar o servidor: ${erro.message}`); });
             this.processo.on('exit', (codigo) => {
                 saiu = true;
-                if (!this.encerrando && !faltamDependencias) this.aoErro(`O servidor do assistente encerrou (código ${codigo}).`);
+                if (!this.encerrando) this.aoErro(`O servidor do assistente encerrou (código ${codigo}). Veja a pasta Logs.`);
             });
+            this.processo.unref();   // continua vivo quando a janela fecha
             let pronto = false;
             for (let i = 0; i < 240 && !pronto && !saiu; i++) {   // até 2 minutos, ou até o processo sair
                 await esperar(500);
                 pronto = await this.saudavel();
             }
-            if (faltamDependencias) {
-                throw new Error('Faltam as bibliotecas do servidor (V5.5). Feche, rode instalar-dependencias.bat e abra de novo. '
-                              + 'Para usar o modo antigo enquanto isso: defina ASSISTENTE_PONTE=stdin.');
-            }
-            if (!pronto) throw new Error(saiu ? 'O servidor do assistente fechou ao iniciar (veja o terminal).'
+            if (!pronto) throw new Error(saiu ? 'O servidor do assistente fechou ao iniciar (porta ocupada ou erro: veja a pasta Logs).'
                                               : 'O servidor do assistente não respondeu em 2 minutos.');
         }
         for (let i = 0; i < 40 && !this.token; i++) {
@@ -132,6 +130,11 @@ class ClienteApi {
         let conteudo;
         try { conteudo = JSON.parse(dados.join('\n')); } catch (e) { return; }
         if (tipo === 'historico') {
+            // Servidor reiniciado: a numeração dos eventos recomeça
+            if (conteudo.instancia && conteudo.instancia !== this.instancia) {
+                if (this.instancia) this.ultimoId = 0;
+                this.instancia = conteudo.instancia;
+            }
             // Ao (re)conectar: o que ainda não foi mostrado nesta janela, e o estado atual
             for (const evento of conteudo.eventos || []) this.entregar(evento);
             if (conteudo.estado) this.aoEvento('state_changed', { state: conteudo.estado });
@@ -165,14 +168,15 @@ class ClienteApi {
         }
     }
 
-    async encerrar() {
+    // Fechar a janela: só para de ouvir; o servidor continua (celular e painel seguem funcionando)
+    encerrar() {
         this.encerrando = true;
-        if (!this.processo) return;   // servidor iniciado por fora continua atendendo o celular
+    }
+
+    // Desligar o assistente de verdade (botão ⏻): pede ao servidor para encerrar
+    async desligarServidor() {
+        this.encerrando = true;
         await this.enviar('shutdown');
-        await new Promise((resolve) => {
-            const limite = setTimeout(() => { try { this.processo.kill(); } catch (e) { /* já saiu */ } resolve(); }, 6000);
-            this.processo.once('exit', () => { clearTimeout(limite); resolve(); });
-        });
     }
 }
 
