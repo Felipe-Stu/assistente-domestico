@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [V5.5] — Servidor: o núcleo como serviço de rede (2026-11-25)
+
+Detalhes e passo a passo em `Sobre a Versão/09 - Servidor, Celular e Painel (V5.5).md`.
+
+### Adicionado
+- **M25 — main.py dividido:** `app/eventos.py` (barramento de eventos), `app/laco.py` (partida e laço de comandos), `app/documentos_app.py` (notas fiscais). `main.py` caiu de 987 para cerca de 680 linhas. `emitir_electron` publica no barramento e, só na ponte antiga, imprime na saída padrão.
+- **M23 — API:** `app/servidor.py` (Starlette + uvicorn + SSE), em 127.0.0.1:8765. Rotas de saúde, mensagens, comandos, anexos (até 20 MB, 5 por vez, formatos de nota), eventos (histórico recente + fluxo), resumo de gastos, `/entrar` (cookie HttpOnly/SameSite) e as páginas. Cabeçalhos de segurança (CSP, X-Frame-Options, nosniff) em toda resposta.
+  - `services/dispositivos_service.py`: token por aparelho, só o hash SHA-256 gravado, revogável; escopo `local` (PC: voz, mudo, arquivo pelo caminho, desligar) e `remoto` (celular: conversa, foto, painel).
+  - `scripts/dispositivos.py` (novo, listar, revogar) e `novo-dispositivo.bat`, que monta o link pelo nome do PC no Tailscale.
+  - `iniciar-servidor.bat`: assistente no ar sem a janela.
+- **Electron como cliente** (`cliente-api.js`): inicia o servidor se ele não estiver no ar, lê os eventos por SSE (com reconexão e sem duplicar o histórico) e envia por POST. `ASSISTENTE_PONTE=stdin` volta à ponte antiga. Só desliga o servidor ao fechar se foi ele que o iniciou.
+- **M22 — resposta em fluxo** na conversa geral: `assistant_delta` a cada 120 ms no máximo, estado `RESPONDING`.
+- **M28 — interface:** Markdown seguro (`web/formatar.js`, usado pelo PC e pelo celular), botões de sim/não/pular, erros no chat, mensagens do celular marcadas (📱), CSP na janela e fonte local (saiu o Google Fonts).
+- **I04 — página do celular (PWA):** `web/` com conversa, foto/arquivo pela câmera, botões, fluxo, instalável (manifesto, ícones, service worker que não guarda dados da API).
+- **I06 — painel de gastos:** `/painel` com total, média, gastos por mês (SVG), por categoria e por loja e últimas compras; botão 📊 na janela do PC (token num cookie da sessão do Electron, fora da URL).
+- **I07 — modo demonstração:** `ASSISTENTE_DEMO=1` usa `core/database/demo/` (banco, memória, anexos, ideias), desliga o Telegram e roda na porta 8766; `scripts/criar_demo.py` cria ~140 compras fictícias com semente fixa; `iniciar-demo.bat`.
+- **I05 — servidor MCP** (`app/mcp_casa.py`): 6 consultas somente leitura para o Claude; desligado por padrão (ligar abre exceção à regra de que compras não saem do PC).
+- Dependências: starlette, uvicorn, sse-starlette, python-multipart, mcp, Pillow.
+- Testes: `tests/test_v55_servidor.py` (barramento, tokens e a API com uvicorn de verdade) e `tests/test_v55_extras.py` (painel, demonstração, MCP, formatação). Suíte: 353 (3 pulados sem as dependências do servidor). Fora da suíte: 25 verificações da API e 4 do cliente do Electron (Node) contra o servidor.
+
+### Decisões
+- SSE em vez de WebSocket: o fluxo é do servidor para os clientes; funciona no navegador sem biblioteca e passa pelo `tailscale serve`.
+- Starlette em vez de FastAPI: é a base do FastAPI, com menos dependências; a troca é direta se for preciso.
+- Acesso de fora de casa pelo Tailscale; servidor no PC atual; M18 marcado como substituído pelas skills.
+
+### Pendente
+- Testar no PC: `instalar-dependencias.bat`, abrir o assistente (o Electron sobe o servidor), Tailscale e `novo-dispositivo.bat` no celular.
+- Áudio pela página do celular (depende da transcrição local, V6.5); atualizar o Electron (M28).
+
 ## [V4.3, parte 9] — Código NF, Série NF e Emissão (2026-11-24)
 
 ### Adicionado

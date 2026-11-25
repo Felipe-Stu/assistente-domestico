@@ -507,3 +507,17 @@ Fonte: `MEDIDO` com `comparar-modelos-visao.bat` na nota da moto. Com a chave li
 | Erro corrigido | "Via Consumidor" fazia a linha da emissão ser apagada junto com os dados do consumidor | `DADOS`: teste do usuário com a NFC-e do Muffato (data saiu 24/11 em vez de 13/11) |
 | Desconto na foto | Distribuído nos itens quando soma − desconto = valor a pagar | `TESTADO` (Muffato: R$ 149,83 − 43,30 = 106,53) |
 
+## 25. V5.5 — Servidor (25/11/2026)
+
+| Item | O que mudou | Evidência |
+|---|---|---|
+| M25 | `main.py` dividido (laço, documentos); barramento de eventos | `TESTADO` (suíte inteira passa sem mudar os testes do núcleo) |
+| M23 | API Starlette + SSE, tokens por dispositivo, anexos, resumo de gastos | `TESTADO` com uvicorn de verdade (25 verificações + `tests/test_v55_servidor.py`); no PC `NÃO TESTADO` |
+| Electron | Cliente da API (`cliente-api.js`); ponte antiga com `ASSISTENTE_PONTE=stdin` | `TESTADO` com Node contra o servidor; na janela do PC `NÃO TESTADO` |
+| M22 / M28 | Resposta em fluxo; Markdown, botões, erros no chat, CSP | `TESTADO` (formatação); na janela `NÃO TESTADO` |
+| I04 / I06 | Página do celular e painel servidos pela API | `TESTADO` (rotas, tipos, CSP); no celular `NÃO TESTADO` |
+| I07 | Modo demonstração com banco próprio | `TESTADO` (140 compras fictícias criadas; consultas e painel sobre elas) |
+| I05 | Servidor MCP somente leitura (desligado) | `TESTADO` (6 ferramentas registradas no mcp 2.x; consultas sobre banco de teste) |
+
+**Dependências novas no PC:** rodar `instalar-dependencias.bat` antes de abrir (starlette, uvicorn, sse-starlette, python-multipart, mcp, Pillow). Sem elas, o Electron não consegue subir o servidor; `ASSISTENTE_PONTE=stdin` mantém o modo antigo.
+
