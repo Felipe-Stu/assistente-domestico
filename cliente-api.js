@@ -174,6 +174,14 @@ class ClienteApi {
     }
 
     // Desligar o assistente de verdade (botão ⏻): pede ao servidor para encerrar
+    // Leitura com o token local (ex.: resumo de gastos para a coluna da direita)
+    async obterJson(caminho) {
+        if (!this.token) return null;
+        const r = await fetch(`${BASE}${caminho}`, { headers: { Authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(8000) });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+    }
+
     async desligarServidor() {
         this.encerrando = true;
         await this.enviar('shutdown');

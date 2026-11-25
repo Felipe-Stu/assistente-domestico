@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('api', {
 
     // I06: abre o painel de gastos numa janela
     abrirPainel: () => ipcRenderer.send('abrir-painel'),
+    // M28: { resumo, mes } para a coluna da direita, ou null
+    resumoGastos: () => ipcRenderer.invoke('resumo-gastos'),
 
     // M22: texto parcial da resposta enquanto o modelo escreve
     onAssistantDelta: (callback) => {

@@ -154,6 +154,22 @@ ipcMain.on('desligar-assistente', async () => {
 });
 
 // I06: painel de gastos numa janela própria; o token do PC vai num cookie desta sessão (não aparece em URL)
+// M28: resumo do mês para a coluna da direita (null na ponte antiga: a coluna some)
+ipcMain.handle('resumo-gastos', async () => {
+    if (!clienteApi) return null;
+    const hoje = new Date();
+    const mes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    try {
+        const [resumo, detalhe] = await Promise.all([
+            clienteApi.obterJson('/api/gastos/resumo?meses=6'),
+            clienteApi.obterJson(`/api/gastos/detalhe?mes=${mes}`),
+        ]);
+        return resumo && detalhe ? { resumo, mes: detalhe } : null;
+    } catch (erro) {
+        return null;
+    }
+});
+
 ipcMain.on('abrir-painel', async () => {
     if (!clienteApi || !clienteApi.token) {
         sendToRenderer('error', 'O painel precisa do servidor do assistente (modo API).');

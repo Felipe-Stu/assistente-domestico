@@ -23,6 +23,9 @@ let backendState = 'STARTING';
 // =============================================================================
 // Helpers
 // =============================================================================
+const ICONE_PESSOA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+const ICONE_CELULAR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-label="pelo celular"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>';
+
 function getFormattedTime() {
     const now = new Date();
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -71,12 +74,12 @@ function appendMessage(sender, text, retryText = null, opcoes = {}) {
     msgElement.classList.add(sender === 'user' ? 'user-msg' : 'assistant-msg');
     if (sender === 'erro') msgElement.classList.add('erro-msg');
 
-    const avatar = sender === 'user' ? (opcoes.canal === 'celular' ? '📱' : '👤') : (sender === 'erro' ? '⚠️' : '🤖');
+    const avatar = sender === 'user' ? (opcoes.canal === 'celular' ? ICONE_CELULAR : ICONE_PESSOA) : (sender === 'erro' ? '!' : '');
     const timeStr = getFormattedTime();
     const corpo = window.Formatar ? window.Formatar.formatarMensagem(text) : escapeHTML(text);
 
     msgElement.innerHTML = `
-        <div class="msg-avatar">${avatar}</div>
+        <div class="msg-avatar" aria-hidden="${avatar === '' ? 'true' : 'false'}">${avatar}</div>
         <div class="msg-content">
             <div class="msg-texto">${corpo}</div>
             <span class="msg-time">${timeStr}${opcoes.canal === 'celular' ? ' · pelo celular' : ''}</span>
@@ -140,6 +143,69 @@ function handleSendMessage() {
 sendBtn.addEventListener('click', handleSendMessage);
 const painelBtn = document.getElementById('painel-btn');
 if (painelBtn) painelBtn.addEventListener('click', () => window.api.abrirPainel());
+const resumoPainelBtn = document.getElementById('resumo-painel');
+if (resumoPainelBtn) resumoPainelBtn.addEventListener('click', () => window.api.abrirPainel());
+
+// =============================================================================
+// M28: tema escuro (padrão) / claro, guardado nesta janela
+// =============================================================================
+const temaBtn = document.getElementById('tema-btn');
+function aplicarTema(tema) {
+    document.documentElement.dataset.tema = tema;
+    try { localStorage.setItem('tema', tema); } catch (e) { /* sem armazenamento: vale só até fechar */ }
+    if (temaBtn) {
+        const proximo = tema === 'escuro' ? 'claro' : 'escuro';
+        document.getElementById('tema-rotulo').textContent = proximo === 'claro' ? 'Claro' : 'Escuro';
+        temaBtn.setAttribute('aria-label', `Mudar para o tema ${proximo}`);
+    }
+}
+if (temaBtn) {
+    aplicarTema(document.documentElement.dataset.tema === 'claro' ? 'claro' : 'escuro');
+    temaBtn.addEventListener('click', () => aplicarTema(document.documentElement.dataset.tema === 'claro' ? 'escuro' : 'claro'));
+}
+
+// =============================================================================
+// M28: resumo do mês (coluna da direita), lido do servidor
+// =============================================================================
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const reais = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+let resumoEmCurso = false;
+let ultimoResumo = 0;
+
+async function atualizarResumo(forcar = false) {
+    const painel = document.getElementById('resumo');
+    if (!painel || !window.api.resumoGastos || resumoEmCurso) return;
+    if (!forcar && Date.now() - ultimoResumo < 5000) return;
+    resumoEmCurso = true;
+    try {
+        const dados = await window.api.resumoGastos();
+        if (!dados) { painel.hidden = true; return; }   // ponte antiga ou servidor indisponível
+        painel.hidden = false;
+        const { resumo, mes } = dados;
+        const nomeMes = mes.trilha && mes.trilha[0] ? mes.trilha[0].rotulo : 'Este mês';
+        document.getElementById('resumo-mes').textContent = `${nomeMes} até agora`;
+        document.getElementById('resumo-total').textContent = reais(mes.total_centavos);
+        document.getElementById('resumo-compras').textContent = `${mes.compras} ${mes.compras === 1 ? 'compra' : 'compras'}`;
+        const maior = Math.max(1, ...resumo.por_mes.map((m) => m.centavos));
+        const atual = mes.periodo.inicio.slice(0, 7);
+        document.getElementById('resumo-meses').innerHTML = resumo.por_mes.map((m) => {
+            const [ano, n] = m.mes.split('-');
+            return `<div class="barra-mes${m.mes === atual ? ' atual' : ''}" title="${MESES_CURTOS[+n - 1]}/${ano}: ${reais(m.centavos)}">
+                      <span class="coluna" style="height:${(100 * m.centavos / maior).toFixed(1)}%"></span>${MESES_CURTOS[+n - 1]}</div>`;
+        }).join('');
+        const linhas = (mes.linhas || []).slice(0, 4);
+        document.getElementById('resumo-categorias').innerHTML = linhas.length
+            ? linhas.map((l) => `<div class="linha"><span>${escapeHTML(l.rotulo)}</span><b>${reais(l.centavos)}</b></div>`).join('')
+            : '<p class="vazio">Sem compras neste mês.</p>';
+        ultimoResumo = Date.now();
+    } catch (erro) {
+        appendDebug(`Resumo de gastos indisponível: ${erro.message || erro}`, 'error');
+    } finally {
+        resumoEmCurso = false;
+    }
+}
+atualizarResumo(true);
+setInterval(() => atualizarResumo(true), 60000);
 const desligarBtn = document.getElementById('desligar-btn');
 if (desligarBtn) desligarBtn.addEventListener('click', () => window.api.desligarAssistente());
 
@@ -263,7 +329,7 @@ window.api.onStateChanged((data) => {
             statusText.textContent = 'Disponível';
             chatInput.disabled = false;
             sendBtn.disabled = false;
-            chatInput.placeholder = "Digite sua mensagem aqui...";
+            chatInput.placeholder = "Ex.: quanto gastei no Moreschi este mês?";
             break;
         case 'PROCESSING':
             statusDot.classList.add('dot-processing');
@@ -323,6 +389,7 @@ window.api.onAssistantMessage((data) => {
         bolhaEmFluxo = null;
     }
     appendMessage('assistant', text, isObj ? data.tentar_novamente || null : null);
+    atualizarResumo();   // uma compra pode ter sido gravada ou corrigida
 });
 
 // =============================================================================
