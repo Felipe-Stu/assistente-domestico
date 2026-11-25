@@ -222,7 +222,8 @@ def criar_app(enfileirar: Callable[[Dict], None], dispositivos, barramento, *, p
         token = request.query_params.get("token", "")
         if not dispositivos.validar(token):
             return JSONResponse({"erro": "token inválido ou revogado"}, status_code=401)
-        resposta = RedirectResponse(url="/", status_code=303)
+        destino = request.query_params.get("destino", "/")
+        resposta = RedirectResponse(url=destino if destino in ("/", "/painel") else "/", status_code=303)
         seguro = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         resposta.set_cookie(COOKIE, token, max_age=60 * 60 * 24 * 365, httponly=True, samesite="strict", secure=seguro)
         return resposta

@@ -1,8 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-const { ClienteApi } = require('./cliente-api');
+const { ClienteApi, BASE } = require('./cliente-api');
 
 // M23: por padrão o Electron é cliente da API do núcleo. ASSISTENTE_PONTE=stdin volta à ponte antiga.
 const MODO_PONTE = process.env.ASSISTENTE_PONTE === 'stdin';
@@ -139,6 +139,20 @@ function sendToPython(type, payload = {}) {
 // =============================================================================
 // Listeners IPC: Renderer → Main → Python
 // =============================================================================
+
+// I06: painel de gastos numa janela própria; o token do PC vai num cookie desta sessão (não aparece em URL)
+ipcMain.on('abrir-painel', async () => {
+    if (!clienteApi || !clienteApi.token) {
+        sendToRenderer('error', 'O painel precisa do servidor do assistente (modo API).');
+        return;
+    }
+    await session.defaultSession.cookies.set({ url: BASE, name: 'assistente_token', value: clienteApi.token,
+                                               httpOnly: true, sameSite: 'strict' });
+    const janela = new BrowserWindow({ width: 1000, height: 820, title: 'Gastos — Assistente Doméstico',
+                                       webPreferences: { contextIsolation: true, nodeIntegration: false } });
+    janela.setMenuBarVisibility(false);
+    janela.loadURL(`${BASE}/painel`);
+});
 
 // Mensagem de texto do chat
 ipcMain.on('send-text', (event, text) => {

@@ -7,7 +7,11 @@ load_dotenv()
 
 # Caminhos do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_DIR = BASE_DIR / "core" / "database"
+# I07: modo demonstração (ASSISTENTE_DEMO=1): banco, memória, anexos e pastas próprios, com dados fictícios.
+# Serve para gravar vídeos e mostrar o projeto sem expor as compras reais.
+DEMO = os.getenv("ASSISTENTE_DEMO", "0") == "1"
+DB_RAIZ = BASE_DIR / "core" / "database"
+DB_DIR = DB_RAIZ / "demo" if DEMO else DB_RAIZ
 DB_PATH = DB_DIR / "assistente_casa.db"
 CHROMA_DIR = DB_DIR / "chroma_db"
 
@@ -35,15 +39,15 @@ OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")           # quanto tem
 OLLAMA_MODELO_VISAO = os.getenv("OLLAMA_MODELO_VISAO", "qwen2.5vl:7b")   # lê fotos de nota; medição de 24/11: leu loja, data, CNPJ e chave certos (gemma3:4b errou; gemma4 não enxerga imagens no Ollama para Windows)
 
 # Entrada de documentos (notas fiscais em HTML, PDF ou foto)
-ENTRADAS_DIR = Path(os.getenv("ENTRADAS_DIR", str(BASE_DIR.parent / "Entradas")))   # pasta vigiada
-ANEXOS_DIR = Path(os.getenv("ANEXOS_DIR", str(BASE_DIR.parent / "Anexos")))         # originais guardados
+ENTRADAS_DIR = DB_DIR / "entradas" if DEMO else Path(os.getenv("ENTRADAS_DIR", str(BASE_DIR.parent / "Entradas")))   # pasta vigiada
+ANEXOS_DIR = DB_DIR / "anexos" if DEMO else Path(os.getenv("ANEXOS_DIR", str(BASE_DIR.parent / "Anexos")))         # originais guardados
 ENTRADAS_INTERVALO_S = float(os.getenv("ENTRADAS_INTERVALO_S", "5"))
 
 # M23: API do núcleo (servidor). Fica em 127.0.0.1; o acesso de fora de casa passa pelo Tailscale ("tailscale serve").
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
 API_PORTA = int(os.getenv("API_PORTA", "8765"))
-DISPOSITIVOS_ARQUIVO = Path(os.getenv("DISPOSITIVOS_ARQUIVO", str(DB_DIR / "dispositivos.json")))
-TOKEN_LOCAL_ARQUIVO = Path(os.getenv("TOKEN_LOCAL_ARQUIVO", str(DB_DIR / "token-local.txt")))
+DISPOSITIVOS_ARQUIVO = Path(os.getenv("DISPOSITIVOS_ARQUIVO", str(DB_RAIZ / "dispositivos.json")))
+TOKEN_LOCAL_ARQUIVO = Path(os.getenv("TOKEN_LOCAL_ARQUIVO", str(DB_RAIZ / "token-local.txt")))
 RECEBIDOS_DIR = Path(os.getenv("RECEBIDOS_DIR", str(ANEXOS_DIR / "_recebidos")))   # fotos e arquivos enviados pela API
 WEB_DIR = BASE_DIR / "web"
 
@@ -94,11 +98,11 @@ CLAUDE_ASSINATURA_TIMEOUT = int(os.getenv("CLAUDE_ASSINATURA_TIMEOUT", "300"))
 CLAUDE_ESTADO_ASSINATURA_ARQUIVO = DB_DIR / "estado_claude_assinatura.json"
 
 # Ideias de projetos (skill ideias): banco SQLite + um .md por ideia, fora do Git
-IDEIAS_DIR = Path(os.getenv("IDEIAS_DIR", str(BASE_DIR / "Ideias")))
+IDEIAS_DIR = DB_DIR / "ideias" if DEMO else Path(os.getenv("IDEIAS_DIR", str(BASE_DIR / "Ideias")))
 IDEIAS_RETESTE_MIN = int(os.getenv("IDEIAS_RETESTE_MIN", "30"))
 
 # Bot do Telegram para mandar ideias do celular (opcional). Só os chats listados são atendidos.
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = "" if DEMO else os.getenv("TELEGRAM_BOT_TOKEN", "")   # a demonstração não liga o bot real
 TELEGRAM_CHAT_IDS = {int(c) for c in os.getenv("TELEGRAM_CHAT_IDS", "").replace(";", ",").split(",") if c.strip().lstrip("-").isdigit()}
 TELEGRAM_OFFSET_ARQUIVO = DB_DIR / "telegram_offset.json"
 CLAUDE_ESTADO_ARQUIVO = DB_DIR / "estado_claude.json"

@@ -615,3 +615,8 @@ body {
 .btn-neutro { background: #475569; }
 .em-fluxo .msg-texto::after { content: "▍"; animation: piscar 1s steps(1) infinite; }
 @keyframes piscar { 50% { opacity: 0; } }
+
+.status-panel { display: flex; align-items: center; gap: 0.75rem; }
+.btn-painel { background: transparent; color: inherit; border: 1px solid var(--border-color); border-radius: 999px;
+    padding: 0.35rem 0.9rem; cursor: pointer; font-size: 0.85rem; }
+.btn-painel:hover { border-color: var(--color-primary); }

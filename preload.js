@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('api', {
             callback(data);
         });
     },
+    // I06: abre o painel de gastos numa janela
+    abrirPainel: () => ipcRenderer.send('abrir-painel'),
+
     // M22: texto parcial da resposta enquanto o modelo escreve
     onAssistantDelta: (callback) => {
         ipcRenderer.on('assistant-delta', (event, data) => callback(data));

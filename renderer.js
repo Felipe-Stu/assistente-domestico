@@ -138,6 +138,8 @@ function handleSendMessage() {
 }
 
 sendBtn.addEventListener('click', handleSendMessage);
+const painelBtn = document.getElementById('painel-btn');
+if (painelBtn) painelBtn.addEventListener('click', () => window.api.abrirPainel());
 
 // =============================================================================
 // Anexos: botão 📎 e arrastar-e-soltar

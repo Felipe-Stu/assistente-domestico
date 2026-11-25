@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <title>Assistente Doméstico</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/web/icone-192.png">
+    <link rel="apple-touch-icon" href="/web/icone-192.png">
+    <link rel="stylesheet" href="/web/estilo.css">
+</head>
+<body>
+    <header class="topo">
+        <span class="titulo">🏠 Assistente</span>
+        <span id="estado" class="estado">conectando…</span>
+        <a class="link-painel" href="/painel" title="Painel de gastos">📊</a>
+    </header>
+    <main id="mensagens" class="mensagens" aria-live="polite"></main>
+    <div id="aviso" class="aviso" hidden></div>
+    <form id="envio" class="envio" autocomplete="off">
+        <label class="botao-anexo" title="Foto ou arquivo da nota">
+            📷<input id="anexo" type="file" accept="image/*,.pdf,.html,.htm" capture="environment" multiple hidden>
+        </label>
+        <input id="texto" type="text" placeholder="Mensagem ou compra…" enterkeyhint="send">
+        <button id="enviar" type="submit">➤</button>
+    </form>
+    <script src="/web/formatar.js"></script>
+    <script src="/web/app.js"></script>
+</body>
+</html>

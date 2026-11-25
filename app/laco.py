@@ -124,6 +124,10 @@ class LacoDeComandos:
         # =====================================================================
         self._set_estado("READY")
         self._emitir("system_ready")
+        import core.config as config_app
+        if config_app.DEMO:
+            self._emitir("assistant_message", {"text": "🎬 **Modo demonstração**: os dados são fictícios e ficam separados dos reais. "
+                                                        "O bot do Telegram fica desligado."})
         if getattr(self, "_aviso_retomada", False):
             trocas = sum(1 for m in self.sessao.historico if m["role"] == "user" and not m["content"].startswith("Resumo da conversa"))
             self._emitir("assistant_message", {"text": f"Continuei a conversa anterior ({trocas} troca(s) recentes na memória). "
